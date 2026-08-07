@@ -3,10 +3,12 @@ local GUI = {
     titlebar = "compact_inventory_titlebar",
     title = "compact_inventory_title",
     dragger = "compact_inventory_dragger",
+    close = "compact_inventory_close",
     grid = "compact_inventory_grid"
 }
 
 local GRID_COLUMNS = 10
+local SHORTCUT_NAME = "compact-inventory-toggle"
 
 
 local function get_frame(player)
@@ -53,6 +55,16 @@ local function create_gui(player)
     dragger.style.height = 24
     dragger.drag_target = frame
 
+    titlebar.add({
+        type = "sprite-button",
+        name = GUI.close,
+        sprite = "utility/close",
+        hovered_sprite = "utility/close_black",
+        clicked_sprite = "utility/close_black",
+        style = "frame_action_button",
+        tooltip = "Close"
+    })
+
     local grid = frame.add({
         type = "table",
         name = GUI.grid,
@@ -61,7 +73,7 @@ local function create_gui(player)
 
     grid.style.horizontal_spacing = 0
     grid.style.vertical_spacing = 0
-    
+
     frame.auto_center = true
 
     return frame
@@ -101,9 +113,23 @@ local function refresh_gui(player)
 end
 
 
+local function set_gui_visible(player, visible)
+    local frame = get_frame(player)
+
+    if not frame then
+        frame = create_gui(player)
+        refresh_gui(player)
+    end
+
+    frame.visible = visible
+    player.set_shortcut_toggled(SHORTCUT_NAME, visible)
+end
+
+
 local function initialize_player(player)
     create_gui(player)
     refresh_gui(player)
+    set_gui_visible(player, true)
 end
 
 
@@ -122,7 +148,11 @@ end)
 
 
 script.on_event(defines.events.on_player_created, function(event)
-    initialize_player(game.get_player(event.player_index))
+    local player = game.get_player(event.player_index)
+
+    if player then
+        initialize_player(player)
+    end
 end)
 
 
@@ -132,4 +162,33 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
     if player then
         refresh_gui(player)
     end
+end)
+
+
+script.on_event(defines.events.on_gui_click, function(event)
+    if not event.element.valid or event.element.name ~= GUI.close then
+        return
+    end
+
+    local player = game.get_player(event.player_index)
+
+    if player then
+        set_gui_visible(player, false)
+    end
+end)
+
+
+script.on_event(defines.events.on_lua_shortcut, function(event)
+    if event.prototype_name ~= SHORTCUT_NAME then
+        return
+    end
+
+    local player = game.get_player(event.player_index)
+
+    if not player then
+        return
+    end
+
+    local frame = get_frame(player)
+    set_gui_visible(player, not (frame and frame.visible))
 end)
