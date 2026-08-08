@@ -1,14 +1,16 @@
 local GUI = {
-    frame = "compact_inventory_frame",
-    titlebar = "compact_inventory_titlebar",
-    title = "compact_inventory_title",
-    dragger = "compact_inventory_dragger",
-    close = "compact_inventory_close",
-    grid = "compact_inventory_grid"
+    frame = "FooPhoenix.CI.frame",
+    titlebar = "FooPhoenix.CI.titlebar",
+    title = "FooPhoenix.CI.title",
+    dragger = "FooPhoenix.CI.dragger",
+    close = "FooPhoenix.CI.close",
+    grid = "FooPhoenix.CI.grid"
 }
 
+-- [CHANGELOG] 2026.08.08-11:53 Changed UI :: Make internal names more resilient to mod conflicts. --
+
 local GRID_COLUMNS = 10
-local SHORTCUT_NAME = "compact-inventory-toggle"
+local SHORTCUT_NAME = "FooPhoenix.CI.main-window-toggle"
 
 
 local function get_frame(player)

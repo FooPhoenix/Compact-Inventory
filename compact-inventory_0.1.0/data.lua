@@ -1,7 +1,10 @@
+
+-- [CHANGELOG] 2026.08.08-11:53 Changed UI :: Make internal names more resilient to mod conflicts. --
+
 data:extend({
     {
         type = "shortcut",
-        name = "compact-inventory-toggle",
+        name = "FooPhoenix.CI.main-window-toggle",
         action = "lua",
         toggleable = true,
         localised_name = "Compact inventory",
