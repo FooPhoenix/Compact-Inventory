@@ -4,7 +4,7 @@
 data:extend({
     {
         type = "shortcut",
-        name = "FooPhoenix.CI.main-window-toggle",
+        name = "FooPhoenix_CI_main-window-toggle",
         action = "lua",
         toggleable = true,
         localised_name = "Compact inventory",
