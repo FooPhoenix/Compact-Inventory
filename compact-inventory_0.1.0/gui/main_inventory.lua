@@ -6,12 +6,13 @@
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
 local GUI_NAME = {
-    main_frame     = "FooPhoenix_CI_MIW_frame",
-    title_bar      = "FooPhoenix_CI_MIW_titlebar",
-    title          = "FooPhoenix_CI_MIW_title",
-    dragger        = "FooPhoenix_CI_MIW_dragger",
-    close_button   = "FooPhoenix_CI_MIW_close",
-    inventory_grid = "FooPhoenix_CI_MIW_grid"
+    main_frame      = "FooPhoenix_CI_MIW_frame",
+    title_bar       = "FooPhoenix_CI_MIW_titlebar",
+    title           = "FooPhoenix_CI_MIW_title",
+    dragger         = "FooPhoenix_CI_MIW_dragger",
+    close_button    = "FooPhoenix_CI_MIW_close",
+    inventory_grid  = "FooPhoenix_CI_MIW_grid",
+    shortcut_button = "FooPhoenix_CI_main-window-toggle"
 }
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -23,9 +24,9 @@ local GUI_NAME = {
 ---
 --- ### This class groups all functions used to create and manage the main inventory window.
 ---
---- @field player      LuaPlayer          The player that own the window.
---- @field valid       boolean            Whether the window is valid or not.
---- @field object_name string             The object name of the window.
+--- @field private player      LuaPlayer          The player that own the window.
+--- @field         valid       boolean            Whether the window is valid or not.
+--- @field         object_name string             The object name of the window.
 --
 local metatable = { }
 
@@ -45,19 +46,29 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:getFrame()
+function metatable:getPlayer()
 
     assert(self.player and self.player.valid and self.player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
-    assert(self.player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")                                        -- [DEBUG-ONLY] . --
 
-    return self.player.gui.screen[GUI_NAME.main_frame]
+    return self.player
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getFrame()
+
+    local player = self:getPlayer()
+    
+    assert(player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")                                        -- [DEBUG-ONLY] . --
+
+    return player.gui.screen[GUI_NAME.main_frame]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:isValid()                                                    ---@private
     
-    local player = self.player
+    local player = self.player      -- Do not use getPlayer() here because of internal assert !
     
     if not player then
         return false
@@ -79,9 +90,7 @@ end
 function metatable:refresh()
 
     local grid   = self:getFrame()[GUI_NAME.inventory_grid]
-    local player = self.player
-
-    assert(player and player.valid and player.object_name == "LuaPlayer", "Player must exist here !")                    -- [DEBUG-ONLY] . --
+    local player = self:getPlayer()
 
     local inventory = player.get_main_inventory()
 
@@ -119,6 +128,7 @@ function metatable:setVisible(visible)
         self:refresh()
     end
     self:getFrame().visible = visible
+    self:getPlayer().set_shortcut_toggled(GUI_NAME.shortcut_button, visible)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -129,7 +139,7 @@ end
 --- @return boolean      @ The visibility of the window.
 --
 function metatable:isVisible()
-    return self:getFrame().visible
+    return self:getFrame().visible  -- The truth come from the frame, not the shortcut.
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -162,7 +172,8 @@ end
 --
 local factory = {
     exposed_gui_names = {
-        close_button = GUI_NAME.close_button
+        close_button    = GUI_NAME.close_button,
+        shortcut_button = GUI_NAME.shortcut_button
     }
 }
 

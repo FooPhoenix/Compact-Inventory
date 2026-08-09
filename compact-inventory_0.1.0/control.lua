@@ -3,10 +3,6 @@ local WindowsManager = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local SHORTCUT_NAME = "FooPhoenix_CI_main-window-toggle"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 --- ### This function receive a player index or a LuaPlayer and will return both.
 --
 ---@param player integer|LuaPlayer      The player to resolve.
@@ -53,7 +49,7 @@ script.on_configuration_changed(function()
         end
     end
     
-    WindowsManager:initialize()
+    WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -79,14 +75,7 @@ end)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
-    if event.prototype_name == SHORTCUT_NAME then
-
-        local player_index, player = resolve_player(event.player_index)
-        
-        local window = WindowsManager.getWindowMainInventory(player_index)
-        local visible = not window:isVisible()
-        
-        window:setVisible(visible)
-        player.set_shortcut_toggled(SHORTCUT_NAME, visible)
+    if event.prototype_name == WindowsManager.exposed_gui_names.MainInventoryWindow.shortcut_button then
+        WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
     end
 end)
