@@ -1,5 +1,5 @@
 
-local MainInventoryWindowManager = require("gui.main_inventory")
+local WindowsManager = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -7,24 +7,38 @@ local SHORTCUT_NAME = "FooPhoenix_CI_main-window-toggle"
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function initialize_player(player)
+--- ### This function receive a player index or a LuaPlayer and will return both.
+--
+---@param player integer|LuaPlayer      The player to resolve.
+--
+---@return integer                      @ The player index.
+---@return LuaPlayer                    @ The player.
+--
+function resolve_player(player)
 
-    assert(player, "Player must exist here!")    -- [DEBUG-ONLY] . --
+    local player_index
 
-    local window = MainInventoryWindowManager:create(player)
+    assert(player ~= nil)                                                                                                   -- [DEBUG-ONLY] . --
+    assert(type(player) == "number" or type(player) == "table", "You need to provide a index or a LuaObject !" )            -- [DEBUG-ONLY] . --
 
-    storage.windows[player.index] = window
-    window.player.set_shortcut_toggled(SHORTCUT_NAME, true)
+    if type(player) == "number" then
+        assert(player > 0, "Index must be > 0 !")                                                                           -- [DEBUG-ONLY] Paranoiac mode. --
+        player_index = player
+        player = game.get_player(player_index) --[[@as LuaPlayer]]
+        assert(player ~= nil, "Player with index " .. player_index .. " does not exist !" )                                 -- [DEBUG-ONLY] . --
+    else
+        assert(player and player.valid, "You need to provide a valid LuaPlayer !" )                                         -- [DEBUG-ONLY] . --
+        assert(player.object_name == "LuaPlayer", "You do not provided a LuaPlayer !" )                                     -- [DEBUG-ONLY] . --
+        player_index = player.index
+    end
+
+    return player_index, player
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_init(function()
-    
-    storage.windows = { }    ---@type table<integer, MainInventoryWindow>
-    for _, player in pairs(game.players) do
-        initialize_player(player)
-    end
+    WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -32,53 +46,33 @@ end)
 script.on_configuration_changed(function()
     
     -- [DEBUG-ONLY] Used only to reinit the mod for the moment. --
-    
-    local frame
-    
-    local windows = storage.windows or { }
-    
-    -- Remove everything.
-    for index, window in pairs(windows) do
-        window:destroy()
-        windows[index] = nil
-    end
-    
-    storage.windows = { }    ---@type table<integer, MainInventoryWindow>
+
     for _, player in pairs(game.players) do
-        initialize_player(player)
+        for _, frame in pairs(player.gui.screen) do
+            frame.destroy()     -- Very dangerous, but it is only for testing purposes.
+        end
     end
+    
+    WindowsManager:initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_created, function(event)
-    local player = game.get_player(event.player_index)
-
-    initialize_player(player)
+    WindowsManager.initializePlayer(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
-
-    local window = storage.windows[event.player_index]
-
-    assert(window)    -- [DEBUG-ONLY] . --
-    
-    window:refresh()
+    WindowsManager.getWindowMainInventory(event.player_index):refresh()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_click, function(event)
-    if event.element.name == MainInventoryWindowManager.GUI_ELEMENTS.close_button then
-
-        local window = storage.windows[event.player_index]
-
-        assert(window)    -- [DEBUG-ONLY] . --
-
-        window:setVisible(false)
-        window.player.set_shortcut_toggled(SHORTCUT_NAME, false)
+    if event.element.name == WindowsManager.exposed_gui_names.MainInventoryWindow.close_button then
+        WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
     end
 end)
 
@@ -87,12 +81,12 @@ end)
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == SHORTCUT_NAME then
 
-        local window = storage.windows[event.player_index]
-
-        assert(window)    -- [DEBUG-ONLY] . --
+        local player_index, player = resolve_player(event.player_index)
         
-        local visible = not window.player.is_shortcut_toggled(SHORTCUT_NAME)
+        local window = WindowsManager.getWindowMainInventory(player_index)
+        local visible = not window:isVisible()
+        
         window:setVisible(visible)
-        window.player.set_shortcut_toggled(SHORTCUT_NAME, visible)
+        player.set_shortcut_toggled(SHORTCUT_NAME, visible)
     end
 end)
