@@ -1,194 +1,82 @@
-local GUI = {
-    frame = "compact_inventory_frame",
-    titlebar = "compact_inventory_titlebar",
-    title = "compact_inventory_title",
-    dragger = "compact_inventory_dragger",
-    close = "compact_inventory_close",
-    grid = "compact_inventory_grid"
-}
 
-local GRID_COLUMNS = 10
-local SHORTCUT_NAME = "compact-inventory-toggle"
+local WindowsManager = require("gui.windows_manager")
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function get_frame(player)
-    return player.gui.screen[GUI.frame]
-end
+--- ### This function receive a player index or a LuaPlayer and will return both.
+--
+---@param player integer|LuaPlayer      The player to resolve.
+--
+---@return integer                      @ The player index.
+---@return LuaPlayer                    @ The player.
+--
+function resolve_player(player)
 
+    local player_index
 
-local function create_gui(player)
-    local old_frame = get_frame(player)
+    assert(player ~= nil)                                                                                                   -- [DEBUG-ONLY] . --
+    assert(type(player) == "number" or type(player) == "table" or type(player) == "userdata", "You need to provide a index or a LuaObject ! " .. type(player) )            -- [DEBUG-ONLY] . --
 
-    if old_frame then
-        old_frame.destroy()
+    if type(player) == "number" then
+        assert(player > 0, "Index must be > 0 !")                                                                           -- [DEBUG-ONLY] Paranoiac mode. --
+        player_index = player
+        player = game.get_player(player_index) --[[@as LuaPlayer]]
+        assert(player ~= nil, "Player with index " .. player_index .. " does not exist !" )                                 -- [DEBUG-ONLY] . --
+    else
+        assert(player and player.valid, "You need to provide a valid LuaPlayer !" )                                         -- [DEBUG-ONLY] . --
+        assert(player.object_name == "LuaPlayer", "You do not provided a LuaPlayer !" )                                     -- [DEBUG-ONLY] . --
+        player_index = player.index
     end
 
-    local frame = player.gui.screen.add({
-        type = "frame",
-        name = GUI.frame,
-        direction = "vertical"
-    })
-
-    local titlebar = frame.add({
-        type = "flow",
-        name = GUI.titlebar,
-        direction = "horizontal"
-    })
-
-    titlebar.style.horizontal_spacing = 8
-    titlebar.style.horizontally_stretchable = true
-
-    titlebar.add({
-        type = "label",
-        name = GUI.title,
-        caption = "Inventory",
-        style = "frame_title"
-    })
-
-    local dragger = titlebar.add({
-        type = "empty-widget",
-        name = GUI.dragger,
-        style = "draggable_space"
-    })
-
-    dragger.style.horizontally_stretchable = true
-    dragger.style.height = 24
-    dragger.drag_target = frame
-
-    titlebar.add({
-        type = "sprite-button",
-        name = GUI.close,
-        sprite = "utility/close",
-        hovered_sprite = "utility/close_black",
-        clicked_sprite = "utility/close_black",
-        style = "frame_action_button",
-        tooltip = "Close"
-    })
-
-    local grid = frame.add({
-        type = "table",
-        name = GUI.grid,
-        column_count = GRID_COLUMNS
-    })
-
-    grid.style.horizontal_spacing = 0
-    grid.style.vertical_spacing = 0
-
-    frame.auto_center = true
-
-    return frame
+    return player_index, player
 end
 
-
-local function refresh_gui(player)
-    local frame = get_frame(player)
-
-    if not frame then
-        frame = create_gui(player)
-    end
-
-    local grid = frame[GUI.grid]
-    grid.clear()
-
-    local inventory = player.get_main_inventory()
-
-    if not inventory then
-        return
-    end
-
-    for _, item in ipairs(inventory.get_contents()) do
-        grid.add({
-            type = "sprite-button",
-            sprite = "item/" .. item.name,
-            style = "slot_button",
-            number = item.count,
-            quality = item.quality,
-            elem_tooltip = {
-                type = "item-with-quality",
-                name = item.name,
-                quality = item.quality
-            }
-        })
-    end
-end
-
-
-local function set_gui_visible(player, visible)
-    local frame = get_frame(player)
-
-    if not frame then
-        frame = create_gui(player)
-        refresh_gui(player)
-    end
-
-    frame.visible = visible
-    player.set_shortcut_toggled(SHORTCUT_NAME, visible)
-end
-
-
-local function initialize_player(player)
-    create_gui(player)
-    refresh_gui(player)
-    set_gui_visible(player, true)
-end
-
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_init(function()
-    for _, player in pairs(game.players) do
-        initialize_player(player)
-    end
+    WindowsManager.initialize()
 end)
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_configuration_changed(function()
+    
+    -- [DEBUG-ONLY] Used only to reinit the mod for the moment. --
+
     for _, player in pairs(game.players) do
-        initialize_player(player)
+        local screen = player.gui.screen
+        for _, frame in pairs(screen.children) do
+            frame.destroy()     -- Very dangerous, but it is only for testing purposes.
+        end
     end
+    
+    WindowsManager.initialize()
 end)
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_created, function(event)
-    local player = game.get_player(event.player_index)
-
-    if player then
-        initialize_player(player)
-    end
+    WindowsManager.initializePlayer(event.player_index)
 end)
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
-    local player = game.get_player(event.player_index)
-
-    if player then
-        refresh_gui(player)
-    end
+    WindowsManager.getWindowMainInventory(event.player_index):refresh()
 end)
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_click, function(event)
-    if not event.element.valid or event.element.name ~= GUI.close then
-        return
-    end
-
-    local player = game.get_player(event.player_index)
-
-    if player then
-        set_gui_visible(player, false)
+    if event.element.name == WindowsManager.exposed_gui_names.MainInventoryWindow.close_button then
+        WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
     end
 end)
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
-    if event.prototype_name ~= SHORTCUT_NAME then
-        return
+    if event.prototype_name == WindowsManager.exposed_gui_names.MainInventoryWindow.shortcut_button then
+        WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
     end
-
-    local player = game.get_player(event.player_index)
-
-    if not player then
-        return
-    end
-
-    local frame = get_frame(player)
-    set_gui_visible(player, not (frame and frame.visible))
 end)
