@@ -1,4 +1,6 @@
 
+local ItemOrder = require("util.item_order")
+
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -99,6 +101,60 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Sort an item list according to the current sorting mode.
+--
+--- -----
+--- @param window MainInventoryWindow      The window that owns the sorting mode.
+--- @param items table                     The item list in Factorio standard order.
+--
+--- @return table                          @ The item list to display.
+--
+local function metatable_sortItems(window, items)
+
+    assert(window and window.object_name == "LuaMainInventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
+    assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
+
+    if window.sort_mode == SortMode.standard then
+        return items
+    end
+
+    if window.sort_mode ~= SortMode.count_ascending and window.sort_mode ~= SortMode.count_descending then
+        return items
+    end
+
+    local sorted_items    = { }
+    local reference_order = { }
+
+    for index, item in ipairs(items) do
+        sorted_items[index]    = item
+        reference_order[item] = index
+    end
+
+    table.sort(sorted_items, function(item_a, item_b)
+
+        if item_a.count ~= item_b.count then
+            if window.sort_mode == SortMode.count_ascending then
+                return item_a.count < item_b.count
+            else
+                return item_a.count > item_b.count
+            end
+        end
+
+        local order_a = ItemOrder.get(item_a.name)
+        local order_b = ItemOrder.get(item_b.name)
+
+        if order_a ~= order_b then
+            return order_a < order_b
+        end
+
+        return reference_order[item_a] < reference_order[item_b]
+    end)
+
+    return sorted_items
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getPlayer()
 
     assert(self.player and self.player.valid and self.player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
@@ -163,7 +219,10 @@ function metatable:refresh()
         return
     end
 
-    for _, item in ipairs(inventory.get_contents()) do
+    local reference_items = inventory.get_contents()
+    local display_items   = metatable_sortItems(self, reference_items)
+
+    for _, item in ipairs(display_items) do
         grid.add({
             type         = "sprite-button",
             sprite       = "item/" .. item.name,
@@ -189,6 +248,7 @@ end
 function metatable:setSortMode(sort_mode)
     self.sort_mode = sort_mode
     metatable_refreshSortButton(self)
+    self:refresh()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
