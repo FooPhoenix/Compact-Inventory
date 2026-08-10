@@ -1,4 +1,5 @@
 
+local ItemOrder      = require("util.item_order")
 local WindowsManager = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -34,6 +35,7 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_init(function()
+    ItemOrder.initialize()
     WindowsManager.initialize()
 end)
 
@@ -50,6 +52,7 @@ script.on_configuration_changed(function()
         end
     end
     
+    ItemOrder.initialize()
     WindowsManager.initialize()
 end)
 
