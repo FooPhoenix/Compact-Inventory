@@ -77,6 +77,28 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Refresh the buttons state matching the current sorting mode.
+--
+--- -----
+--- @param window MainInventoryWindow      The window to refresh.
+--
+local function metatable_refreshSortButton(window)
+
+    assert(window and window.object_name == "LuaMainInventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
+    assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
+
+    local sort_mode = window.sort_mode
+    local toolbar   = window:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar]
+
+    window:getFrame()[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].sprite = SORT_SPRITE[sort_mode]
+
+    for _, button in pairs(toolbar.children) do
+        button.toggled = ( button.tags[SORT_TAG_NAME] == sort_mode )  -- Just added useless parenthesis, but it is for the sake of readability.
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getPlayer()
 
     assert(self.player and self.player.valid and self.player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
@@ -160,25 +182,7 @@ function metatable:setSortMode(sort_mode)
     assert(SORT_SPRITE[sort_mode], "Invalid sort mode !")      -- [DEBUG-ONLY] . --
 
     self.sort_mode = sort_mode
-    self:activateSortButton(sort_mode)
-    self:getFrame()[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].sprite = SORT_SPRITE[sort_mode]
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
---- ### Activate the button matching the sorting mode and deactivate all others.
---- [_private_]
---
---- -----
---- @param sort_mode SortMode      The sorting mode to activate.
---
-function metatable:activateSortButton(sort_mode)                                 ---@private
-
-    local toolbar = self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar]
-
-    for _, button in pairs(toolbar.children) do
-        button.toggled = button.tags[SORT_TAG_NAME] == sort_mode
-    end
+    metatable_refreshSortButton(self)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -189,7 +193,11 @@ end
 --- @param visible boolean      The visibility of the toolbar.
 --
 function metatable:setToolbarVisibility(visible)
-    self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar].visible = visible
+    
+    local frame = self:getFrame()
+    
+    frame[GUI_NAME.content_flow][GUI_NAME.sort_toolbar].visible     = visible
+    frame[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].toggled = visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -317,7 +325,8 @@ function factory.destroy(player)
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.player = nil
+    window.player    = nil
+    window.sort_mode = nil
 
     storage.windows.main_inventory[player_index] = nil
 end
@@ -417,12 +426,12 @@ function factory.createGUI(window)          ---@private
         })
     end
 
-    addSortButton(GUI_NAME.sort_standard_button, SortMode.standard, "Standard sorting")
-    addSortButton(GUI_NAME.sort_count_asc_button, SortMode.count_ascending, "Sort by quantity ascending")
-    addSortButton(GUI_NAME.sort_count_desc_button, SortMode.count_descending, "Sort by quantity descending")
-    addSortButton(GUI_NAME.sort_inventory_button, SortMode.inventory, "Inventory order")
-    addSortButton(GUI_NAME.sort_last_change_button, SortMode.last_change, "Sort by last change")
-    addSortButton(GUI_NAME.sort_custom_button, SortMode.custom, "Custom sorting")
+    addSortButton(GUI_NAME.sort_standard_button,    SortMode.standard,         "Standard sorting")
+    addSortButton(GUI_NAME.sort_count_asc_button,   SortMode.count_ascending,  "Sort by quantity ascending")
+    addSortButton(GUI_NAME.sort_count_desc_button,  SortMode.count_descending, "Sort by quantity descending")
+    addSortButton(GUI_NAME.sort_inventory_button,   SortMode.inventory,        "Inventory order")
+    addSortButton(GUI_NAME.sort_last_change_button, SortMode.last_change,      "Sort by last change")
+    addSortButton(GUI_NAME.sort_custom_button,      SortMode.custom,           "Custom sorting")
 
     local grid = content.add({
         type         = "table",
@@ -435,8 +444,8 @@ function factory.createGUI(window)          ---@private
 
     frame.auto_center = true
 
-    window:setSortMode(window.sort_mode)
-    window:setToolbarVisibility(true)
+    metatable_refreshSortButton(window)
+    window:setToolbarVisibility(false)
     window:setVisible(true)
 
     return frame
