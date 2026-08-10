@@ -126,7 +126,7 @@ local function metatable_sortItems(window, items)
     local reference_order = { }
 
     for index, item in ipairs(items) do
-        sorted_items[index]    = item
+        sorted_items[index]   = item
         reference_order[item] = index
     end
 
