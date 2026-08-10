@@ -15,7 +15,7 @@ function resolve_player(player)
     local player_index
 
     assert(player ~= nil)                                                                                                   -- [DEBUG-ONLY] . --
-    assert(type(player) == "number" or type(player) == "table", "You need to provide a index or a LuaObject !" )            -- [DEBUG-ONLY] . --
+    assert(type(player) == "number" or type(player) == "table" or type(player) == "userdata", "You need to provide a index or a LuaObject ! " .. type(player) )            -- [DEBUG-ONLY] . --
 
     if type(player) == "number" then
         assert(player > 0, "Index must be > 0 !")                                                                           -- [DEBUG-ONLY] Paranoiac mode. --
@@ -44,7 +44,8 @@ script.on_configuration_changed(function()
     -- [DEBUG-ONLY] Used only to reinit the mod for the moment. --
 
     for _, player in pairs(game.players) do
-        for _, frame in pairs(player.gui.screen) do
+        local screen = player.gui.screen
+        for _, frame in pairs(screen.children) do
             frame.destroy()     -- Very dangerous, but it is only for testing purposes.
         end
     end
