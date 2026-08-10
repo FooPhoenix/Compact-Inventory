@@ -68,8 +68,19 @@ end)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_click, function(event)
-    if event.element.name == WindowsManager.exposed_gui_names.MainInventoryWindow.close_button then
+
+    local gui_names = WindowsManager.exposed_gui_names.MainInventoryWindow
+
+    if event.element.name == gui_names.close_button then
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
+
+    elseif event.element.name == gui_names.sort_toolbar_button then
+        WindowsManager.getWindowMainInventory(event.player_index):toggleToolbarVisibility()
+
+    elseif event.element.tags[gui_names.sort_tag_name] then
+        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
+            event.element.tags[gui_names.sort_tag_name]
+        )
     end
 end)
 
