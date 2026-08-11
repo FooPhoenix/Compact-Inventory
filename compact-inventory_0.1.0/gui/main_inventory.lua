@@ -121,24 +121,23 @@ local function metatable_sortItems(window, inventory, items)
 
     if window.sort_mode == SortMode.inventory then
 
-        local items_by_name = { }
-        local sorted_items  = { }
+        local items_by_order = { }
+        local sorted_items   = { }
 
         for _, item in ipairs(items) do
-            items_by_name[item.name] = items_by_name[item.name] or { }
-            items_by_name[item.name][item.quality] = item
+            items_by_order[ItemOrder.get(item.name, item.quality)] = item
         end
 
         for slot_index = 1, #inventory do
             local stack = inventory[slot_index]
 
             if stack.valid_for_read then
-                local qualities = items_by_name[stack.name]
-                local item      = qualities and qualities[stack.quality.name]
+                local order = ItemOrder.get(stack.name, stack.quality.name)
+                local item  = items_by_order[order]
 
                 if item then
                     sorted_items[#sorted_items + 1] = item
-                    qualities[stack.quality.name] = nil
+                    items_by_order[order] = nil
                 end
             end
         end
@@ -152,12 +151,10 @@ local function metatable_sortItems(window, inventory, items)
         return items
     end
 
-    local sorted_items    = { }
-    local reference_order = { }
+    local sorted_items = { }
 
     for index, item in ipairs(items) do
-        sorted_items[index]   = item
-        reference_order[item] = index
+        sorted_items[index] = item
     end
 
     table.sort(sorted_items, function(item_a, item_b)
@@ -170,14 +167,10 @@ local function metatable_sortItems(window, inventory, items)
             end
         end
 
-        local order_a = ItemOrder.get(item_a.name)
-        local order_b = ItemOrder.get(item_b.name)
+        local order_a = ItemOrder.get(item_a.name, item_a.quality)
+        local order_b = ItemOrder.get(item_b.name, item_b.quality)
 
-        if order_a ~= order_b then
-            return order_a < order_b
-        end
-
-        return reference_order[item_a] < reference_order[item_b]
+        return order_a < order_b
     end)
 
     return sorted_items
