@@ -78,6 +78,45 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Bootstrap an empty state from a real inventory snapshot without recording changes.
+--
+--- -----
+--- @param state table       The player last-change state.
+--- @param items table       The current inventory contents in Factorio standard order.
+--
+--- @return boolean          @ Whether a non-empty baseline was initialized.
+--
+local function bootstrapState(state, items)
+
+    if #items == 0 then
+        return false
+    end
+
+    local previous_id
+
+    for _, item in ipairs(items) do
+        local item_id = ItemOrder.get(item.name, item.quality)
+
+        state.counts[item_id]   = item.count
+        state.previous[item_id] = previous_id
+
+        if previous_id then
+            state.next[previous_id] = item_id
+        else
+            state.first = item_id
+        end
+
+        previous_id = item_id
+    end
+
+    state.last        = previous_id
+    state.initialized = true
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Initialize the last-change state for one player.
 --
 --- -----
@@ -85,41 +124,18 @@ end
 --
 function LastChangeOrder.initializePlayer(player)
 
-    local player_index, player = resolve_player(player)
-    local inventory = player.get_main_inventory()
+    local player_index = resolve_player(player)
 
-    local state = {
-        counts     = { },
-        seen       = { },
-        previous   = { },
-        next       = { },
-        first      = nil,
-        last       = nil,
-        generation = 0
+    storage.last_change_order[player_index] = {
+        counts      = { },
+        seen        = { },
+        previous    = { },
+        next        = { },
+        first       = nil,
+        last        = nil,
+        generation  = 0,
+        initialized = false
     }
-
-    if inventory then
-        local previous_id
-
-        for _, item in ipairs(inventory.get_contents()) do
-            local item_id = ItemOrder.get(item.name, item.quality)
-
-            state.counts[item_id]   = item.count
-            state.previous[item_id] = previous_id
-
-            if previous_id then
-                state.next[previous_id] = item_id
-            else
-                state.first = item_id
-            end
-
-            previous_id = item_id
-        end
-
-        state.last = previous_id
-    end
-
-    storage.last_change_order[player_index] = state
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -155,11 +171,18 @@ function LastChangeOrder.update(player)
         return
     end
 
+    local items = inventory.get_contents()
+
+    if not state.initialized then
+        bootstrapState(state, items)
+        return
+    end
+
     state.generation = state.generation + 1
 
     local generation = state.generation
 
-    for _, item in ipairs(inventory.get_contents()) do
+    for _, item in ipairs(items) do
         local item_id   = ItemOrder.get(item.name, item.quality)
         local old_count = state.counts[item_id]
 
@@ -217,6 +240,10 @@ function LastChangeOrder.sort(player, items)
     local state = storage.last_change_order[player_index]
 
     assert(state, "Last change state does not exist for player " .. player_index .. " !")      -- [DEBUG-ONLY] . --
+
+    if not state.initialized then
+        bootstrapState(state, items)
+    end
 
     local items_by_id  = { }
     local sorted_items = { }
