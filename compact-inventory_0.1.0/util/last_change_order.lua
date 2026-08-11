@@ -4,6 +4,13 @@ local ItemOrder = require("util.item_order")
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
+-- ║ Local Working Buffers.                                                                                         ║ --
+-- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+
+local changed_items = { }
+local changed_delta = { }
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ LastChangeOrder.                                                                                               ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
@@ -142,6 +149,7 @@ function LastChangeOrder.update(player)
     local state = storage.last_change_order[player_index]
 
     assert(state, "Last change state does not exist for player " .. player_index .. " !")      -- [DEBUG-ONLY] . --
+    assert(#changed_items == 0 and next(changed_delta) == nil, "Last change working buffers must be empty !")      -- [DEBUG-ONLY] . --
 
     if not inventory then
         return
@@ -149,9 +157,7 @@ function LastChangeOrder.update(player)
 
     state.generation = state.generation + 1
 
-    local generation    = state.generation
-    local changed_items = { }
-    local changed_delta = { }
+    local generation = state.generation
 
     for _, item in ipairs(inventory.get_contents()) do
         local item_id   = ItemOrder.get(item.name, item.quality)
@@ -189,6 +195,9 @@ function LastChangeOrder.update(player)
 
         detachItem(state, item_id)
         prependItem(state, item_id)
+
+        changed_delta[item_id] = nil
+        changed_items[index]   = nil
     end
 end
 
@@ -209,7 +218,7 @@ function LastChangeOrder.sort(player, items)
 
     assert(state, "Last change state does not exist for player " .. player_index .. " !")      -- [DEBUG-ONLY] . --
 
-    local items_by_id = { }
+    local items_by_id  = { }
     local sorted_items = { }
 
     for _, item in ipairs(items) do
