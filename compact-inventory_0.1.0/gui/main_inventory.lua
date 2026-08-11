@@ -1,5 +1,6 @@
 
-local ItemOrder = require("util.item_order")
+local ItemOrder       = require("util.item_order")
+local LastChangeOrder = require("util.last_change_order")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -145,6 +146,10 @@ local function metatable_sortItems(window, inventory, items)
         assert(#sorted_items == #items, "Inventory sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
 
         return sorted_items
+    end
+
+    if window.sort_mode == SortMode.last_change then
+        return LastChangeOrder.sort(window:getPlayer(), items)
     end
 
     if window.sort_mode ~= SortMode.count_ascending and window.sort_mode ~= SortMode.count_descending then
