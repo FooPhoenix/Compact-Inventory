@@ -1,6 +1,7 @@
 
-local ItemOrder      = require("util.item_order")
-local WindowsManager = require("gui.windows_manager")
+local ItemOrder       = require("util.item_order")
+local LastChangeOrder = require("util.last_change_order")
+local WindowsManager  = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -36,6 +37,7 @@ end
 
 script.on_init(function()
     ItemOrder.initialize()
+    LastChangeOrder.initialize()
     WindowsManager.initialize()
 end)
 
@@ -53,19 +55,27 @@ script.on_configuration_changed(function()
     end
     
     ItemOrder.initialize()
+    LastChangeOrder.initialize()
     WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_created, function(event)
+    LastChangeOrder.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
-    WindowsManager.getWindowMainInventory(event.player_index):refresh()
+    local window = WindowsManager.getWindowMainInventory(event.player_index)
+
+    LastChangeOrder.update(event.player_index)
+
+    if window:isVisible() then
+        window:refresh()
+    end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
