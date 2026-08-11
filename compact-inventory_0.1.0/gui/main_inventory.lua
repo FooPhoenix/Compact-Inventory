@@ -105,17 +105,47 @@ end
 --
 --- -----
 --- @param window MainInventoryWindow      The window that owns the sorting mode.
+--- @param inventory LuaInventory          The inventory used to determine physical slot order.
 --- @param items table                     The item list in Factorio standard order.
 --
 --- @return table                          @ The item list to display.
 --
-local function metatable_sortItems(window, items)
+local function metatable_sortItems(window, inventory, items)
 
     assert(window and window.object_name == "LuaMainInventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
     assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
 
     if window.sort_mode == SortMode.standard then
         return items
+    end
+
+    if window.sort_mode == SortMode.inventory then
+
+        local items_by_name = { }
+        local sorted_items  = { }
+
+        for _, item in ipairs(items) do
+            items_by_name[item.name] = items_by_name[item.name] or { }
+            items_by_name[item.name][item.quality] = item
+        end
+
+        for slot_index = 1, #inventory do
+            local stack = inventory[slot_index]
+
+            if stack.valid_for_read then
+                local qualities = items_by_name[stack.name]
+                local item      = qualities and qualities[stack.quality.name]
+
+                if item then
+                    sorted_items[#sorted_items + 1] = item
+                    qualities[stack.quality.name] = nil
+                end
+            end
+        end
+
+        assert(#sorted_items == #items, "Inventory sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
+
+        return sorted_items
     end
 
     if window.sort_mode ~= SortMode.count_ascending and window.sort_mode ~= SortMode.count_descending then
@@ -220,7 +250,7 @@ function metatable:refresh()
     end
 
     local reference_items = inventory.get_contents()
-    local display_items   = metatable_sortItems(self, reference_items)
+    local display_items   = metatable_sortItems(self, inventory, reference_items)
 
     for _, item in ipairs(display_items) do
         grid.add({
