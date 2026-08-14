@@ -70,6 +70,7 @@ metatable.object_name = "LuaMainInventoryWindow"
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+script.register_metatable("MainInventoryWindowMetatable", metatable)
 metatable.__index = function(self, key)                                         ---@private
     if key == "valid" then
         return metatable.isValid(self)
