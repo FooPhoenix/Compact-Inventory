@@ -1,5 +1,7 @@
 
-local WindowsManager = require("gui.windows_manager")
+local ItemOrder       = require("util.item_order")
+local LastChangeOrder = require("util.last_change_order")
+local WindowsManager  = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -34,6 +36,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_init(function()
+    ItemOrder.initialize()
+    LastChangeOrder.initialize()
     WindowsManager.initialize()
 end)
 
@@ -50,26 +54,46 @@ script.on_configuration_changed(function()
         end
     end
     
+    ItemOrder.initialize()
+    LastChangeOrder.initialize()
     WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_created, function(event)
+    LastChangeOrder.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
-    WindowsManager.getWindowMainInventory(event.player_index):refresh()
+    local window = WindowsManager.getWindowMainInventory(event.player_index)
+
+    LastChangeOrder.update(event.player_index)
+
+    if window:isVisible() then
+        window:refresh()
+    end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_click, function(event)
-    if event.element.name == WindowsManager.exposed_gui_names.MainInventoryWindow.close_button then
+
+    local gui_names = WindowsManager.exposed_gui_names.MainInventoryWindow
+
+    if event.element.name == gui_names.close_button then
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
+
+    elseif event.element.name == gui_names.sort_toolbar_button then
+        WindowsManager.getWindowMainInventory(event.player_index):toggleToolbarVisibility()
+
+    elseif event.element.tags[gui_names.sort_tag_name] then
+        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
+            event.element.tags[gui_names.sort_tag_name]
+        )
     end
 end)
 
