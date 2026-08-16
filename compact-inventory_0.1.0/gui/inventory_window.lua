@@ -9,22 +9,22 @@ local LastChangeOrder = require("util.last_change_order")
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
 local GUI_NAME = {
-    main_frame              = "FooPhoenix_CI_MIW_frame",
-    title_bar               = "FooPhoenix_CI_MIW_titlebar",
-    title                   = "FooPhoenix_CI_MIW_title",
-    dragger                 = "FooPhoenix_CI_MIW_dragger",
-    close_button            = "FooPhoenix_CI_MIW_close",
-    sort_toolbar_button     = "FooPhoenix_CI_MIW_sort-toolbar-button",
-    content_flow            = "FooPhoenix_CI_MIW_content-flow",
-    sort_toolbar            = "FooPhoenix_CI_MIW_sort-toolbar",
-    sort_standard_button    = "FooPhoenix_CI_MIW_sort-standard",
-    sort_count_asc_button   = "FooPhoenix_CI_MIW_sort-count-asc",
-    sort_count_desc_button  = "FooPhoenix_CI_MIW_sort-count-desc",
-    sort_inventory_button   = "FooPhoenix_CI_MIW_sort-inventory",
-    sort_last_change_button = "FooPhoenix_CI_MIW_sort-last-change",
-    sort_custom_button      = "FooPhoenix_CI_MIW_sort-custom",
-    inventory_grid          = "FooPhoenix_CI_MIW_grid",
-    shortcut_button         = "FooPhoenix_CI_main-window-toggle"
+    main_frame              = MOD_PREFIX .. "IW_frame",
+    title_bar               = MOD_PREFIX .. "IW_titlebar",
+    title                   = MOD_PREFIX .. "IW_title",
+    dragger                 = MOD_PREFIX .. "IW_dragger",
+    close_button            = MOD_PREFIX .. "IW_close",
+    sort_toolbar_button     = MOD_PREFIX .. "IW_sort-toolbar-button",
+    content_flow            = MOD_PREFIX .. "IW_content-flow",
+    sort_toolbar            = MOD_PREFIX .. "IW_sort-toolbar",
+    sort_standard_button    = MOD_PREFIX .. "IW_sort-standard",
+    sort_count_asc_button   = MOD_PREFIX .. "IW_sort-count-asc",
+    sort_count_desc_button  = MOD_PREFIX .. "IW_sort-count-desc",
+    sort_inventory_button   = MOD_PREFIX .. "IW_sort-inventory",
+    sort_last_change_button = MOD_PREFIX .. "IW_sort-last-change",
+    sort_custom_button      = MOD_PREFIX .. "IW_sort-custom",
+    inventory_grid          = MOD_PREFIX .. "IW_grid",
+    shortcut_button         = MOD_PREFIX .. "main-window-toggle"
 }
 
 ---@enum SortMode
@@ -38,15 +38,15 @@ local SortMode = {
 }
 
 local SORT_SPRITE = {
-    [SortMode.standard]         = "FooPhoenix_CI_sort-standard",
-    [SortMode.count_ascending]  = "FooPhoenix_CI_sort-count-asc",
-    [SortMode.count_descending] = "FooPhoenix_CI_sort-count-desc",
-    [SortMode.inventory]        = "FooPhoenix_CI_sort-inventory",
-    [SortMode.last_change]      = "FooPhoenix_CI_sort-last-change",
-    [SortMode.custom]           = "FooPhoenix_CI_sort-custom"
+    [SortMode.standard]         = MOD_PREFIX .. "sort-standard",
+    [SortMode.count_ascending]  = MOD_PREFIX .. "sort-count-asc",
+    [SortMode.count_descending] = MOD_PREFIX .. "sort-count-desc",
+    [SortMode.inventory]        = MOD_PREFIX .. "sort-inventory",
+    [SortMode.last_change]      = MOD_PREFIX .. "sort-last-change",
+    [SortMode.custom]           = MOD_PREFIX .. "sort-custom"
 }
 
-local SORT_TAG_NAME = "FooPhoenix_CI_SortID"
+local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventoryWindowMetatable.                                                                                      ║ --
