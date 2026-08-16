@@ -1,5 +1,5 @@
 
-local ItemOrder = require("util.item_order")
+local InventoryViewFactory = require("inventory.inventory_view")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -26,15 +26,7 @@ local GUI_NAME = {
     shortcut_button         = MOD_PREFIX .. "main-window-toggle"
 }
 
----@enum SortMode
-local SortMode = {
-    standard         = 1,
-    count_ascending  = 2,
-    count_descending = 3,
-    inventory        = 4,
-    last_change      = 5,
-    custom           = 6
-}
+local SortMode = InventoryViewFactory.sort_modes
 
 local SORT_SPRITE = {
     [SortMode.standard]         = MOD_PREFIX .. "sort-standard",
@@ -56,11 +48,10 @@ local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 ---
 --- ### This class groups all functions used to create and manage an inventory window.
 ---
---- @field private lua_player  LuaPlayer          The player that owns the window.
---- @field private inventory   Inventory          The logical inventory displayed by the window.
---- @field private sort_mode   SortMode           The current sorting mode.
---- @field         valid       boolean            Whether the window is valid or not.
---- @field         object_name string             The object name of the window.
+--- @field private lua_player     LuaPlayer       The player that owns the window.
+--- @field private inventory_view InventoryView   The inventory projection displayed by the window.
+--- @field         valid          boolean         Whether the window is valid or not.
+--- @field         object_name    string          The object name of the window.
 ---
 --
 local metatable = { }
@@ -89,10 +80,9 @@ end
 --
 local function metatable_refreshSortButton(window)
 
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
-    assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
 
-    local sort_mode = window.sort_mode
+    local sort_mode = window:getInventoryView():getSortMode()
     local toolbar   = window:getToolbar()
 
     window:getFrame()[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].sprite = SORT_SPRITE[sort_mode]
@@ -100,92 +90,6 @@ local function metatable_refreshSortButton(window)
     for _, button in pairs(toolbar.children) do
         button.toggled = ( button.tags[SORT_TAG_NAME] == sort_mode )  -- Just added useless parenthesis, but it is for the sake of readability.
     end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
---- ### Sort an item list according to the current sorting mode.
---
---- -----
---- @param window InventoryWindow      The window that owns the sorting mode.
---- @param inventory Inventory         The logical inventory used by inventory-dependent sorting modes.
---- @param items table                 The item list in Factorio standard order.
---
---- @return table                      @ The item list to display.
---
-local function metatable_sortItems(window, inventory, items)
-
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
-    assert(inventory and inventory.object_name == "Inventory", "Window must have a valid Inventory !")                  -- [DEBUG-ONLY] . --
-    assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
-
-    if window.sort_mode == SortMode.standard then
-        return items
-    end
-
-    if window.sort_mode == SortMode.inventory then
-
-        local items_by_order = { }
-        local sorted_items   = { }
-
-        for _, item in ipairs(items) do
-            items_by_order[ItemOrder.get(item.name, item.quality)] = item
-        end
-
-        for _, lua_inventory in ipairs(inventory:getSource():getInventories()) do
-            if lua_inventory.valid then
-                for slot_index = 1, #lua_inventory do
-                    local stack = lua_inventory[slot_index]
-
-                    if stack.valid_for_read then
-                        local order = ItemOrder.get(stack.name, stack.quality.name)
-                        local item  = items_by_order[order]
-
-                        if item then
-                            sorted_items[#sorted_items + 1] = item
-                            items_by_order[order] = nil
-                        end
-                    end
-                end
-            end
-        end
-
-        assert(#sorted_items == #items, "Inventory sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
-
-        return sorted_items
-    end
-
-    if window.sort_mode == SortMode.last_change then
-        return inventory:sortByLastChange(items)
-    end
-
-    if window.sort_mode ~= SortMode.count_ascending and window.sort_mode ~= SortMode.count_descending then
-        return items
-    end
-
-    local sorted_items = { }
-
-    for index, item in ipairs(items) do
-        sorted_items[index] = item
-    end
-
-    table.sort(sorted_items, function(item_a, item_b)
-
-        if item_a.count ~= item_b.count then
-            if window.sort_mode == SortMode.count_ascending then
-                return item_a.count < item_b.count
-            else
-                return item_a.count > item_b.count
-            end
-        end
-
-        local order_a = ItemOrder.get(item_a.name, item_a.quality)
-        local order_b = ItemOrder.get(item_b.name, item_b.quality)
-
-        return order_a < order_b
-    end)
-
-    return sorted_items
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -199,11 +103,11 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:getInventory()
+function metatable:getInventoryView()
 
-    assert(self.inventory and self.inventory.object_name == "Inventory", "Inventory must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(self.inventory_view and self.inventory_view.object_name == "InventoryView", "InventoryView must be valid here !")      -- [DEBUG-ONLY] . --
 
-    return self.inventory
+    return self.inventory_view
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -212,7 +116,7 @@ function metatable:getFrame()
 
     local lua_player = self:getPlayer()
 
-    assert(lua_player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")                                        -- [DEBUG-ONLY] . --
+    assert(lua_player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")      -- [DEBUG-ONLY] . --
 
     return lua_player.gui.screen[GUI_NAME.main_frame]
 end
@@ -221,7 +125,7 @@ end
 
 function metatable:getToolbar()
 
-    assert(self:getFrame()[GUI_NAME.content_flow] and self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar], "GUI toolbar does not exist!")                                        -- [DEBUG-ONLY] . --
+    assert(self:getFrame()[GUI_NAME.content_flow] and self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar], "GUI toolbar does not exist!")      -- [DEBUG-ONLY] . --
 
     return self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar]
 end
@@ -240,7 +144,7 @@ function metatable:isValid()                                                    
 
     assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] In any way this should never happen. --
 
-    if not self.inventory or self.inventory.object_name ~= "Inventory" then
+    if not self.inventory_view or self.inventory_view.object_name ~= "InventoryView" then
         return false
     end
 
@@ -255,16 +159,12 @@ end
 
 function metatable:refresh()
 
-    local content   = self:getFrame()[GUI_NAME.content_flow]
-    local grid      = content[GUI_NAME.inventory_grid]
-    local inventory = self:getInventory()
+    local content = self:getFrame()[GUI_NAME.content_flow]
+    local grid    = content[GUI_NAME.inventory_grid]
 
     grid.clear()
 
-    local reference_items = inventory:getContent()
-    local display_items   = metatable_sortItems(self, inventory, reference_items)
-
-    for _, item in ipairs(display_items) do
+    for _, item in ipairs(self:getInventoryView():getContent()) do
         grid.add({
             type         = "sprite-button",
             sprite       = "item/" .. item.name,
@@ -288,7 +188,7 @@ end
 --- @param sort_mode SortMode      The sorting mode to activate.
 --
 function metatable:setSortMode(sort_mode)
-    self.sort_mode = sort_mode
+    self:getInventoryView():setSortMode(sort_mode)
     metatable_refreshSortButton(self)
     self:refresh()
 end
@@ -409,16 +309,15 @@ function factory.create(player, inventory)
 
     ---@diagnostic disable-next-line: missing-fields
     local window = {                                        ---@type InventoryWindow
-        lua_player = lua_player,
-        inventory  = inventory,
-        sort_mode  = SortMode.standard
+        lua_player     = lua_player,
+        inventory_view = InventoryViewFactory.new(inventory)
     }
 
     setmetatable(window, metatable)
 
     factory.createGUI(window)
 
-    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists!")    -- [DEBUG-ONLY] . --
+    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists!")      -- [DEBUG-ONLY] . --
 
     storage.windows.main_inventory[player_index] = window
 
@@ -432,15 +331,14 @@ function factory.destroy(player)
     local player_index, lua_player = resolve_player(player)
     local window = storage.windows.main_inventory[player_index]                 ---@type InventoryWindow
 
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                              -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                                  -- [DEBUG-ONLY] . --
     assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.lua_player == lua_player, "Player must be the same as the window one !")                                            -- [DEBUG-ONLY] . --
+    assert(window.lua_player == lua_player, "Player must be the same as the window one !")                                                -- [DEBUG-ONLY] . --
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.lua_player = nil
-    window.inventory  = nil
-    window.sort_mode  = nil
+    window.lua_player     = nil
+    window.inventory_view = nil
 
     storage.windows.main_inventory[player_index] = nil
 end
@@ -457,9 +355,9 @@ end
 --
 function factory.createGUI(window)          ---@private
 
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                               -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                                  -- [DEBUG-ONLY] . --
     assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists!")                                     -- [DEBUG-ONLY] . --
+    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists!")                                        -- [DEBUG-ONLY] . --
 
     local frame = window.lua_player.gui.screen.add({
         type      = "frame",
@@ -496,7 +394,7 @@ function factory.createGUI(window)          ---@private
     title_bar.add({
         type    = "sprite-button",
         name    = GUI_NAME.sort_toolbar_button,
-        sprite  = SORT_SPRITE[window.sort_mode],
+        sprite  = SORT_SPRITE[window:getInventoryView():getSortMode()],
         style   = "frame_action_button",
         tooltip = "Sorting"
     })
