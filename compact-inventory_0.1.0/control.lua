@@ -1,7 +1,11 @@
 
+MOD_PREFIX = "FooPhoenix_CI_"
+
 local ItemOrder       = require("util.item_order")
 local LastChangeOrder = require("util.last_change_order")
 local WindowsManager  = require("gui.windows_manager")
+
+require("inventory.inventory_source")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
