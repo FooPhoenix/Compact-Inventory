@@ -89,7 +89,7 @@ end)
 
 script.on_event(defines.events.on_gui_click, function(event)
 
-    local gui_names = WindowsManager.exposed_gui_names.MainInventoryWindow
+    local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
 
     if event.element.name == gui_names.close_button then
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
@@ -107,7 +107,7 @@ end)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
-    if event.prototype_name == WindowsManager.exposed_gui_names.MainInventoryWindow.shortcut_button then
+    if event.prototype_name == WindowsManager.exposed_gui_names.InventoryWindow.shortcut_button then
         WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
     end
 end)
