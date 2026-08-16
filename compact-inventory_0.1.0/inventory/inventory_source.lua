@@ -45,6 +45,7 @@ function metatable:containsInventory(lua_inventory)
 
     assert(lua_inventory ~= nil, "LuaInventory cannot be nil !")                                                       -- [DEBUG-ONLY] . --
     assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "LuaInventory must be a LuaObject !")  -- [DEBUG-ONLY] . --
+    assert(lua_inventory.valid, "LuaInventory must be valid !")                                                        -- [DEBUG-ONLY] . --
     assert(lua_inventory.object_name == "LuaInventory", "LuaInventory must be a LuaInventory !")                       -- [DEBUG-ONLY] . --
 
     for _, source_lua_inventory in ipairs(self.lua_inventories) do
@@ -98,8 +99,8 @@ function factory.new(...)
 
         assert(lua_inventory ~= nil, "InventorySource cannot contain nil LuaInventory !")                              -- [DEBUG-ONLY] . --
         assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "InventorySource can only contain LuaObject !")  -- [DEBUG-ONLY] . --
-        assert(lua_inventory.object_name == "LuaInventory", "InventorySource can only contain LuaInventory !")         -- [DEBUG-ONLY] . --
         assert(lua_inventory.valid, "InventorySource can only contain valid LuaInventory !")                            -- [DEBUG-ONLY] . --
+        assert(lua_inventory.object_name == "LuaInventory", "InventorySource can only contain LuaInventory !")         -- [DEBUG-ONLY] . --
     end
 
     local source = {                                     ---@type InventorySource
