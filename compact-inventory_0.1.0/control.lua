@@ -2,7 +2,6 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder               = require("util.item_order")
-local LastChangeOrder         = require("util.last_change_order")
 local WindowsManager          = require("gui.windows_manager")
 local InventorySourceFactory  = require("inventory.inventory_source")
 local InventoryManagerFactory = require("inventory.inventory_manager")
@@ -41,44 +40,45 @@ end
 
 script.on_init(function()
     ItemOrder.initialize()
-    LastChangeOrder.initialize()
-    WindowsManager.initialize()
     InventoryManagerFactory.initialize()
+    WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_configuration_changed(function()
-    
+
     -- [DEBUG-ONLY] Used only to reinit the mod for the moment. --
 
-    for _, player in pairs(game.players) do
-        local screen = player.gui.screen
+    for _, lua_player in pairs(game.players) do
+        local screen = lua_player.gui.screen
         for _, frame in pairs(screen.children) do
             frame.destroy()     -- Very dangerous, but it is only for testing purposes.
         end
     end
-    
+
     ItemOrder.initialize()
-    LastChangeOrder.initialize()
-    WindowsManager.initialize()
     InventoryManagerFactory.initialize()
+    WindowsManager.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_created, function(event)
-    LastChangeOrder.initializePlayer(event.player_index)
-    WindowsManager.initializePlayer(event.player_index)
     InventoryManagerFactory.initializePlayer(event.player_index)
+    WindowsManager.initializePlayer(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
+    local _, lua_player = resolve_player(event.player_index)
+    local lua_inventory = lua_player.get_main_inventory()
     local window = WindowsManager.getWindowMainInventory(event.player_index)
 
-    LastChangeOrder.update(event.player_index)
+    if lua_inventory then
+        InventoryManagerFactory.get(lua_player):updateInventory(lua_inventory)
+    end
 
     if window:isVisible() then
         window:refresh()
