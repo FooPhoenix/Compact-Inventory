@@ -1,6 +1,5 @@
 
-local ItemOrder       = require("util.item_order")
-local LastChangeOrder = require("util.last_change_order")
+local ItemOrder = require("util.item_order")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -57,10 +56,12 @@ local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 ---
 --- ### This class groups all functions used to create and manage an inventory window.
 ---
---- @field private player      LuaPlayer          The player that own the window.
+--- @field private lua_player  LuaPlayer          The player that owns the window.
+--- @field private inventory   Inventory          The logical inventory displayed by the window.
 --- @field private sort_mode   SortMode           The current sorting mode.
 --- @field         valid       boolean            Whether the window is valid or not.
 --- @field         object_name string             The object name of the window.
+---
 --
 local metatable = { }
 
@@ -107,14 +108,15 @@ end
 --
 --- -----
 --- @param window InventoryWindow      The window that owns the sorting mode.
---- @param inventory LuaInventory     The inventory used to determine physical slot order.
---- @param items table                The item list in Factorio standard order.
+--- @param inventory Inventory         The logical inventory used by inventory-dependent sorting modes.
+--- @param items table                 The item list in Factorio standard order.
 --
---- @return table                     @ The item list to display.
+--- @return table                      @ The item list to display.
 --
 local function metatable_sortItems(window, inventory, items)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                  -- [DEBUG-ONLY] . --
+    assert(inventory and inventory.object_name == "Inventory", "Window must have a valid Inventory !")                  -- [DEBUG-ONLY] . --
     assert(type(window.sort_mode) == "number" and window.sort_mode >= 1 and window.sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")   -- [DEBUG-ONLY] . --
 
     if window.sort_mode == SortMode.standard then
@@ -130,16 +132,20 @@ local function metatable_sortItems(window, inventory, items)
             items_by_order[ItemOrder.get(item.name, item.quality)] = item
         end
 
-        for slot_index = 1, #inventory do
-            local stack = inventory[slot_index]
+        for _, lua_inventory in ipairs(inventory:getSource():getInventories()) do
+            if lua_inventory.valid then
+                for slot_index = 1, #lua_inventory do
+                    local stack = lua_inventory[slot_index]
 
-            if stack.valid_for_read then
-                local order = ItemOrder.get(stack.name, stack.quality.name)
-                local item  = items_by_order[order]
+                    if stack.valid_for_read then
+                        local order = ItemOrder.get(stack.name, stack.quality.name)
+                        local item  = items_by_order[order]
 
-                if item then
-                    sorted_items[#sorted_items + 1] = item
-                    items_by_order[order] = nil
+                        if item then
+                            sorted_items[#sorted_items + 1] = item
+                            items_by_order[order] = nil
+                        end
+                    end
                 end
             end
         end
@@ -150,7 +156,7 @@ local function metatable_sortItems(window, inventory, items)
     end
 
     if window.sort_mode == SortMode.last_change then
-        return LastChangeOrder.sort(window:getPlayer(), items)
+        return inventory:sortByLastChange(items)
     end
 
     if window.sort_mode ~= SortMode.count_ascending and window.sort_mode ~= SortMode.count_descending then
@@ -186,20 +192,29 @@ end
 
 function metatable:getPlayer()
 
-    assert(self.player and self.player.valid and self.player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(self.lua_player and self.lua_player.valid and self.lua_player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
 
-    return self.player
+    return self.lua_player
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getInventory()
+
+    assert(self.inventory and self.inventory.object_name == "Inventory", "Inventory must be valid here !")      -- [DEBUG-ONLY] . --
+
+    return self.inventory
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getFrame()
 
-    local player = self:getPlayer()
+    local lua_player = self:getPlayer()
 
-    assert(player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")                                        -- [DEBUG-ONLY] . --
+    assert(lua_player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")                                        -- [DEBUG-ONLY] . --
 
-    return player.gui.screen[GUI_NAME.main_frame]
+    return lua_player.gui.screen[GUI_NAME.main_frame]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -215,17 +230,21 @@ end
 
 function metatable:isValid()                                                    ---@private
 
-    local player = self.player      -- Do not use getPlayer() here because of internal assert !
+    local lua_player = self.lua_player      -- Do not use getPlayer() here because of internal assert !
 
-    if not player then
+    if not lua_player then
         return false
-    elseif not player.valid then
+    elseif not lua_player.valid then
         return false
     end
 
-    assert(player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] In any way this should never happen. --
+    assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] In any way this should never happen. --
 
-    if not player.gui.screen[GUI_NAME.main_frame] then
+    if not self.inventory or self.inventory.object_name ~= "Inventory" then
+        return false
+    end
+
+    if not lua_player.gui.screen[GUI_NAME.main_frame] then
         return false
     end
 
@@ -236,19 +255,13 @@ end
 
 function metatable:refresh()
 
-    local content = self:getFrame()[GUI_NAME.content_flow]
-    local grid    = content[GUI_NAME.inventory_grid]
-    local player  = self:getPlayer()
-
-    local inventory = player.get_main_inventory()
+    local content   = self:getFrame()[GUI_NAME.content_flow]
+    local grid      = content[GUI_NAME.inventory_grid]
+    local inventory = self:getInventory()
 
     grid.clear()
 
-    if not inventory then
-        return
-    end
-
-    local reference_items = inventory.get_contents()
+    local reference_items = inventory:getContent()
     local display_items   = metatable_sortItems(self, inventory, reference_items)
 
     for _, item in ipairs(display_items) do
@@ -383,27 +396,31 @@ local factory = {
 --- ### Create a new inventory window.
 --
 --- -----
---- @param player LuaPlayer      The player that will own the window.
+--- @param player integer|LuaPlayer      The player that will own the window.
+--- @param inventory Inventory           The logical inventory displayed by the window.
 --
---- @return InventoryWindow      @ Returns the created window.
+--- @return InventoryWindow              @ Returns the created window.
 --
-function factory.create(player)
+function factory.create(player, inventory)
 
-    local player_index, player = resolve_player(player)
+    local player_index, lua_player = resolve_player(player)
+
+    assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     ---@diagnostic disable-next-line: missing-fields
     local window = {                                        ---@type InventoryWindow
-        player    = player,
-        sort_mode = SortMode.standard
+        lua_player = lua_player,
+        inventory  = inventory,
+        sort_mode  = SortMode.standard
     }
 
     setmetatable(window, metatable)
 
     factory.createGUI(window)
 
-    assert(storage.windows.main_inventory[player.index] == nil, "Inventory window already exists!")    -- [DEBUG-ONLY] . --
+    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists!")    -- [DEBUG-ONLY] . --
 
-    storage.windows.main_inventory[player.index] = window
+    storage.windows.main_inventory[player_index] = window
 
     return window
 end
@@ -412,17 +429,18 @@ end
 
 function factory.destroy(player)
 
-    local player_index, player = resolve_player(player)
+    local player_index, lua_player = resolve_player(player)
     local window = storage.windows.main_inventory[player_index]                 ---@type InventoryWindow
 
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                 -- [DEBUG-ONLY] . --
-    assert(window.player and window.player.valid and window.player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.player == player, "Player must be the same as the window one !")                                          -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                              -- [DEBUG-ONLY] . --
+    assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
+    assert(window.lua_player == lua_player, "Player must be the same as the window one !")                                            -- [DEBUG-ONLY] . --
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.player    = nil
-    window.sort_mode = nil
+    window.lua_player = nil
+    window.inventory  = nil
+    window.sort_mode  = nil
 
     storage.windows.main_inventory[player_index] = nil
 end
@@ -439,11 +457,11 @@ end
 --
 function factory.createGUI(window)          ---@private
 
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                       -- [DEBUG-ONLY] . --
-    assert(window.player and window.player.valid and window.player.object_name == "LuaPlayer", "Player must exist here !")    -- [DEBUG-ONLY] . --
-    assert(window.player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists!")                                 -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                               -- [DEBUG-ONLY] . --
+    assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
+    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists!")                                     -- [DEBUG-ONLY] . --
 
-    local frame = window.player.gui.screen.add({
+    local frame = window.lua_player.gui.screen.add({
         type      = "frame",
         name      = GUI_NAME.main_frame,
         direction = "vertical"
