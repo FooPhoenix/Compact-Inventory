@@ -1,12 +1,11 @@
 
 MOD_PREFIX = "FooPhoenix_CI_"
 
-local ItemOrder        = require("util.item_order")
-local LastChangeOrder  = require("util.last_change_order")
-local WindowsManager   = require("gui.windows_manager")
-local InventoryManager = require("inventory.inventory_manager")
-
-require("inventory.inventory_source")
+local ItemOrder               = require("util.item_order")
+local LastChangeOrder         = require("util.last_change_order")
+local WindowsManager          = require("gui.windows_manager")
+local InventorySourceFactory  = require("inventory.inventory_source")
+local InventoryManagerFactory = require("inventory.inventory_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -44,7 +43,7 @@ script.on_init(function()
     ItemOrder.initialize()
     LastChangeOrder.initialize()
     WindowsManager.initialize()
-    InventoryManager.initialize()
+    InventoryManagerFactory.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -63,7 +62,7 @@ script.on_configuration_changed(function()
     ItemOrder.initialize()
     LastChangeOrder.initialize()
     WindowsManager.initialize()
-    InventoryManager.initialize()
+    InventoryManagerFactory.initialize()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -71,7 +70,7 @@ end)
 script.on_event(defines.events.on_player_created, function(event)
     LastChangeOrder.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
-    InventoryManager.initializePlayer(event.player_index)
+    InventoryManagerFactory.initializePlayer(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
