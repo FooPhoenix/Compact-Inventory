@@ -11,6 +11,7 @@
 --- ### This class groups all functions used to manage an inventory source.
 ---
 --- @field private lua_inventories LuaInventory[]       The LuaInventory contained in the source.
+--- @field private inventory       Inventory?            The Inventory currently monitoring the source.
 ---
 --
 local metatable = { }
@@ -70,6 +71,7 @@ end
 --- ### This class represents a logical inventory source containing zero or more LuaInventory.
 ---
 --- @field private lua_inventories LuaInventory[]      The LuaInventory contained in the source.
+--- @field private inventory       Inventory?          The Inventory currently monitoring the source.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
