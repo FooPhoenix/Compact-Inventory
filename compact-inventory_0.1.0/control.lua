@@ -2,9 +2,8 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder               = require("util.item_order")
-local WindowsManager          = require("gui.windows_manager")
-local InventorySourceFactory  = require("inventory.inventory_source")
 local InventoryManagerFactory = require("inventory.inventory_manager")
+local WindowsManager          = require("gui.windows_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
