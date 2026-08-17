@@ -1,5 +1,6 @@
 
 local InventoryViewFactory = require("inventory.inventory_view")
+local ItemGroupFactory      = require("gui.item_group")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -48,10 +49,10 @@ local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 ---
 --- ### This class groups all functions used to create and manage an inventory window.
 ---
---- @field private lua_player     LuaPlayer       The player that owns the window.
---- @field private inventory_view InventoryView   The inventory projection displayed by the window.
---- @field         valid          boolean         Whether the window is valid or not.
---- @field         object_name    string          The object name of the window.
+--- @field private lua_player  LuaPlayer       The player that owns the window.
+--- @field private item_groups ItemGroup[]     The ordered item groups displayed by the window.
+--- @field         valid       boolean         Whether the window is valid or not.
+--- @field         object_name string          The object name of the window.
 ---
 --
 local metatable = { }
@@ -82,7 +83,7 @@ local function metatable_refreshSortButton(window)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
 
-    local sort_mode = window:getInventoryView():getSortMode()
+    local sort_mode = window:getDefaultItemGroup():getSortMode()
     local toolbar   = window:getToolbar()
 
     window:getFrame()[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].sprite = SORT_SPRITE[sort_mode]
@@ -103,11 +104,32 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:getInventoryView()
+--- ### Get all item groups displayed by the window.
+--
+--- -----
+--- @return ItemGroup[]      @ The ordered item groups displayed by the window.
+--
+function metatable:getItemGroups()
 
-    assert(self.inventory_view and self.inventory_view.object_name == "InventoryView", "InventoryView must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(self.item_groups and #self.item_groups > 0, "InventoryWindow must contain at least one ItemGroup !")      -- [DEBUG-ONLY] . --
 
-    return self.inventory_view
+    return self.item_groups
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the default item group of the window.
+--
+--- -----
+--- @return ItemGroup      @ The default item group.
+--
+function metatable:getDefaultItemGroup()
+
+    local item_group = self:getItemGroups()[1]
+
+    assert(item_group and item_group.object_name == "ItemGroup", "Default ItemGroup must be valid here !")      -- [DEBUG-ONLY] . --
+
+    return item_group
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -144,8 +166,14 @@ function metatable:isValid()                                                    
 
     assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] In any way this should never happen. --
 
-    if not self.inventory_view or self.inventory_view.object_name ~= "InventoryView" then
+    if not self.item_groups or #self.item_groups == 0 then
         return false
+    end
+
+    for _, item_group in ipairs(self.item_groups) do
+        if not item_group or item_group.object_name ~= "ItemGroup" then
+            return false
+        end
     end
 
     if not lua_player.gui.screen[GUI_NAME.main_frame] then
@@ -164,31 +192,33 @@ function metatable:refresh()
 
     grid.clear()
 
-    for _, item in ipairs(self:getInventoryView():getContent()) do
-        grid.add({
-            type         = "sprite-button",
-            sprite       = "item/" .. item.name,
-            style        = "slot_button",
-            number       = item.count,
-            quality      = item.quality,
-            elem_tooltip = {
-                type    = "item-with-quality",
-                name    = item.name,
-                quality = item.quality
-            }
-        })
+    for _, item_group in ipairs(self:getItemGroups()) do
+        for _, item in ipairs(item_group:getContent()) do
+            grid.add({
+                type         = "sprite-button",
+                sprite       = "item/" .. item.name,
+                style        = "slot_button",
+                number       = item.count,
+                quality      = item.quality,
+                elem_tooltip = {
+                    type    = "item-with-quality",
+                    name    = item.name,
+                    quality = item.quality
+                }
+            })
+        end
     end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set the sorting mode.
+--- ### Set the sorting mode of the default item group.
 --
 --- -----
 --- @param sort_mode SortMode      The sorting mode to activate.
 --
 function metatable:setSortMode(sort_mode)
-    self:getInventoryView():setSortMode(sort_mode)
+    self:getDefaultItemGroup():setSortMode(sort_mode)
     metatable_refreshSortButton(self)
     self:refresh()
 end
@@ -309,8 +339,10 @@ function factory.create(player, inventory)
 
     ---@diagnostic disable-next-line: missing-fields
     local window = {                                        ---@type InventoryWindow
-        lua_player     = lua_player,
-        inventory_view = InventoryViewFactory.new(inventory)
+        lua_player  = lua_player,
+        item_groups = {
+            ItemGroupFactory.new(inventory)
+        }
     }
 
     setmetatable(window, metatable)
@@ -337,8 +369,8 @@ function factory.destroy(player)
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.lua_player     = nil
-    window.inventory_view = nil
+    window.lua_player  = nil
+    window.item_groups = nil
 
     storage.windows.main_inventory[player_index] = nil
 end
@@ -394,7 +426,7 @@ function factory.createGUI(window)          ---@private
     title_bar.add({
         type    = "sprite-button",
         name    = GUI_NAME.sort_toolbar_button,
-        sprite  = SORT_SPRITE[window:getInventoryView():getSortMode()],
+        sprite  = SORT_SPRITE[window:getDefaultItemGroup():getSortMode()],
         style   = "frame_action_button",
         tooltip = "Sorting"
     })
