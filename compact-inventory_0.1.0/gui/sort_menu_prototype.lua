@@ -6,9 +6,8 @@ local InventoryViewFactory = require("inventory.inventory_view")
 local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
-    sort_toolbar_button = MOD_PREFIX .. "IW_sort-toolbar-button",
-    sort_menu           = MOD_PREFIX .. "IW_sort-menu",
-    sort_menu_entries   = MOD_PREFIX .. "IW_sort-menu-entries"
+    sort_menu         = MOD_PREFIX .. "IW_sort-menu",
+    sort_menu_entries = MOD_PREFIX .. "IW_sort-menu-entries"
 }
 
 local SORT_SPRITE = {
@@ -106,13 +105,7 @@ function factory.attach(window)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
 
-    local sort_button = window:getFrame()[MOD_PREFIX .. "IW_titlebar"][GUI_NAME.sort_toolbar_button]
-
-    assert(sort_button, "InventoryWindow sort button must exist here !")      -- [DEBUG-ONLY] . --
-
-    sort_button.visible = true
     window:getToolbar().visible = false
-
     factory.close(window:getPlayer())
 end
 
