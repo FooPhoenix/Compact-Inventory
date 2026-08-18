@@ -1,10 +1,11 @@
 
 MOD_PREFIX = "FooPhoenix_CI_"
 
-local ItemOrder                = require("util.item_order")
-local InventoryManagerFactory  = require("inventory.inventory_manager")
-local WindowsManager           = require("gui.windows_manager")
-local SortMenuPrototypeFactory = require("gui.sort_menu_prototype")
+local ItemOrder                       = require("util.item_order")
+local InventoryManagerFactory         = require("inventory.inventory_manager")
+local WindowsManager                  = require("gui.windows_manager")
+local SortMenuPrototypeFactory        = require("gui.sort_menu_prototype")
+local ItemGroupLayoutPrototypeFactory = require("gui.item_group_layout_prototype")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -38,9 +39,12 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function attachSortMenus()
+local function attachPrototypes()
     for _, lua_player in pairs(game.players) do
-        SortMenuPrototypeFactory.attach(WindowsManager.getWindowMainInventory(lua_player))
+        local window = WindowsManager.getWindowMainInventory(lua_player)
+
+        ItemGroupLayoutPrototypeFactory.attach(window)
+        SortMenuPrototypeFactory.attach(window)
     end
 end
 
@@ -50,7 +54,7 @@ script.on_init(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachSortMenus()
+    attachPrototypes()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -69,7 +73,7 @@ script.on_configuration_changed(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachSortMenus()
+    attachPrototypes()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -77,7 +81,11 @@ end)
 script.on_event(defines.events.on_player_created, function(event)
     InventoryManagerFactory.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
-    SortMenuPrototypeFactory.attach(WindowsManager.getWindowMainInventory(event.player_index))
+
+    local window = WindowsManager.getWindowMainInventory(event.player_index)
+
+    ItemGroupLayoutPrototypeFactory.attach(window)
+    SortMenuPrototypeFactory.attach(window)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -100,22 +108,24 @@ end)
 
 script.on_event(defines.events.on_gui_click, function(event)
 
-    local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
+    local gui_names       = WindowsManager.exposed_gui_names.InventoryWindow
+    local prototype_names = ItemGroupLayoutPrototypeFactory.exposed_gui_names
 
     if event.element.name == gui_names.close_button then
         SortMenuPrototypeFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
 
-    elseif event.element.name == gui_names.sort_toolbar_button then
+    elseif event.element.name == prototype_names.group_sort_button then
         SortMenuPrototypeFactory.open(
             WindowsManager.getWindowMainInventory(event.player_index),
             event.cursor_display_location
         )
 
     elseif event.element.tags[gui_names.sort_tag_name] then
-        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
-            event.element.tags[gui_names.sort_tag_name]
-        )
+        local window = WindowsManager.getWindowMainInventory(event.player_index)
+
+        window:setSortMode(event.element.tags[gui_names.sort_tag_name])
+        ItemGroupLayoutPrototypeFactory.refreshSortButton(window)
         SortMenuPrototypeFactory.close(event.player_index)
     end
 end)
