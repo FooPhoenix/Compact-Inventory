@@ -64,22 +64,3 @@ data:extend({
         }
     }
 })
-
-local function addSortDropdownStyle(name, filename)
-    data.raw["gui-style"].default[MOD_PREFIX .. name] = {
-        type   = "dropdown_style",
-        parent = "dropdown",
-        icon   = {
-            filename = filename,
-            size     = 16,
-            x        = 32
-        }
-    }
-end
-
-addSortDropdownStyle("sort-dropdown-standard",    "__compact-inventory__/graphics/sort-standard.png")
-addSortDropdownStyle("sort-dropdown-count-asc",   "__compact-inventory__/graphics/sort-by-count-asc.png")
-addSortDropdownStyle("sort-dropdown-count-desc",  "__compact-inventory__/graphics/sort-by-count-desc.png")
-addSortDropdownStyle("sort-dropdown-inventory",   "__compact-inventory__/graphics/sort-inventory.png")
-addSortDropdownStyle("sort-dropdown-last-change", "__compact-inventory__/graphics/sort-last-change.png")
-addSortDropdownStyle("sort-dropdown-custom",      "__compact-inventory__/graphics/sort-custom.png")
