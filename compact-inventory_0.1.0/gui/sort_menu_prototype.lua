@@ -69,8 +69,30 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function debugEvent(lua_player, event_name, lua_element, tick)
-    lua_player.print("[SortMenu] " .. event_name .. " | " .. getElementDebugName(lua_element) .. " | tick " .. tick)
+local function recordEvent(lua_player, event_name, lua_element, tick)
+
+    local player_index = lua_player.index
+    local state = hover_state[player_index] or {
+        sequence_tick = tick,
+        sequence      = 0
+    }
+
+    if state.sequence_tick ~= tick then
+        state.sequence_tick = tick
+        state.sequence      = 0
+    end
+
+    state.sequence        = state.sequence + 1
+    state.last_event      = event_name
+    state.last_event_tick = tick
+
+    hover_state[player_index] = state
+
+    lua_player.print(
+        "[SortMenu] #" .. state.sequence .. " " .. event_name ..
+        " | " .. getElementDebugName(lua_element) ..
+        " | tick " .. tick
+    )
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -160,8 +182,10 @@ function factory.open(window, location)
     end
 
     hover_state[lua_player.index] = {
-        last_hover_tick = game.tick,
-        last_leave_tick = nil
+        last_event      = "HOVER",
+        last_event_tick = game.tick,
+        sequence_tick   = game.tick,
+        sequence        = 0
     }
 
     menu.bring_to_front()
@@ -200,10 +224,7 @@ function factory.onHover(event)
         return
     end
 
-    hover_state[event.player_index] = hover_state[event.player_index] or { }
-    hover_state[event.player_index].last_hover_tick = event.tick
-
-    debugEvent(lua_player, "HOVER", event.element, event.tick)
+    recordEvent(lua_player, "HOVER", event.element, event.tick)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -220,21 +241,18 @@ function factory.onLeave(event)
         return
     end
 
-    hover_state[event.player_index] = hover_state[event.player_index] or { }
-    hover_state[event.player_index].last_leave_tick = event.tick
-
-    debugEvent(lua_player, "LEAVE", event.element, event.tick)
+    recordEvent(lua_player, "LEAVE", event.element, event.tick)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onTick(event)
     for player_index, state in pairs(hover_state) do
-        if state.last_leave_tick == event.tick - 1 and state.last_hover_tick ~= state.last_leave_tick then
+        if state.last_event_tick == event.tick - 1 and state.last_event == "LEAVE" then
             local lua_player = game.get_player(player_index)
 
             if lua_player then
-                lua_player.print("[SortMenu] CLOSE | no compensating hover | tick " .. event.tick)
+                lua_player.print("[SortMenu] CLOSE | last event was LEAVE | tick " .. event.tick)
                 factory.close(lua_player)
             else
                 hover_state[player_index] = nil
