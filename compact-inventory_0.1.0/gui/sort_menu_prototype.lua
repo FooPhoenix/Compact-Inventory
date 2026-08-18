@@ -7,7 +7,8 @@ local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
     sort_toolbar_button = MOD_PREFIX .. "IW_sort-toolbar-button",
-    sort_menu           = MOD_PREFIX .. "IW_sort-menu"
+    sort_menu           = MOD_PREFIX .. "IW_sort-menu",
+    sort_menu_entries   = MOD_PREFIX .. "IW_sort-menu-entries"
 }
 
 local SORT_SPRITE = {
@@ -30,6 +31,8 @@ local SORT_CAPTION = {
 
 local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 
+local hover_state = { }
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ SortMenuPrototype.                                                                                             ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -39,6 +42,36 @@ local factory = {
         sort_menu = GUI_NAME.sort_menu
     }
 }
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getElementDebugName(lua_element)
+    if lua_element.name and lua_element.name ~= "" then
+        return lua_element.name
+    end
+
+    return "<" .. lua_element.type .. ">"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function isMenuElement(lua_element)
+    while lua_element do
+        if lua_element.name == GUI_NAME.sort_menu then
+            return true
+        end
+
+        lua_element = lua_element.parent
+    end
+
+    return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function debugEvent(lua_player, event_name, lua_element, tick)
+    lua_player.print("[SortMenu] " .. event_name .. " | " .. getElementDebugName(lua_element) .. " | tick " .. tick)
+end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -91,8 +124,10 @@ function factory.open(window, location)
     }
 
     local entries = menu.add({
-        type         = "table",
-        column_count = 2
+        type               = "table",
+        name               = GUI_NAME.sort_menu_entries,
+        column_count       = 2,
+        raise_hover_events = true
     })
 
     entries.style.horizontal_spacing = 4
@@ -100,25 +135,34 @@ function factory.open(window, location)
 
     for sort_mode = SortMode.standard, SortMode.custom do
         entries.add({
-            type    = "sprite-button",
-            sprite  = SORT_SPRITE[sort_mode],
-            style   = "frame_action_button",
-            tooltip = SORT_CAPTION[sort_mode],
-            tags    = {
+            type               = "sprite-button",
+            name               = MOD_PREFIX .. "IW_sort-menu-icon-" .. sort_mode,
+            sprite             = SORT_SPRITE[sort_mode],
+            style              = "frame_action_button",
+            tooltip            = SORT_CAPTION[sort_mode],
+            raise_hover_events = true,
+            tags               = {
                 [SORT_TAG_NAME] = sort_mode
             }
         })
 
         local button = entries.add({
-            type    = "button",
-            caption = SORT_CAPTION[sort_mode],
-            tags    = {
+            type               = "button",
+            name               = MOD_PREFIX .. "IW_sort-menu-button-" .. sort_mode,
+            caption            = SORT_CAPTION[sort_mode],
+            raise_hover_events = true,
+            tags               = {
                 [SORT_TAG_NAME] = sort_mode
             }
         })
 
         button.style.horizontally_stretchable = true
     end
+
+    hover_state[lua_player.index] = {
+        last_hover_tick = game.tick,
+        last_leave_tick = nil
+    }
 
     menu.bring_to_front()
 end
@@ -132,11 +176,70 @@ end
 --
 function factory.close(player)
 
-    local _, lua_player = resolve_player(player)
+    local player_index, lua_player = resolve_player(player)
     local menu = lua_player.gui.screen[GUI_NAME.sort_menu]
 
     if menu then
         menu.destroy()
+    end
+
+    hover_state[player_index] = nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.onHover(event)
+
+    if not isMenuElement(event.element) then
+        return
+    end
+
+    local lua_player = game.get_player(event.player_index)
+
+    if not lua_player then
+        return
+    end
+
+    hover_state[event.player_index] = hover_state[event.player_index] or { }
+    hover_state[event.player_index].last_hover_tick = event.tick
+
+    debugEvent(lua_player, "HOVER", event.element, event.tick)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.onLeave(event)
+
+    if not isMenuElement(event.element) then
+        return
+    end
+
+    local lua_player = game.get_player(event.player_index)
+
+    if not lua_player then
+        return
+    end
+
+    hover_state[event.player_index] = hover_state[event.player_index] or { }
+    hover_state[event.player_index].last_leave_tick = event.tick
+
+    debugEvent(lua_player, "LEAVE", event.element, event.tick)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.onTick(event)
+    for player_index, state in pairs(hover_state) do
+        if state.last_leave_tick == event.tick - 1 and state.last_hover_tick ~= state.last_leave_tick then
+            local lua_player = game.get_player(player_index)
+
+            if lua_player then
+                lua_player.print("[SortMenu] CLOSE | no compensating hover | tick " .. event.tick)
+                factory.close(lua_player)
+            else
+                hover_state[player_index] = nil
+            end
+        end
     end
 end
 
