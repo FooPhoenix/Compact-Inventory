@@ -1,10 +1,10 @@
 
 MOD_PREFIX = "FooPhoenix_CI_"
 
-local ItemOrder                    = require("util.item_order")
-local InventoryManagerFactory      = require("inventory.inventory_manager")
-local WindowsManager               = require("gui.windows_manager")
-local SortDropdownPrototypeFactory = require("gui.sort_dropdown_prototype")
+local ItemOrder                = require("util.item_order")
+local InventoryManagerFactory  = require("inventory.inventory_manager")
+local WindowsManager           = require("gui.windows_manager")
+local SortMenuPrototypeFactory = require("gui.sort_menu_prototype")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -38,9 +38,9 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function attachSortDropdowns()
+local function attachSortMenus()
     for _, lua_player in pairs(game.players) do
-        SortDropdownPrototypeFactory.attach(WindowsManager.getWindowMainInventory(lua_player))
+        SortMenuPrototypeFactory.attach(WindowsManager.getWindowMainInventory(lua_player))
     end
 end
 
@@ -50,7 +50,7 @@ script.on_init(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachSortDropdowns()
+    attachSortMenus()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -69,7 +69,7 @@ script.on_configuration_changed(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachSortDropdowns()
+    attachSortMenus()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -77,7 +77,7 @@ end)
 script.on_event(defines.events.on_player_created, function(event)
     InventoryManagerFactory.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
-    SortDropdownPrototypeFactory.attach(WindowsManager.getWindowMainInventory(event.player_index))
+    SortMenuPrototypeFactory.attach(WindowsManager.getWindowMainInventory(event.player_index))
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -101,28 +101,26 @@ end)
 script.on_event(defines.events.on_gui_click, function(event)
 
     local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
+    local window    = WindowsManager.getWindowMainInventory(event.player_index)
 
     if event.element.name == gui_names.close_button then
-        WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
+        SortMenuPrototypeFactory.close(event.player_index)
+        window:setVisible(false)
 
     elseif event.element.name == gui_names.sort_toolbar_button then
-        WindowsManager.getWindowMainInventory(event.player_index):toggleToolbarVisibility()
+        SortMenuPrototypeFactory.open(window, event.cursor_display_location)
 
     elseif event.element.tags[gui_names.sort_tag_name] then
-        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
-            event.element.tags[gui_names.sort_tag_name]
-        )
+        window:setSortMode(event.element.tags[gui_names.sort_tag_name])
+        SortMenuPrototypeFactory.close(event.player_index)
     end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-script.on_event(defines.events.on_gui_selection_state_changed, function(event)
-    if event.element.name == SortDropdownPrototypeFactory.exposed_gui_names.sort_dropdown then
-        SortDropdownPrototypeFactory.applySelection(
-            WindowsManager.getWindowMainInventory(event.player_index),
-            event.element
-        )
+script.on_event(defines.events.on_gui_leave, function(event)
+    if event.element.name == SortMenuPrototypeFactory.exposed_gui_names.sort_menu then
+        SortMenuPrototypeFactory.close(event.player_index)
     end
 end)
 
@@ -130,6 +128,7 @@ end)
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == WindowsManager.exposed_gui_names.InventoryWindow.shortcut_button then
+        SortMenuPrototypeFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
     end
 end)
