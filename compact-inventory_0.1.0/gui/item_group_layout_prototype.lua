@@ -14,6 +14,7 @@ local GUI_NAME = {
     content_flow        = MOD_PREFIX .. "IW_content-flow",
     sort_toolbar        = MOD_PREFIX .. "IW_sort-toolbar",
     inventory_grid      = MOD_PREFIX .. "IW_grid",
+    group_frame         = MOD_PREFIX .. "IG_frame",
     group_header        = MOD_PREFIX .. "IG_header",
     group_title         = MOD_PREFIX .. "IG_title",
     group_spacer        = MOD_PREFIX .. "IG_spacer",
@@ -51,7 +52,8 @@ function factory.refreshSortButton(window)
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
 
     local content = window:getFrame()[GUI_NAME.content_flow]
-    local header  = content and content[GUI_NAME.group_header]
+    local group   = content and content[GUI_NAME.group_frame]
+    local header  = group and group[GUI_NAME.group_header]
     local button  = header and header[GUI_NAME.group_sort_button]
 
     assert(button, "Experimental ItemGroup sort button must exist here !")      -- [DEBUG-ONLY] . --
@@ -83,7 +85,6 @@ function factory.attach(window)
     title.visible    = false
     old_sort.visible = false
 
-    frame.style = "inside_shallow_frame"
     frame.style.left_padding   = 4
     frame.style.right_padding  = 4
     frame.style.top_padding    = 3
@@ -101,13 +102,23 @@ function factory.attach(window)
     content = frame.add({
         type      = "frame",
         name      = GUI_NAME.content_flow,
-        direction = "vertical"
+        direction = "vertical",
+        style     = "inside_shallow_frame"
     })
 
     content.style.padding                  = 2
     content.style.horizontally_stretchable = true
 
-    local toolbar = content.add({
+    local group = content.add({
+        type      = "frame",
+        name      = GUI_NAME.group_frame,
+        direction = "vertical"
+    })
+
+    group.style.padding                  = 2
+    group.style.horizontally_stretchable = true
+
+    local toolbar = group.add({
         type      = "flow",
         name      = GUI_NAME.sort_toolbar,
         direction = "vertical",
@@ -116,7 +127,7 @@ function factory.attach(window)
 
     toolbar.style.vertical_spacing = 0
 
-    local header = content.add({
+    local header = group.add({
         type      = "flow",
         name      = GUI_NAME.group_header,
         direction = "horizontal"
@@ -153,7 +164,7 @@ function factory.attach(window)
     sort_button.style.height  = 20
     sort_button.style.padding = 0
 
-    local grid = content.add({
+    local grid = group.add({
         type         = "table",
         name         = GUI_NAME.inventory_grid,
         column_count = 10
