@@ -101,17 +101,21 @@ end)
 script.on_event(defines.events.on_gui_click, function(event)
 
     local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
-    local window    = WindowsManager.getWindowMainInventory(event.player_index)
 
     if event.element.name == gui_names.close_button then
         SortMenuPrototypeFactory.close(event.player_index)
-        window:setVisible(false)
+        WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
 
     elseif event.element.name == gui_names.sort_toolbar_button then
-        SortMenuPrototypeFactory.open(window, event.cursor_display_location)
+        SortMenuPrototypeFactory.open(
+            WindowsManager.getWindowMainInventory(event.player_index),
+            event.cursor_display_location
+        )
 
     elseif event.element.tags[gui_names.sort_tag_name] then
-        window:setSortMode(event.element.tags[gui_names.sort_tag_name])
+        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
+            event.element.tags[gui_names.sort_tag_name]
+        )
         SortMenuPrototypeFactory.close(event.player_index)
     end
 end)
