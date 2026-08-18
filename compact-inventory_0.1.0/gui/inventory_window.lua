@@ -24,6 +24,7 @@ local GUI_NAME = {
     sort_last_change_button = MOD_PREFIX .. "IW_sort-last-change",
     sort_custom_button      = MOD_PREFIX .. "IW_sort-custom",
     inventory_grid          = MOD_PREFIX .. "IW_grid",
+    group_frame             = MOD_PREFIX .. "IG_frame",
     shortcut_button         = MOD_PREFIX .. "main-window-toggle"
 }
 
@@ -147,9 +148,13 @@ end
 
 function metatable:getToolbar()
 
-    assert(self:getFrame()[GUI_NAME.content_flow] and self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar], "GUI toolbar does not exist!")      -- [DEBUG-ONLY] . --
+    local content = self:getFrame()[GUI_NAME.content_flow]
+    local group   = content and content[GUI_NAME.group_frame]
+    local toolbar = (group and group[GUI_NAME.sort_toolbar]) or (content and content[GUI_NAME.sort_toolbar])
 
-    return self:getFrame()[GUI_NAME.content_flow][GUI_NAME.sort_toolbar]
+    assert(toolbar, "GUI toolbar does not exist!")      -- [DEBUG-ONLY] . --
+
+    return toolbar
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -188,7 +193,10 @@ end
 function metatable:refresh()
 
     local content = self:getFrame()[GUI_NAME.content_flow]
-    local grid    = content[GUI_NAME.inventory_grid]
+    local group   = content and content[GUI_NAME.group_frame]
+    local grid    = (group and group[GUI_NAME.inventory_grid]) or (content and content[GUI_NAME.inventory_grid])
+
+    assert(grid, "GUI inventory grid does not exist!")      -- [DEBUG-ONLY] . --
 
     grid.clear()
 
