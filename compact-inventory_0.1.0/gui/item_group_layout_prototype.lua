@@ -83,22 +83,30 @@ function factory.attach(window)
     title.visible    = false
     old_sort.visible = false
 
+    frame.style = "inside_shallow_frame"
+    frame.style.left_padding   = 4
+    frame.style.right_padding  = 4
+    frame.style.top_padding    = 3
+    frame.style.bottom_padding = 4
+
     title_bar.style.horizontal_spacing = 2
     dragger.style.height               = 16
 
-    close.style.width  = 16
-    close.style.height = 16
+    close.style.width   = 16
+    close.style.height  = 16
     close.style.padding = 0
 
     content.destroy()
 
     content = frame.add({
-        type      = "flow",
+        type      = "frame",
         name      = GUI_NAME.content_flow,
         direction = "vertical"
     })
 
+    content.style.padding = 2
     content.style.vertical_spacing = 0
+    content.style.horizontally_stretchable = true
 
     local toolbar = content.add({
         type      = "flow",
