@@ -104,8 +104,7 @@ function factory.attach(window)
         direction = "vertical"
     })
 
-    content.style.padding = 2
-    content.style.vertical_spacing = 0
+    content.style.padding                  = 2
     content.style.horizontally_stretchable = true
 
     local toolbar = content.add({
