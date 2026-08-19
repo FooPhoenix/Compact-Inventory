@@ -45,6 +45,18 @@ data:extend({
         x = 32
     },
     {
+        type = "sprite",
+        name = MOD_PREFIX .. "window-unlock",
+        filename = "__base__/graphics/icons/signal/signal-unlock.png",
+        size = 64
+    },
+    {
+        type = "sprite",
+        name = MOD_PREFIX .. "group-delete",
+        filename = "__base__/graphics/icons/signal/signal-trash-bin.png",
+        size = 64
+    },
+    {
         type = "shortcut",
         name = MOD_PREFIX .. "main-window-toggle",
         action = "lua",
