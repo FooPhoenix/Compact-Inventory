@@ -6,8 +6,16 @@ local InventoryViewFactory = require("inventory.inventory_view")
 local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
-    sort_menu         = MOD_PREFIX .. "IW_sort-menu",
-    sort_menu_entries = MOD_PREFIX .. "IW_sort-menu-entries"
+    menu                 = MOD_PREFIX .. "IG_options-menu",
+    group_column         = MOD_PREFIX .. "IG_options-group-column",
+    group_title          = MOD_PREFIX .. "IG_options-group-title",
+    sort_toggle_button   = MOD_PREFIX .. "IG_options-sort-toggle",
+    delete_group_button  = MOD_PREFIX .. "IG_options-delete-group",
+    sort_column_wrapper  = MOD_PREFIX .. "IG_options-sort-wrapper",
+    sort_separator       = MOD_PREFIX .. "IG_options-sort-separator",
+    sort_column          = MOD_PREFIX .. "IG_options-sort-column",
+    sort_title           = MOD_PREFIX .. "IG_options-sort-title",
+    sort_entries         = MOD_PREFIX .. "IG_options-sort-entries"
 }
 
 local SORT_SPRITE = {
@@ -38,7 +46,9 @@ local hover_state = { }
 
 local factory = {
     exposed_gui_names = {
-        sort_menu = GUI_NAME.sort_menu
+        sort_menu           = GUI_NAME.menu,
+        sort_toggle_button  = GUI_NAME.sort_toggle_button,
+        delete_group_button = GUI_NAME.delete_group_button
     }
 }
 
@@ -56,7 +66,7 @@ end
 
 local function isMenuElement(lua_element)
     while lua_element do
-        if lua_element.name == GUI_NAME.sort_menu then
+        if lua_element.name == GUI_NAME.menu then
             return true
         end
 
@@ -88,7 +98,7 @@ local function recordEvent(lua_player, event_name, lua_element, tick)
     hover_state[player_index] = state
 
     lua_player.print(
-        "[SortMenu] #" .. state.sequence .. " " .. event_name ..
+        "[GroupMenu] #" .. state.sequence .. " " .. event_name ..
         " | " .. getElementDebugName(lua_element) ..
         " | tick " .. tick
     )
@@ -96,7 +106,39 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Attach the experimental floating sorting menu to an InventoryWindow.
+local function addColumnTitle(parent, menu, name, caption)
+    local title = parent.add({
+        type               = "label",
+        name               = name,
+        caption            = caption,
+        raise_hover_events = true
+    })
+
+    title.style.font = "default-bold"
+    title.drag_target = menu
+
+    return title
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addGroupAction(parent, name, caption, enabled)
+    local button = parent.add({
+        type               = "button",
+        name               = name,
+        caption            = caption,
+        enabled            = enabled,
+        raise_hover_events = true
+    })
+
+    button.style.horizontally_stretchable = true
+
+    return button
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Attach the experimental floating options menu to an InventoryWindow.
 --
 --- -----
 --- @param window InventoryWindow      The window that receives the prototype menu.
@@ -111,7 +153,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Open the experimental sorting menu at the cursor location.
+--- ### Open the experimental group options menu at the cursor location.
 --
 --- -----
 --- @param window InventoryWindow      The affected inventory window.
@@ -128,8 +170,8 @@ function factory.open(window, location)
 
     local menu = lua_player.gui.screen.add({
         type               = "frame",
-        name               = GUI_NAME.sort_menu,
-        direction          = "vertical",
+        name               = GUI_NAME.menu,
+        direction          = "horizontal",
         raise_hover_events = true
     })
 
@@ -138,9 +180,57 @@ function factory.open(window, location)
         y = location.y - 4
     }
 
-    local entries = menu.add({
+    menu.style.horizontal_spacing = 4
+
+    local group_column = menu.add({
+        type               = "flow",
+        name               = GUI_NAME.group_column,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    group_column.style.vertical_spacing = 2
+
+    addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options")
+
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false)
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false)
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-down", "Move down", false)
+
+    addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true)
+    addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true)
+
+    local sort_wrapper = menu.add({
+        type               = "flow",
+        name               = GUI_NAME.sort_column_wrapper,
+        direction          = "horizontal",
+        visible            = false,
+        raise_hover_events = true
+    })
+
+    sort_wrapper.style.horizontal_spacing = 4
+
+    sort_wrapper.add({
+        type               = "line",
+        name               = GUI_NAME.sort_separator,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    local sort_column = sort_wrapper.add({
+        type               = "flow",
+        name               = GUI_NAME.sort_column,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    sort_column.style.vertical_spacing = 2
+
+    addColumnTitle(sort_column, menu, GUI_NAME.sort_title, "Sort options")
+
+    local entries = sort_column.add({
         type               = "table",
-        name               = GUI_NAME.sort_menu_entries,
+        name               = GUI_NAME.sort_entries,
         column_count       = 2,
         raise_hover_events = true
     })
@@ -151,7 +241,7 @@ function factory.open(window, location)
     for sort_mode = SortMode.standard, SortMode.custom do
         entries.add({
             type               = "sprite-button",
-            name               = MOD_PREFIX .. "IW_sort-menu-icon-" .. sort_mode,
+            name               = MOD_PREFIX .. "IG_options-sort-icon-" .. sort_mode,
             sprite             = SORT_SPRITE[sort_mode],
             style              = "frame_action_button",
             tooltip            = SORT_CAPTION[sort_mode],
@@ -163,7 +253,7 @@ function factory.open(window, location)
 
         local button = entries.add({
             type               = "button",
-            name               = MOD_PREFIX .. "IW_sort-menu-button-" .. sort_mode,
+            name               = MOD_PREFIX .. "IG_options-sort-button-" .. sort_mode,
             caption            = SORT_CAPTION[sort_mode],
             raise_hover_events = true,
             tags               = {
@@ -186,7 +276,30 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Close the experimental sorting menu if it exists.
+--- ### Toggle the sorting options column.
+--
+--- -----
+--- @param player integer|LuaPlayer      The player that owns the menu.
+--
+function factory.toggleSortColumn(player)
+
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(menu, "Group options menu must exist here !")      -- [DEBUG-ONLY] . --
+
+    local wrapper = menu[GUI_NAME.sort_column_wrapper]
+    local button  = menu[GUI_NAME.group_column][GUI_NAME.sort_toggle_button]
+
+    assert(wrapper and button, "Group options sorting controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    wrapper.visible = not wrapper.visible
+    button.caption = wrapper.visible and "Sorting options  <" or "Sorting options  >"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Close the experimental group options menu if it exists.
 --
 --- -----
 --- @param player integer|LuaPlayer      The player that owns the menu.
@@ -194,7 +307,7 @@ end
 function factory.close(player)
 
     local player_index, lua_player = resolve_player(player)
-    local menu = lua_player.gui.screen[GUI_NAME.sort_menu]
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
 
     if menu then
         menu.destroy()
@@ -245,7 +358,7 @@ function factory.onTick(event)
             local lua_player = game.get_player(player_index)
 
             if lua_player then
-                lua_player.print("[SortMenu] CLOSE | last event was LEAVE | tick " .. event.tick)
+                lua_player.print("[GroupMenu] CLOSE | last event was LEAVE | tick " .. event.tick)
                 factory.close(lua_player)
             else
                 hover_state[player_index] = nil
