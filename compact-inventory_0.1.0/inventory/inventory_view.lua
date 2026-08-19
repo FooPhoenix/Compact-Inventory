@@ -54,11 +54,6 @@ metatable.__index = metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the logical Inventory projected by the view.
---
---- -----
---- @return Inventory      @ The projected Inventory.
---
 function metatable:getInventory()
 
     assert(self.inventory and self.inventory.object_name == "Inventory", "InventoryView must have a valid Inventory !")      -- [DEBUG-ONLY] . --
@@ -68,22 +63,12 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the current sorting mode.
---
---- -----
---- @return SortMode      @ The current sorting mode.
---
 function metatable:getSortMode()
     return self.sort_mode
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set the sorting mode.
---
---- -----
---- @param sort_mode SortMode      The sorting mode to activate.
---
 function metatable:setSortMode(sort_mode)
 
     assert(type(sort_mode) == "number" and sort_mode >= 1 and sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")      -- [DEBUG-ONLY] . --
@@ -93,22 +78,12 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the current filtering mode.
---
---- -----
---- @return FilterMode      @ The current filtering mode.
---
 function metatable:getFilterMode()
     return self.filter_mode
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set the filtering mode.
---
---- -----
---- @param filter_mode FilterMode      The filtering mode to activate.
---
 function metatable:setFilterMode(filter_mode)
 
     assert(filter_mode == FilterMode.blacklist or filter_mode == FilterMode.whitelist, "Filter mode must be valid !")      -- [DEBUG-ONLY] . --
@@ -118,11 +93,6 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get all positioned item filters.
---
---- -----
---- @return table<integer, string>      @ The positioned item filters.
---
 function metatable:getFilters()
     assert(type(self.filters) == "table", "InventoryView filters must be a table !")      -- [DEBUG-ONLY] . --
     return self.filters
@@ -130,12 +100,6 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set one positioned item filter.
---
---- -----
---- @param slot_index integer      The filter slot index.
---- @param item_name string|nil    The item name, or nil to clear the slot.
---
 function metatable:setFilter(slot_index, item_name)
 
     assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
@@ -146,13 +110,6 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the number of visible filter slots needed by the filter editor.
---
---- Keeps at least two rows visible and always adds one empty row below the last row containing a filter.
---
---- -----
---- @return integer      @ The number of visible filter slots.
---
 function metatable:getVisibleFilterSlotCount()
 
     local last_used_slot = 0
@@ -200,7 +157,10 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the projected inventory content according to the current filtering and sorting modes.
+--- ### Get the projected inventory content according to the current sorting and filtering modes.
+--
+--- Sorting always operates on the complete logical inventory. Filtering is applied afterwards so hiding an item never
+--- alters or invalidates stateful ordering strategies such as last-change ordering.
 --
 --- -----
 --- @return table      @ The item list to display.
@@ -208,16 +168,16 @@ end
 function metatable:getContent()
 
     local inventory = self:getInventory()
-    local items     = filterItems(self, inventory:getContent())
+    local items     = inventory:getContent()
+    local sorted_items
 
     if self.sort_mode == SortMode.standard then
-        return items
-    end
+        sorted_items = items
 
-    if self.sort_mode == SortMode.inventory then
+    elseif self.sort_mode == SortMode.inventory then
 
         local items_by_order = { }
-        local sorted_items   = { }
+        sorted_items         = { }
 
         for _, item in ipairs(items) do
             items_by_order[ItemOrder.get(item.name, item.quality)] = item
@@ -243,40 +203,37 @@ function metatable:getContent()
 
         assert(#sorted_items == #items, "Inventory sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
 
-        return sorted_items
-    end
+    elseif self.sort_mode == SortMode.last_change then
+        sorted_items = inventory:sortByLastChange(items)
 
-    if self.sort_mode == SortMode.last_change then
-        return inventory:sortByLastChange(items)
-    end
+    elseif self.sort_mode == SortMode.count_ascending or self.sort_mode == SortMode.count_descending then
+        sorted_items = { }
 
-    if self.sort_mode ~= SortMode.count_ascending and self.sort_mode ~= SortMode.count_descending then
-        return items
-    end
-
-    local sorted_items = { }
-
-    for index, item in ipairs(items) do
-        sorted_items[index] = item
-    end
-
-    table.sort(sorted_items, function(item_a, item_b)
-
-        if item_a.count ~= item_b.count then
-            if self.sort_mode == SortMode.count_ascending then
-                return item_a.count < item_b.count
-            else
-                return item_a.count > item_b.count
-            end
+        for index, item in ipairs(items) do
+            sorted_items[index] = item
         end
 
-        local order_a = ItemOrder.get(item_a.name, item_a.quality)
-        local order_b = ItemOrder.get(item_b.name, item_b.quality)
+        table.sort(sorted_items, function(item_a, item_b)
 
-        return order_a < order_b
-    end)
+            if item_a.count ~= item_b.count then
+                if self.sort_mode == SortMode.count_ascending then
+                    return item_a.count < item_b.count
+                else
+                    return item_a.count > item_b.count
+                end
+            end
 
-    return sorted_items
+            local order_a = ItemOrder.get(item_a.name, item_a.quality)
+            local order_b = ItemOrder.get(item_b.name, item_b.quality)
+
+            return order_a < order_b
+        end)
+
+    else
+        sorted_items = items
+    end
+
+    return filterItems(self, sorted_items)
 end
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -293,11 +250,6 @@ end
 -- ║ InventoryViewFactory.                                                                                         ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
----
---- @class InventoryViewFactory
----
---- ### This class groups all functions used to create inventory views.
----
 local factory = {
     sort_modes   = SortMode,
     filter_modes = FilterMode
@@ -305,13 +257,6 @@ local factory = {
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Create a new inventory view.
---
---- -----
---- @param inventory Inventory      The logical Inventory projected by the view.
---
---- @return InventoryView          @ Returns the created InventoryView.
---
 function factory.new(inventory)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
