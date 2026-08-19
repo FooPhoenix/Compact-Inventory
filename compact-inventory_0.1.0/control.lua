@@ -6,7 +6,8 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 local WindowsManager          = require("gui.windows_manager")
 local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
-local FilterMode = InventoryViewFactory.filter_modes
+local FilterMode          = InventoryViewFactory.filter_modes
+local CANCEL_RENAME_INPUT = MOD_PREFIX .. "cancel-rename"
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -238,6 +239,20 @@ script.on_event(defines.events.on_gui_confirmed, function(event)
         WindowsManager.getWindowMainInventory(event.player_index):confirmRename(
             event.element.tags[gui_names.group_id_tag_name]
         )
+    end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(CANCEL_RENAME_INPUT, function(event)
+    if not WindowsManager.hasWindowMainInventory(event.player_index) then
+        return
+    end
+
+    local window = WindowsManager.getWindowMainInventory(event.player_index)
+
+    for _, item_group in ipairs(window:getItemGroups()) do
+        window:cancelRename(item_group:getID())
     end
 end)
 
