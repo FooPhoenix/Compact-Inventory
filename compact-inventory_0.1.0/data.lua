@@ -59,8 +59,9 @@ data:extend({
     {
         type = "sprite",
         name = MOD_PREFIX .. "group-menu",
-        filename = "__core__/graphics/icons/mip/expand-panel-white.png",
-        size = 32
+        filename = "__core__/graphics/icons/mip/open-panel-options-8x16-white.png",
+        width = 8,
+        height = 16
     },
     {
         type = "shortcut",
