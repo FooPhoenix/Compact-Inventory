@@ -113,21 +113,25 @@ end)
 script.on_event(defines.events.on_gui_click, function(event)
 
     local gui_names       = WindowsManager.exposed_gui_names.InventoryWindow
-    local prototype_names = ItemGroupLayoutPrototypeFactory.exposed_gui_names
+    local layout_names    = ItemGroupLayoutPrototypeFactory.exposed_gui_names
+    local menu_names      = SortMenuPrototypeFactory.exposed_gui_names
 
     if event.element.name == gui_names.close_button then
         SortMenuPrototypeFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
 
-    elseif event.element.name == prototype_names.group_close_button then
-        SortMenuPrototypeFactory.close(event.player_index)
-        WindowsManager.destroyWindowMainInventory(event.player_index)
-
-    elseif event.element.name == prototype_names.group_sort_button then
+    elseif event.element.name == layout_names.group_menu_button then
         SortMenuPrototypeFactory.open(
             WindowsManager.getWindowMainInventory(event.player_index),
             event.cursor_display_location
         )
+
+    elseif event.element.name == menu_names.sort_toggle_button then
+        SortMenuPrototypeFactory.toggleSortColumn(event.player_index)
+
+    elseif event.element.name == menu_names.delete_group_button then
+        SortMenuPrototypeFactory.close(event.player_index)
+        WindowsManager.destroyWindowMainInventory(event.player_index)
 
     elseif event.element.tags[gui_names.sort_tag_name] then
         local window = WindowsManager.getWindowMainInventory(event.player_index)
