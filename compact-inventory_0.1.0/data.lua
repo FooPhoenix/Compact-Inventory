@@ -26,7 +26,7 @@ data:extend({
         type                = "custom-input",
         name                = MOD_PREFIX .. "cancel-rename",
         key_sequence        = "",
-        linked_game_control = "close-menu",
+        linked_game_control = "toggle-menu",
         consuming           = "none"
     },
     {
