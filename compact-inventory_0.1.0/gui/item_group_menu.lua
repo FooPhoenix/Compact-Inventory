@@ -7,26 +7,29 @@ local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
 local GUI_NAME = {
-    menu                  = MOD_PREFIX .. "IG_options-menu",
-    columns_flow          = MOD_PREFIX .. "IG_options-columns-flow",
-    group_column          = MOD_PREFIX .. "IG_options-group-column",
-    group_title           = MOD_PREFIX .. "IG_options-group-title",
-    group_filler          = MOD_PREFIX .. "IG_options-group-filler",
-    sort_column_wrapper   = MOD_PREFIX .. "IG_options-sort-wrapper",
-    sort_outer_frame      = MOD_PREFIX .. "IG_options-sort-outer-frame",
-    sort_inner_frame      = MOD_PREFIX .. "IG_options-sort-inner-frame",
-    sort_column           = MOD_PREFIX .. "IG_options-sort-column",
-    sort_title            = MOD_PREFIX .. "IG_options-sort-title",
-    sort_toggle_button    = MOD_PREFIX .. "IG_options-sort-toggle",
-    filter_column_wrapper = MOD_PREFIX .. "IG_options-filter-wrapper",
-    filter_outer_frame    = MOD_PREFIX .. "IG_options-filter-outer-frame",
-    filter_inner_frame    = MOD_PREFIX .. "IG_options-filter-inner-frame",
-    filter_column         = MOD_PREFIX .. "IG_options-filter-column",
-    filter_title          = MOD_PREFIX .. "IG_options-filter-title",
-    filter_switch         = MOD_PREFIX .. "IG_options-filter-switch",
-    filter_table          = MOD_PREFIX .. "IG_options-filter-table",
-    filter_toggle_button  = MOD_PREFIX .. "IG_options-filter-toggle",
-    delete_group_button   = MOD_PREFIX .. "IG_options-delete-group"
+    menu                   = MOD_PREFIX .. "IG_options-menu",
+    columns_flow           = MOD_PREFIX .. "IG_options-columns-flow",
+    group_column           = MOD_PREFIX .. "IG_options-group-column",
+    group_title            = MOD_PREFIX .. "IG_options-group-title",
+    group_filler           = MOD_PREFIX .. "IG_options-group-filler",
+    sort_column_wrapper    = MOD_PREFIX .. "IG_options-sort-wrapper",
+    sort_outer_frame       = MOD_PREFIX .. "IG_options-sort-outer-frame",
+    sort_inner_frame       = MOD_PREFIX .. "IG_options-sort-inner-frame",
+    sort_column            = MOD_PREFIX .. "IG_options-sort-column",
+    sort_title             = MOD_PREFIX .. "IG_options-sort-title",
+    sort_toggle_button     = MOD_PREFIX .. "IG_options-sort-toggle",
+    filter_column_wrapper  = MOD_PREFIX .. "IG_options-filter-wrapper",
+    filter_outer_frame     = MOD_PREFIX .. "IG_options-filter-outer-frame",
+    filter_inner_frame     = MOD_PREFIX .. "IG_options-filter-inner-frame",
+    filter_column          = MOD_PREFIX .. "IG_options-filter-column",
+    filter_title           = MOD_PREFIX .. "IG_options-filter-title",
+    filter_mode_flow       = MOD_PREFIX .. "IG_options-filter-mode-flow",
+    filter_blacklist_label = MOD_PREFIX .. "IG_options-filter-blacklist-label",
+    filter_switch          = MOD_PREFIX .. "IG_options-filter-switch",
+    filter_whitelist_label = MOD_PREFIX .. "IG_options-filter-whitelist-label",
+    filter_table           = MOD_PREFIX .. "IG_options-filter-table",
+    filter_toggle_button   = MOD_PREFIX .. "IG_options-filter-toggle",
+    delete_group_button    = MOD_PREFIX .. "IG_options-delete-group"
 }
 
 local SORT_SPRITE = {
@@ -77,6 +80,13 @@ local function isMenuElement(lua_element)
     end
 
     return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function isNonAuthoritativeLeaveElement(lua_element)
+    return lua_element.name == GUI_NAME.filter_blacklist_label
+        or lua_element.name == GUI_NAME.filter_whitelist_label
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -204,13 +214,21 @@ function factory.refreshFilterTable(window, item_group)
         return
     end
 
-    local filter_table = getFilterTable(menu)
-    local group_id     = item_group:getID()
-    local filters      = item_group:getFilters()
+    local filter_table       = getFilterTable(menu)
+    local visible_slot_count = item_group:getVisibleFilterSlotCount()
+
+    -- Factorio already updates the choose-elem-button that triggered on_gui_elem_changed.
+    -- Rebuild the table only when the number of visible rows actually changed.
+    if #filter_table.children == visible_slot_count then
+        return
+    end
+
+    local group_id = item_group:getID()
+    local filters  = item_group:getFilters()
 
     filter_table.clear()
 
-    for slot_index = 1, item_group:getVisibleFilterSlotCount() do
+    for slot_index = 1, visible_slot_count do
         filter_table.add({
             type               = "choose-elem-button",
             name               = MOD_PREFIX .. "IG_options-filter-slot-" .. slot_index,
@@ -349,6 +367,7 @@ function factory.open(window, item_group, location)
 
     local filter_mode_flow = filter_column.add({
         type               = "flow",
+        name               = GUI_NAME.filter_mode_flow,
         direction          = "horizontal",
         raise_hover_events = true
     })
@@ -359,6 +378,7 @@ function factory.open(window, item_group, location)
 
     filter_mode_flow.add({
         type               = "label",
+        name               = GUI_NAME.filter_blacklist_label,
         caption            = "Blacklist",
         raise_hover_events = true
     })
@@ -376,6 +396,7 @@ function factory.open(window, item_group, location)
 
     filter_mode_flow.add({
         type               = "label",
+        name               = GUI_NAME.filter_whitelist_label,
         caption            = "Whitelist",
         raise_hover_events = true
     })
@@ -479,7 +500,7 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onLeave(event)
-    if not isMenuElement(event.element) then
+    if not isMenuElement(event.element) or isNonAuthoritativeLeaveElement(event.element) then
         return
     end
 
