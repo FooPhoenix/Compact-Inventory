@@ -25,6 +25,7 @@ local GUI_NAME = {
     group_spacer         = MOD_PREFIX .. "IG_spacer",
     group_sort_icon      = MOD_PREFIX .. "IG_sort-icon",
     group_menu_button    = MOD_PREFIX .. "IG_menu-button",
+    group_unlock_button  = MOD_PREFIX .. "IG_unlock-button",
     inventory_grid       = MOD_PREFIX .. "IG_grid",
     shortcut_button      = MOD_PREFIX .. "main-window-toggle"
 }
@@ -53,6 +54,7 @@ local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
 --- @field private lua_player     LuaPlayer       The player that owns the window.
 --- @field private item_groups    ItemGroup[]     The ordered item groups displayed by the window.
 --- @field private next_group_id  integer         The next stable ItemGroup identifier.
+--- @field private locked         boolean         Whether the window is displayed in locked mode.
 --- @field         valid          boolean         Whether the window is valid or not.
 --- @field         object_name    string          The object name of the window.
 ---
@@ -151,6 +153,25 @@ local function getGroupHeader(window, item_group)
     assert(header, "ItemGroup header must exist here !")      -- [DEBUG-ONLY] . --
 
     return header
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function setGroupLockGUI(group, locked, first_group)
+    group.style = locked and MOD_PREFIX .. "locked-window-frame" or "frame"
+    group.style.padding                  = locked and 0 or 2
+    group.style.horizontally_stretchable = true
+
+    local header        = group[GUI_NAME.group_header]
+    local rename_button = header and header[GUI_NAME.group_rename_button]
+    local menu_button   = header and header[GUI_NAME.group_menu_button]
+    local unlock_button = header and header[GUI_NAME.group_unlock_button]
+
+    assert(header and rename_button and menu_button and unlock_button, "ItemGroup lock GUI must be complete here !")      -- [DEBUG-ONLY] . --
+
+    rename_button.visible = not locked
+    menu_button.visible   = not locked
+    unlock_button.visible = locked and first_group
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -343,6 +364,52 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:isLocked()
+    return self.locked == true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:setLocked(locked)
+    assert(type(locked) == "boolean", "Locked state must be a boolean !")      -- [DEBUG-ONLY] . --
+
+    if self.locked == locked then
+        return
+    end
+
+    self.locked = locked
+
+    local frame     = self:getFrame()
+    local title_bar = frame[GUI_NAME.title_bar]
+    local content   = frame[GUI_NAME.content_frame]
+
+    assert(title_bar and content, "InventoryWindow lock GUI must be complete here !")      -- [DEBUG-ONLY] . --
+
+    title_bar.visible = not locked
+
+    frame.style = locked and MOD_PREFIX .. "locked-window-frame" or "frame"
+    frame.style.left_padding   = locked and 0 or 4
+    frame.style.right_padding  = locked and 0 or 4
+    frame.style.top_padding    = locked and 0 or 3
+    frame.style.bottom_padding = locked and 0 or 4
+
+    content.style = locked and MOD_PREFIX .. "locked-content-frame" or "inside_shallow_frame"
+    content.style.padding                  = locked and 0 or 2
+    content.style.horizontally_stretchable = true
+
+    for index, item_group in ipairs(self:getItemGroups()) do
+        setGroupLockGUI(self:getGroupFrame(item_group), locked, index == 1)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:toggleLocked()
+    self:setLocked(not self:isLocked())
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setVisible(visible)
     if visible then
         self:updateMaxHeight()
@@ -378,6 +445,7 @@ factory = {
         group_name_field     = GUI_NAME.group_name_field,
         group_confirm_button = GUI_NAME.group_confirm_button,
         group_menu_button    = GUI_NAME.group_menu_button,
+        group_unlock_button  = GUI_NAME.group_unlock_button,
         shortcut_button      = GUI_NAME.shortcut_button,
         sort_tag_name        = SORT_TAG_NAME,
         group_id_tag_name    = GROUP_ID_TAG_NAME
@@ -396,7 +464,8 @@ function factory.create(player, inventory)
         item_groups   = {
             ItemGroupFactory.new(inventory, 1)
         },
-        next_group_id = 2
+        next_group_id = 2,
+        locked        = false
     }
 
     setmetatable(window, metatable)
@@ -424,6 +493,7 @@ function factory.destroy(player)
     window.lua_player     = nil
     window.item_groups    = nil
     window.next_group_id  = nil
+    window.locked         = nil
 
     storage.windows.main_inventory[player_index] = nil
 end
@@ -535,6 +605,19 @@ function factory.createItemGroupGUI(window, item_group)                         
     menu_button.style.height  = 22
     menu_button.style.padding = 0
 
+    local unlock_button = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_unlock_button,
+        sprite  = MOD_PREFIX .. "window-unlock",
+        style   = "frame_action_button",
+        tooltip = "Unlock window",
+        visible = false
+    })
+
+    unlock_button.style.width   = 22
+    unlock_button.style.height  = 22
+    unlock_button.style.padding = 0
+
     local grid = group.add({
         type         = "table",
         name         = GUI_NAME.inventory_grid,
@@ -543,6 +626,10 @@ function factory.createItemGroupGUI(window, item_group)                         
 
     grid.style.horizontal_spacing = 0
     grid.style.vertical_spacing   = 0
+
+    if window:isLocked() then
+        setGroupLockGUI(group, true, #container.children == 1)
+    end
 
     return group
 end
@@ -601,7 +688,7 @@ function factory.createGUI(window)                                              
         name    = GUI_NAME.lock_button,
         sprite  = MOD_PREFIX .. "window-unlock",
         style   = "frame_action_button",
-        tooltip = "Lock window (not implemented yet)"
+        tooltip = "Lock window"
     })
 
     lock.style.width   = 16
