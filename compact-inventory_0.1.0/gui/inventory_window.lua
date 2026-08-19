@@ -14,6 +14,8 @@ local GUI_NAME = {
     lock_button          = MOD_PREFIX .. "IW_lock-button",
     close_button         = MOD_PREFIX .. "IW_close",
     content_frame        = MOD_PREFIX .. "IW_content-frame",
+    groups_scroll        = MOD_PREFIX .. "IW_groups-scroll",
+    groups_container     = MOD_PREFIX .. "IW_groups-container",
     group_frame          = MOD_PREFIX .. "IG_frame",
     group_header         = MOD_PREFIX .. "IG_header",
     group_title          = MOD_PREFIX .. "IG_title",
@@ -23,7 +25,7 @@ local GUI_NAME = {
     group_spacer         = MOD_PREFIX .. "IG_spacer",
     group_sort_icon      = MOD_PREFIX .. "IG_sort-icon",
     group_menu_button    = MOD_PREFIX .. "IG_menu-button",
-    inventory_grid       = MOD_PREFIX .. "IW_grid",
+    inventory_grid       = MOD_PREFIX .. "IG_grid",
     shortcut_button      = MOD_PREFIX .. "main-window-toggle"
 }
 
@@ -36,7 +38,8 @@ local SORT_SPRITE = {
     [SortMode.custom]           = MOD_PREFIX .. "sort-custom"
 }
 
-local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
+local SORT_TAG_NAME     = MOD_PREFIX .. "SortID"
+local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventoryWindowMetatable.                                                                                      ║ --
@@ -47,10 +50,11 @@ local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 ---
 --- ### This class groups all functions used to create and manage an inventory window.
 ---
---- @field private lua_player  LuaPlayer       The player that owns the window.
---- @field private item_groups ItemGroup[]     The ordered item groups displayed by the window.
---- @field         valid       boolean         Whether the window is valid or not.
---- @field         object_name string          The object name of the window.
+--- @field private lua_player     LuaPlayer       The player that owns the window.
+--- @field private item_groups    ItemGroup[]     The ordered item groups displayed by the window.
+--- @field private next_group_id  integer         The next stable ItemGroup identifier.
+--- @field         valid          boolean         Whether the window is valid or not.
+--- @field         object_name    string          The object name of the window.
 ---
 --
 local metatable = { }
@@ -92,6 +96,20 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:getItemGroupByID(group_id)
+    assert(type(group_id) == "number" and group_id > 0, "ItemGroup ID must be a positive integer !")      -- [DEBUG-ONLY] . --
+
+    for _, item_group in ipairs(self:getItemGroups()) do
+        if item_group:getID() == group_id then
+            return item_group
+        end
+    end
+
+    return nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getFrame()
     local lua_player = self:getPlayer()
     local frame = lua_player.gui.screen[GUI_NAME.main_frame]
@@ -103,10 +121,32 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getGroupHeader(window)
-    local content = window:getFrame()[GUI_NAME.content_frame]
-    local group   = content and content[GUI_NAME.group_frame]
-    local header  = group and group[GUI_NAME.group_header]
+function metatable:getGroupsContainer()
+    local content   = self:getFrame()[GUI_NAME.content_frame]
+    local scroll    = content and content[GUI_NAME.groups_scroll]
+    local container = scroll and scroll[GUI_NAME.groups_container]
+
+    assert(container, "ItemGroup container must exist here !")      -- [DEBUG-ONLY] . --
+
+    return container
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getGroupFrame(item_group)
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup must be valid here !")      -- [DEBUG-ONLY] . --
+
+    local group = self:getGroupsContainer()[GUI_NAME.group_frame .. "-" .. item_group:getID()]
+
+    assert(group, "ItemGroup GUI frame must exist here !")      -- [DEBUG-ONLY] . --
+
+    return group
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getGroupHeader(window, item_group)
+    local header = window:getGroupFrame(item_group)[GUI_NAME.group_header]
 
     assert(header, "ItemGroup header must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -139,55 +179,88 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:refresh()
-    local content = self:getFrame()[GUI_NAME.content_frame]
-    local group   = content and content[GUI_NAME.group_frame]
-    local grid    = group and group[GUI_NAME.inventory_grid]
+function metatable:updateMaxHeight()
+    local lua_player = self:getPlayer()
+    local content    = self:getFrame()[GUI_NAME.content_frame]
+    local scroll     = content and content[GUI_NAME.groups_scroll]
 
-    assert(grid, "GUI inventory grid does not exist !")      -- [DEBUG-ONLY] . --
+    assert(scroll, "ItemGroup scroll pane must exist here !")      -- [DEBUG-ONLY] . --
+
+    local display_height = math.floor(lua_player.display_resolution.height / lua_player.display_scale)
+
+    scroll.style.maximal_height = math.max(120, display_height - 32)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:refreshGroup(item_group)
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup must be valid here !")      -- [DEBUG-ONLY] . --
+
+    local group = self:getGroupFrame(item_group)
+    local grid  = group[GUI_NAME.inventory_grid]
+
+    assert(grid, "ItemGroup inventory grid must exist here !")      -- [DEBUG-ONLY] . --
 
     grid.clear()
 
-    for _, item_group in ipairs(self:getItemGroups()) do
-        for _, item in ipairs(item_group:getContent()) do
-            grid.add({
-                type         = "sprite-button",
-                sprite       = "item/" .. item.name,
-                style        = "slot_button",
-                number       = item.count,
-                quality      = item.quality,
-                elem_tooltip = {
-                    type    = "item-with-quality",
-                    name    = item.name,
-                    quality = item.quality
-                }
-            })
-        end
+    for _, item in ipairs(item_group:getContent()) do
+        grid.add({
+            type         = "sprite-button",
+            sprite       = "item/" .. item.name,
+            style        = "slot_button",
+            number       = item.count,
+            quality      = item.quality,
+            elem_tooltip = {
+                type    = "item-with-quality",
+                name    = item.name,
+                quality = item.quality
+            }
+        })
     end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:refreshSortIcon()
-    local icon = getGroupHeader(self)[GUI_NAME.group_sort_icon]
+function metatable:refresh()
+    for _, item_group in ipairs(self:getItemGroups()) do
+        self:refreshGroup(item_group)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:refreshSortIcon(group_id)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    local icon = getGroupHeader(self, item_group)[GUI_NAME.group_sort_icon]
 
     assert(icon, "ItemGroup sort icon must exist here !")      -- [DEBUG-ONLY] . --
 
-    icon.sprite = SORT_SPRITE[self:getDefaultItemGroup():getSortMode()]
+    icon.sprite = SORT_SPRITE[item_group:getSortMode()]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:setSortMode(sort_mode)
-    self:getDefaultItemGroup():setSortMode(sort_mode)
-    self:refreshSortIcon()
-    self:refresh()
+function metatable:setSortMode(group_id, sort_mode)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    item_group:setSortMode(sort_mode)
+    self:refreshSortIcon(group_id)
+    self:refreshGroup(item_group)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:startRename()
-    local header        = getGroupHeader(self)
+function metatable:startRename(group_id)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    local header        = getGroupHeader(self, item_group)
     local title         = header[GUI_NAME.group_title]
     local rename_button = header[GUI_NAME.group_rename_button]
     local name_field    = header[GUI_NAME.group_name_field]
@@ -195,7 +268,7 @@ function metatable:startRename()
 
     assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
-    name_field.text = self:getDefaultItemGroup():getName()
+    name_field.text = item_group:getName()
 
     title.visible         = false
     rename_button.visible = false
@@ -208,16 +281,18 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:confirmRename()
-    local header        = getGroupHeader(self)
+function metatable:confirmRename(group_id)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    local header        = getGroupHeader(self, item_group)
     local title         = header[GUI_NAME.group_title]
     local rename_button = header[GUI_NAME.group_rename_button]
     local name_field    = header[GUI_NAME.group_name_field]
     local confirm       = header[GUI_NAME.group_confirm_button]
 
     assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
-
-    local item_group = self:getDefaultItemGroup()
 
     item_group:setName(name_field.text)
     title.caption = item_group:getName()
@@ -230,8 +305,47 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:createItemGroup()
+    local inventory  = self:getDefaultItemGroup():getView():getInventory()
+    local item_group = ItemGroupFactory.new(inventory, self.next_group_id)
+
+    self.next_group_id = self.next_group_id + 1
+    self.item_groups[#self.item_groups + 1] = item_group
+
+    factory.createItemGroupGUI(self, item_group)
+    self:refreshGroup(item_group)
+    self:updateMaxHeight()
+
+    local content = self:getFrame()[GUI_NAME.content_frame]
+    local scroll  = content[GUI_NAME.groups_scroll]
+
+    scroll.scroll_to_element(self:getGroupFrame(item_group))
+
+    return item_group
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:removeItemGroup(group_id)
+    assert(#self:getItemGroups() > 1, "The last ItemGroup must not be removed directly !")      -- [DEBUG-ONLY] . --
+
+    for index, item_group in ipairs(self.item_groups) do
+        if item_group:getID() == group_id then
+            self:getGroupFrame(item_group).destroy()
+            table.remove(self.item_groups, index)
+            self:updateMaxHeight()
+            return
+        end
+    end
+
+    assert(false, "ItemGroup to remove does not exist !")      -- [DEBUG-ONLY] . --
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setVisible(visible)
     if visible then
+        self:updateMaxHeight()
         self:refresh()
     end
 
@@ -255,7 +369,7 @@ end
 -- ║ InventoryWindowFactory.                                                                                        ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
-local factory = {
+factory = {
     exposed_gui_names = {
         close_button         = GUI_NAME.close_button,
         add_button           = GUI_NAME.add_button,
@@ -265,7 +379,8 @@ local factory = {
         group_confirm_button = GUI_NAME.group_confirm_button,
         group_menu_button    = GUI_NAME.group_menu_button,
         shortcut_button      = GUI_NAME.shortcut_button,
-        sort_tag_name        = SORT_TAG_NAME
+        sort_tag_name        = SORT_TAG_NAME,
+        group_id_tag_name    = GROUP_ID_TAG_NAME
     }
 }
 
@@ -277,10 +392,11 @@ function factory.create(player, inventory)
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     local window = {                                        ---@type InventoryWindow
-        lua_player  = lua_player,
-        item_groups = {
-            ItemGroupFactory.new(inventory)
-        }
+        lua_player    = lua_player,
+        item_groups   = {
+            ItemGroupFactory.new(inventory, 1)
+        },
+        next_group_id = 2
     }
 
     setmetatable(window, metatable)
@@ -305,10 +421,130 @@ function factory.destroy(player)
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.lua_player  = nil
-    window.item_groups = nil
+    window.lua_player     = nil
+    window.item_groups    = nil
+    window.next_group_id  = nil
 
     storage.windows.main_inventory[player_index] = nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.createItemGroupGUI(window, item_group)                         ---@private
+    local container = window:getGroupsContainer()
+    local group_id  = item_group:getID()
+    local tags      = {
+        [GROUP_ID_TAG_NAME] = group_id
+    }
+
+    local group = container.add({
+        type      = "frame",
+        name      = GUI_NAME.group_frame .. "-" .. group_id,
+        direction = "vertical"
+    })
+
+    group.style.padding                  = 2
+    group.style.horizontally_stretchable = true
+
+    local header = group.add({
+        type      = "flow",
+        name      = GUI_NAME.group_header,
+        direction = "horizontal"
+    })
+
+    header.style.horizontal_spacing       = 2
+    header.style.horizontally_stretchable = true
+    header.style.vertical_align           = "center"
+
+    local group_title = header.add({
+        type    = "label",
+        name    = GUI_NAME.group_title,
+        caption = item_group:getName()
+    })
+
+    group_title.style.top_margin    = 0
+    group_title.style.bottom_margin = 0
+
+    local rename_button = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_rename_button,
+        sprite  = "utility/rename_icon",
+        style   = "button",
+        tooltip = "Rename group",
+        tags    = tags
+    })
+
+    rename_button.style.width   = 16
+    rename_button.style.height  = 16
+    rename_button.style.padding = 0
+
+    local name_field = header.add({
+        type                  = "textfield",
+        name                  = GUI_NAME.group_name_field,
+        text                  = item_group:getName(),
+        icon_selector         = true,
+        lose_focus_on_confirm = true,
+        visible               = false,
+        tags                  = tags
+    })
+
+    name_field.style.width  = 180
+    name_field.style.height = 28
+
+    local confirm = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_confirm_button,
+        sprite  = "utility/enter",
+        style   = "green_button",
+        tooltip = "Confirm group name",
+        visible = false,
+        tags    = tags
+    })
+
+    confirm.style.width   = 28
+    confirm.style.height  = 28
+    confirm.style.padding = 0
+
+    local spacer = header.add({
+        type = "empty-widget",
+        name = GUI_NAME.group_spacer
+    })
+
+    spacer.style.horizontally_stretchable = true
+
+    local sort_icon = header.add({
+        type    = "sprite",
+        name    = GUI_NAME.group_sort_icon,
+        sprite  = SORT_SPRITE[item_group:getSortMode()],
+        tooltip = "Current sorting"
+    })
+
+    sort_icon.style.width  = 22
+    sort_icon.style.height = 22
+
+    local menu_button = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_menu_button,
+        sprite  = MOD_PREFIX .. "group-menu",
+        style   = "frame_action_button",
+        tooltip = "Group options",
+        tags    = tags
+    })
+
+    menu_button.style.width   = 22
+    menu_button.style.height  = 22
+    menu_button.style.padding = 0
+
+    local grid = group.add({
+        type         = "table",
+        name         = GUI_NAME.inventory_grid,
+        column_count = 10
+    })
+
+    grid.style.horizontal_spacing = 0
+    grid.style.vertical_spacing   = 0
+
+    return group
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -353,7 +589,7 @@ function factory.createGUI(window)                                              
         name    = GUI_NAME.add_button,
         sprite  = "utility/add_white",
         style   = "frame_action_button",
-        tooltip = "Add group (not implemented yet)"
+        tooltip = "Add group"
     })
 
     add_button.style.width   = 16
@@ -396,112 +632,33 @@ function factory.createGUI(window)                                              
     content.style.padding                  = 2
     content.style.horizontally_stretchable = true
 
-    local group = content.add({
-        type      = "frame",
-        name      = GUI_NAME.group_frame,
+    local scroll = content.add({
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.groups_scroll,
+        direction                = "vertical",
+        style                    = "naked_scroll_pane",
+        horizontal_scroll_policy = "never",
+        vertical_scroll_policy   = "auto"
+    })
+
+    scroll.style.padding                  = 0
+    scroll.style.horizontally_stretchable = true
+
+    local container = scroll.add({
+        type      = "flow",
+        name      = GUI_NAME.groups_container,
         direction = "vertical"
     })
 
-    group.style.padding                  = 2
-    group.style.horizontally_stretchable = true
+    container.style.vertical_spacing         = 2
+    container.style.horizontally_stretchable = true
 
-    local header = group.add({
-        type      = "flow",
-        name      = GUI_NAME.group_header,
-        direction = "horizontal"
-    })
-
-    header.style.horizontal_spacing       = 2
-    header.style.horizontally_stretchable = true
-    header.style.vertical_align           = "center"
-
-    local item_group = window:getDefaultItemGroup()
-
-    local group_title = header.add({
-        type    = "label",
-        name    = GUI_NAME.group_title,
-        caption = item_group:getName()
-    })
-
-    group_title.style.top_margin    = 0
-    group_title.style.bottom_margin = 0
-
-    local rename_button = header.add({
-        type    = "sprite-button",
-        name    = GUI_NAME.group_rename_button,
-        sprite  = "utility/rename_icon",
-        style   = "button",
-        tooltip = "Rename group"
-    })
-
-    rename_button.style.width   = 16
-    rename_button.style.height  = 16
-    rename_button.style.padding = 0
-
-    local name_field = header.add({
-        type                  = "textfield",
-        name                  = GUI_NAME.group_name_field,
-        text                  = item_group:getName(),
-        icon_selector         = true,
-        lose_focus_on_confirm = true,
-        visible               = false
-    })
-
-    name_field.style.width  = 180
-    name_field.style.height = 28
-
-    local confirm = header.add({
-        type    = "sprite-button",
-        name    = GUI_NAME.group_confirm_button,
-        sprite  = "utility/enter",
-        style   = "green_button",
-        tooltip = "Confirm group name",
-        visible = false
-    })
-
-    confirm.style.width   = 28
-    confirm.style.height  = 28
-    confirm.style.padding = 0
-
-    local spacer = header.add({
-        type = "empty-widget",
-        name = GUI_NAME.group_spacer
-    })
-
-    spacer.style.horizontally_stretchable = true
-
-    local sort_icon = header.add({
-        type    = "sprite",
-        name    = GUI_NAME.group_sort_icon,
-        sprite  = SORT_SPRITE[item_group:getSortMode()],
-        tooltip = "Current sorting"
-    })
-
-    sort_icon.style.width  = 22
-    sort_icon.style.height = 22
-
-    local menu_button = header.add({
-        type    = "sprite-button",
-        name    = GUI_NAME.group_menu_button,
-        sprite  = MOD_PREFIX .. "group-menu",
-        style   = "frame_action_button",
-        tooltip = "Group options"
-    })
-
-    menu_button.style.width   = 22
-    menu_button.style.height  = 22
-    menu_button.style.padding = 0
-
-    local grid = group.add({
-        type         = "table",
-        name         = GUI_NAME.inventory_grid,
-        column_count = 10
-    })
-
-    grid.style.horizontal_spacing = 0
-    grid.style.vertical_spacing   = 0
+    for _, item_group in ipairs(window:getItemGroups()) do
+        factory.createItemGroupGUI(window, item_group)
+    end
 
     frame.auto_center = true
+    window:updateMaxHeight()
     window:setVisible(true)
 
     return frame
