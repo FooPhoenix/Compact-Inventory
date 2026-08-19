@@ -94,34 +94,50 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     local gui_names  = WindowsManager.exposed_gui_names.InventoryWindow
     local menu_names = ItemGroupMenuFactory.exposed_gui_names
+    local window     = WindowsManager.hasWindowMainInventory(event.player_index)
+        and WindowsManager.getWindowMainInventory(event.player_index)
+        or nil
 
     if event.element.name == gui_names.close_button then
         ItemGroupMenuFactory.close(event.player_index)
-        WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
+        window:setVisible(false)
+
+    elseif event.element.name == gui_names.add_button then
+        window:createItemGroup()
 
     elseif event.element.name == gui_names.group_rename_button then
-        WindowsManager.getWindowMainInventory(event.player_index):startRename()
+        window:startRename(event.element.tags[gui_names.group_id_tag_name])
 
     elseif event.element.name == gui_names.group_confirm_button then
-        WindowsManager.getWindowMainInventory(event.player_index):confirmRename()
+        window:confirmRename(event.element.tags[gui_names.group_id_tag_name])
 
     elseif event.element.name == gui_names.group_menu_button then
-        ItemGroupMenuFactory.open(
-            WindowsManager.getWindowMainInventory(event.player_index),
-            event.cursor_display_location
-        )
+        local group_id   = event.element.tags[gui_names.group_id_tag_name]
+        local item_group = window:getItemGroupByID(group_id)
+
+        assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+        ItemGroupMenuFactory.open(window, item_group, event.cursor_display_location)
 
     elseif event.element.name == menu_names.sort_toggle_button then
         ItemGroupMenuFactory.toggleSortColumn(event.player_index)
 
     elseif event.element.name == menu_names.delete_group_button then
-        ItemGroupMenuFactory.close(event.player_index)
-        WindowsManager.destroyWindowMainInventory(event.player_index)
+        local group_id = event.element.tags[menu_names.group_id_tag_name]
 
-    elseif event.element.tags[gui_names.sort_tag_name] then
-        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
-            event.element.tags[gui_names.sort_tag_name]
-        )
+        ItemGroupMenuFactory.close(event.player_index)
+
+        if #window:getItemGroups() == 1 then
+            WindowsManager.destroyWindowMainInventory(event.player_index)
+        else
+            window:removeItemGroup(group_id)
+        end
+
+    elseif event.element.tags[menu_names.sort_tag_name] then
+        local sort_mode = event.element.tags[menu_names.sort_tag_name]
+        local group_id  = event.element.tags[menu_names.group_id_tag_name]
+
+        window:setSortMode(group_id, sort_mode)
         ItemGroupMenuFactory.close(event.player_index)
     end
 end)
@@ -132,7 +148,9 @@ script.on_event(defines.events.on_gui_confirmed, function(event)
     local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
 
     if event.element.name == gui_names.group_name_field then
-        WindowsManager.getWindowMainInventory(event.player_index):confirmRename()
+        WindowsManager.getWindowMainInventory(event.player_index):confirmRename(
+            event.element.tags[gui_names.group_id_tag_name]
+        )
     end
 end)
 
@@ -152,6 +170,22 @@ end)
 
 script.on_event(defines.events.on_tick, function(event)
     ItemGroupMenuFactory.onTick(event)
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function updateWindowMaxHeight(player_index)
+    if WindowsManager.hasWindowMainInventory(player_index) then
+        WindowsManager.getWindowMainInventory(player_index):updateMaxHeight()
+    end
+end
+
+script.on_event(defines.events.on_player_display_resolution_changed, function(event)
+    updateWindowMaxHeight(event.player_index)
+end)
+
+script.on_event(defines.events.on_player_display_scale_changed, function(event)
+    updateWindowMaxHeight(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
