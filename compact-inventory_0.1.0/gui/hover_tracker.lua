@@ -61,6 +61,16 @@ function metatable:shouldClose(tick)
         and self.last_event_tick == tick - 1
 end
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getDebugState()
+    return {
+        waiting_for_reenter = self.waiting_for_reenter,
+        last_event          = self.last_event,
+        last_event_tick     = self.last_event_tick
+    }
+end
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ HoverTrackerFactory.                                                                                          ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -72,7 +82,7 @@ local factory = { }
 --- ### Create a new hover tracker.
 --
 --- -----
---- @return HoverTracker      @ Returns the created hover tracker.
+--- @return HoverTracker      @ Returns the created HoverTracker.
 --
 function factory.new()
     local tracker = {                                      ---@type HoverTracker
