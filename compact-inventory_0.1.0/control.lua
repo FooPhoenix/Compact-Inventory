@@ -8,6 +8,19 @@ local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
 local FilterMode = InventoryViewFactory.filter_modes
 
+-- [TEST-ONLY] Temporary lock-mode prototype. --
+local LOCK_TEST_GUI = {
+    main_frame           = MOD_PREFIX .. "IW_frame",
+    title_bar            = MOD_PREFIX .. "IW_titlebar",
+    content_frame        = MOD_PREFIX .. "IW_content-frame",
+    groups_scroll        = MOD_PREFIX .. "IW_groups-scroll",
+    groups_container     = MOD_PREFIX .. "IW_groups-container",
+    group_header         = MOD_PREFIX .. "IG_header",
+    group_rename_button  = MOD_PREFIX .. "IG_rename-button",
+    group_menu_button    = MOD_PREFIX .. "IG_menu-button",
+    group_unlock_button  = MOD_PREFIX .. "IG_unlock-test"
+}
+
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 --- ### This function receive a player index or a LuaPlayer and will return both.
@@ -36,6 +49,67 @@ function resolve_player(player)
     end
 
     return player_index, player
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function setLockTestMode(window, locked)
+    local frame     = window:getFrame()
+    local title_bar = frame[LOCK_TEST_GUI.title_bar]
+    local content   = frame[LOCK_TEST_GUI.content_frame]
+    local scroll    = content and content[LOCK_TEST_GUI.groups_scroll]
+    local container = scroll and scroll[LOCK_TEST_GUI.groups_container]
+
+    assert(title_bar and content and container, "Lock test GUI must be complete here !")      -- [DEBUG-ONLY] . --
+
+    title_bar.visible = not locked
+
+    frame.style = locked and MOD_PREFIX .. "locked-window-frame" or "frame"
+    frame.style.left_padding   = locked and 0 or 4
+    frame.style.right_padding  = locked and 0 or 4
+    frame.style.top_padding    = locked and 0 or 3
+    frame.style.bottom_padding = locked and 0 or 4
+
+    content.style = locked and MOD_PREFIX .. "locked-content-frame" or "inside_shallow_frame"
+    content.style.padding                  = locked and 0 or 2
+    content.style.horizontally_stretchable = true
+
+    for index, group in ipairs(container.children) do
+        group.style = locked and MOD_PREFIX .. "locked-window-frame" or "frame"
+        group.style.padding                  = locked and 0 or 2
+        group.style.horizontally_stretchable = true
+
+        local header = group[LOCK_TEST_GUI.group_header]
+        assert(header, "ItemGroup header must exist here !")      -- [DEBUG-ONLY] . --
+
+        local rename_button = header[LOCK_TEST_GUI.group_rename_button]
+        local menu_button   = header[LOCK_TEST_GUI.group_menu_button]
+
+        assert(rename_button and menu_button, "ItemGroup lock test controls must exist here !")      -- [DEBUG-ONLY] . --
+
+        rename_button.visible = not locked
+        menu_button.visible   = not locked
+
+        local unlock_button = header[LOCK_TEST_GUI.group_unlock_button]
+
+        if locked and index == 1 then
+            if not unlock_button then
+                unlock_button = header.add({
+                    type    = "sprite-button",
+                    name    = LOCK_TEST_GUI.group_unlock_button,
+                    sprite  = MOD_PREFIX .. "window-unlock",
+                    style   = "frame_action_button",
+                    tooltip = "Unlock window"
+                })
+
+                unlock_button.style.width   = 22
+                unlock_button.style.height  = 22
+                unlock_button.style.padding = 0
+            end
+        elseif unlock_button then
+            unlock_button.destroy()
+        end
+    end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -106,6 +180,13 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == gui_names.add_button then
         window:createItemGroup()
+
+    elseif event.element.name == gui_names.lock_button then
+        ItemGroupMenuFactory.close(event.player_index)
+        setLockTestMode(window, true)
+
+    elseif event.element.name == LOCK_TEST_GUI.group_unlock_button then
+        setLockTestMode(window, false)
 
     elseif event.element.name == gui_names.group_rename_button then
         window:startRename(event.element.tags[gui_names.group_id_tag_name])
