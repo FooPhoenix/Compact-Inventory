@@ -152,6 +152,7 @@ function factory.attach(window)
 
     header.style.horizontal_spacing       = 2
     header.style.horizontally_stretchable = true
+    header.style.vertical_align           = "center"
 
     local group_title = header.add({
         type    = "label",
