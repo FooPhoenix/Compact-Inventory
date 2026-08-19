@@ -6,15 +6,17 @@ local InventoryViewFactory = require("inventory.inventory_view")
 local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
-    menu                 = MOD_PREFIX .. "IG_options-menu",
-    group_column         = MOD_PREFIX .. "IG_options-group-column",
-    group_title          = MOD_PREFIX .. "IG_options-group-title",
-    sort_column_wrapper  = MOD_PREFIX .. "IG_options-sort-wrapper",
-    sort_separator       = MOD_PREFIX .. "IG_options-sort-separator",
-    sort_column          = MOD_PREFIX .. "IG_options-sort-column",
-    sort_title           = MOD_PREFIX .. "IG_options-sort-title",
-    sort_toggle_button   = MOD_PREFIX .. "IG_options-sort-toggle",
-    delete_group_button  = MOD_PREFIX .. "IG_options-delete-group"
+    menu                = MOD_PREFIX .. "IG_options-menu",
+    group_column        = MOD_PREFIX .. "IG_options-group-column",
+    group_title         = MOD_PREFIX .. "IG_options-group-title",
+    group_filler        = MOD_PREFIX .. "IG_options-group-filler",
+    sort_column_wrapper = MOD_PREFIX .. "IG_options-sort-wrapper",
+    sort_outer_frame    = MOD_PREFIX .. "IG_options-sort-outer-frame",
+    sort_inner_frame    = MOD_PREFIX .. "IG_options-sort-inner-frame",
+    sort_column         = MOD_PREFIX .. "IG_options-sort-column",
+    sort_title          = MOD_PREFIX .. "IG_options-sort-title",
+    sort_toggle_button  = MOD_PREFIX .. "IG_options-sort-toggle",
+    delete_group_button = MOD_PREFIX .. "IG_options-delete-group"
 }
 
 local SORT_SPRITE = {
@@ -105,7 +107,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function addColumnTitle(parent, menu, name, caption)
+local function addColumnTitle(parent, menu, name, caption, with_dragger)
     local title_flow = parent.add({
         type               = "flow",
         direction          = "horizontal",
@@ -114,6 +116,7 @@ local function addColumnTitle(parent, menu, name, caption)
 
     title_flow.style.horizontal_spacing       = 4
     title_flow.style.horizontally_stretchable = true
+    title_flow.style.vertical_align           = "center"
 
     local title = title_flow.add({
         type               = "label",
@@ -123,17 +126,20 @@ local function addColumnTitle(parent, menu, name, caption)
         raise_hover_events = true
     })
 
+    title.style.font = "default-bold"
     title.drag_target = menu
 
-    local dragger = title_flow.add({
-        type               = "empty-widget",
-        style              = "draggable_space",
-        raise_hover_events = true
-    })
+    if with_dragger then
+        local dragger = title_flow.add({
+            type               = "empty-widget",
+            style              = "draggable_space",
+            raise_hover_events = true
+        })
 
-    dragger.style.horizontally_stretchable = true
-    dragger.style.height = 16
-    dragger.drag_target  = menu
+        dragger.style.horizontally_stretchable = true
+        dragger.style.height = 16
+        dragger.drag_target  = menu
+    end
 
     return title_flow
 end
@@ -205,9 +211,10 @@ function factory.open(window, location)
         raise_hover_events = true
     })
 
-    group_column.style.vertical_spacing = 2
+    group_column.style.vertical_spacing       = 2
+    group_column.style.vertically_stretchable = true
 
-    addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options")
+    addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options", true)
 
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false)
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false)
@@ -215,6 +222,15 @@ function factory.open(window, location)
 
     addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true)
     addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true)
+
+    local filler = group_column.add({
+        type               = "empty-widget",
+        name               = GUI_NAME.group_filler,
+        raise_hover_events = true
+    })
+
+    filler.style.vertically_stretchable   = true
+    filler.style.horizontally_stretchable = true
 
     local sort_wrapper = menu.add({
         type               = "flow",
@@ -224,21 +240,26 @@ function factory.open(window, location)
         raise_hover_events = true
     })
 
-    sort_wrapper.style.horizontal_spacing = 4
-
-    local separator = sort_wrapper.add({
+    local sort_outer = sort_wrapper.add({
         type               = "frame",
-        name               = GUI_NAME.sort_separator,
+        name               = GUI_NAME.sort_outer_frame,
         direction          = "vertical",
         style              = "inside_shallow_frame",
         raise_hover_events = true
     })
 
-    separator.style.width                  = 2
-    separator.style.vertically_stretchable = true
-    separator.style.padding                = 0
+    sort_outer.style.padding = 2
 
-    local sort_column = sort_wrapper.add({
+    local sort_inner = sort_outer.add({
+        type               = "frame",
+        name               = GUI_NAME.sort_inner_frame,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    sort_inner.style.padding = 2
+
+    local sort_column = sort_inner.add({
         type               = "flow",
         name               = GUI_NAME.sort_column,
         direction          = "vertical",
@@ -247,7 +268,7 @@ function factory.open(window, location)
 
     sort_column.style.vertical_spacing = 2
 
-    addColumnTitle(sort_column, menu, GUI_NAME.sort_title, "Sort options")
+    addColumnTitle(sort_column, menu, GUI_NAME.sort_title, "Sort options", false)
 
     for sort_mode = SortMode.standard, SortMode.custom do
         local row = sort_column.add({
