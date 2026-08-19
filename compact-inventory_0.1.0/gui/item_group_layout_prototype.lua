@@ -19,8 +19,8 @@ local GUI_NAME = {
     group_header        = MOD_PREFIX .. "IG_header",
     group_title         = MOD_PREFIX .. "IG_title",
     group_spacer        = MOD_PREFIX .. "IG_spacer",
-    group_sort_button   = MOD_PREFIX .. "IG_sort-button",
-    group_close_button  = MOD_PREFIX .. "IG_close-button"
+    group_sort_icon     = MOD_PREFIX .. "IG_sort-icon",
+    group_menu_button   = MOD_PREFIX .. "IG_menu-button"
 }
 
 local SORT_SPRITE = {
@@ -38,15 +38,14 @@ local SORT_SPRITE = {
 
 local factory = {
     exposed_gui_names = {
-        lock_button        = GUI_NAME.lock_button,
-        group_sort_button  = GUI_NAME.group_sort_button,
-        group_close_button = GUI_NAME.group_close_button
+        lock_button       = GUI_NAME.lock_button,
+        group_menu_button = GUI_NAME.group_menu_button
     }
 }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Refresh the experimental group sorting button.
+--- ### Refresh the experimental group sorting icon.
 --
 --- -----
 --- @param window InventoryWindow      The affected inventory window.
@@ -58,11 +57,11 @@ function factory.refreshSortButton(window)
     local content = window:getFrame()[GUI_NAME.content_flow]
     local group   = content and content[GUI_NAME.group_frame]
     local header  = group and group[GUI_NAME.group_header]
-    local button  = header and header[GUI_NAME.group_sort_button]
+    local icon    = header and header[GUI_NAME.group_sort_icon]
 
-    assert(button, "Experimental ItemGroup sort button must exist here !")      -- [DEBUG-ONLY] . --
+    assert(icon, "Experimental ItemGroup sort icon must exist here !")      -- [DEBUG-ONLY] . --
 
-    button.sprite = SORT_SPRITE[window:getDefaultItemGroup():getSortMode()]
+    icon.sprite = SORT_SPRITE[window:getDefaultItemGroup():getSortMode()]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -170,29 +169,27 @@ function factory.attach(window)
 
     spacer.style.horizontally_stretchable = true
 
-    local sort_button = header.add({
-        type    = "sprite-button",
-        name    = GUI_NAME.group_sort_button,
+    local sort_icon = header.add({
+        type    = "sprite",
+        name    = GUI_NAME.group_sort_icon,
         sprite  = SORT_SPRITE[window:getDefaultItemGroup():getSortMode()],
-        style   = "frame_action_button",
-        tooltip = "Sorting"
+        tooltip = "Current sorting"
     })
 
-    sort_button.style.width   = 20
-    sort_button.style.height  = 20
-    sort_button.style.padding = 0
+    sort_icon.style.width  = 22
+    sort_icon.style.height = 22
 
-    local close_group = header.add({
+    local menu_button = header.add({
         type    = "sprite-button",
-        name    = GUI_NAME.group_close_button,
-        sprite  = MOD_PREFIX .. "group-delete",
+        name    = GUI_NAME.group_menu_button,
+        sprite  = MOD_PREFIX .. "group-menu",
         style   = "frame_action_button",
-        tooltip = "Delete group"
+        tooltip = "Group options"
     })
 
-    close_group.style.width   = 20
-    close_group.style.height  = 20
-    close_group.style.padding = 0
+    menu_button.style.width   = 22
+    menu_button.style.height  = 22
+    menu_button.style.padding = 0
 
     local grid = group.add({
         type         = "table",
