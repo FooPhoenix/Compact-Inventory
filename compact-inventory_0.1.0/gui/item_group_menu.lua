@@ -3,21 +3,30 @@ local InventoryViewFactory = require("inventory.inventory_view")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
-local SortMode = InventoryViewFactory.sort_modes
+local SortMode   = InventoryViewFactory.sort_modes
+local FilterMode = InventoryViewFactory.filter_modes
 
 local GUI_NAME = {
-    menu                = MOD_PREFIX .. "IG_options-menu",
-    columns_flow        = MOD_PREFIX .. "IG_options-columns-flow",
-    group_column        = MOD_PREFIX .. "IG_options-group-column",
-    group_title         = MOD_PREFIX .. "IG_options-group-title",
-    group_filler        = MOD_PREFIX .. "IG_options-group-filler",
-    sort_column_wrapper = MOD_PREFIX .. "IG_options-sort-wrapper",
-    sort_outer_frame    = MOD_PREFIX .. "IG_options-sort-outer-frame",
-    sort_inner_frame    = MOD_PREFIX .. "IG_options-sort-inner-frame",
-    sort_column         = MOD_PREFIX .. "IG_options-sort-column",
-    sort_title          = MOD_PREFIX .. "IG_options-sort-title",
-    sort_toggle_button  = MOD_PREFIX .. "IG_options-sort-toggle",
-    delete_group_button = MOD_PREFIX .. "IG_options-delete-group"
+    menu                  = MOD_PREFIX .. "IG_options-menu",
+    columns_flow          = MOD_PREFIX .. "IG_options-columns-flow",
+    group_column          = MOD_PREFIX .. "IG_options-group-column",
+    group_title           = MOD_PREFIX .. "IG_options-group-title",
+    group_filler          = MOD_PREFIX .. "IG_options-group-filler",
+    sort_column_wrapper   = MOD_PREFIX .. "IG_options-sort-wrapper",
+    sort_outer_frame      = MOD_PREFIX .. "IG_options-sort-outer-frame",
+    sort_inner_frame      = MOD_PREFIX .. "IG_options-sort-inner-frame",
+    sort_column           = MOD_PREFIX .. "IG_options-sort-column",
+    sort_title            = MOD_PREFIX .. "IG_options-sort-title",
+    sort_toggle_button    = MOD_PREFIX .. "IG_options-sort-toggle",
+    filter_column_wrapper = MOD_PREFIX .. "IG_options-filter-wrapper",
+    filter_outer_frame    = MOD_PREFIX .. "IG_options-filter-outer-frame",
+    filter_inner_frame    = MOD_PREFIX .. "IG_options-filter-inner-frame",
+    filter_column         = MOD_PREFIX .. "IG_options-filter-column",
+    filter_title          = MOD_PREFIX .. "IG_options-filter-title",
+    filter_switch         = MOD_PREFIX .. "IG_options-filter-switch",
+    filter_table          = MOD_PREFIX .. "IG_options-filter-table",
+    filter_toggle_button  = MOD_PREFIX .. "IG_options-filter-toggle",
+    delete_group_button   = MOD_PREFIX .. "IG_options-delete-group"
 }
 
 local SORT_SPRITE = {
@@ -38,17 +47,21 @@ local SORT_CAPTION = {
     [SortMode.custom]           = "Custom sorting"
 }
 
-local SORT_TAG_NAME     = MOD_PREFIX .. "SortID"
-local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
-local hover_state       = { }
+local SORT_TAG_NAME        = MOD_PREFIX .. "SortID"
+local GROUP_ID_TAG_NAME    = MOD_PREFIX .. "ItemGroupID"
+local FILTER_SLOT_TAG_NAME = MOD_PREFIX .. "FilterSlot"
+local hover_state          = { }
 
 local factory = {
     exposed_gui_names = {
-        menu                = GUI_NAME.menu,
-        sort_toggle_button  = GUI_NAME.sort_toggle_button,
-        delete_group_button = GUI_NAME.delete_group_button,
-        sort_tag_name       = SORT_TAG_NAME,
-        group_id_tag_name   = GROUP_ID_TAG_NAME
+        menu                 = GUI_NAME.menu,
+        sort_toggle_button   = GUI_NAME.sort_toggle_button,
+        filter_toggle_button = GUI_NAME.filter_toggle_button,
+        filter_switch        = GUI_NAME.filter_switch,
+        delete_group_button  = GUI_NAME.delete_group_button,
+        sort_tag_name        = SORT_TAG_NAME,
+        group_id_tag_name    = GROUP_ID_TAG_NAME,
+        filter_slot_tag_name = FILTER_SLOT_TAG_NAME
     }
 }
 
@@ -131,6 +144,100 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function addRaisedColumn(parent, wrapper_name, outer_name, inner_name, column_name, visible)
+    local wrapper = parent.add({
+        type               = "flow",
+        name               = wrapper_name,
+        direction          = "horizontal",
+        visible            = visible,
+        raise_hover_events = true
+    })
+
+    local outer = wrapper.add({
+        type               = "frame",
+        name               = outer_name,
+        direction          = "vertical",
+        style              = "inside_shallow_frame",
+        raise_hover_events = true
+    })
+
+    outer.style.padding = 2
+
+    local inner = outer.add({
+        type               = "frame",
+        name               = inner_name,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    inner.style.padding = 2
+
+    local column = inner.add({
+        type               = "flow",
+        name               = column_name,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    column.style.vertical_spacing = 2
+
+    return column
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getFilterTable(menu)
+    local columns_flow   = menu[GUI_NAME.columns_flow]
+    local filter_wrapper = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
+    local outer          = filter_wrapper and filter_wrapper[GUI_NAME.filter_outer_frame]
+    local inner          = outer and outer[GUI_NAME.filter_inner_frame]
+    local column         = inner and inner[GUI_NAME.filter_column]
+    local filter_table   = column and column[GUI_NAME.filter_table]
+
+    assert(filter_table, "Filter table must exist here !")      -- [DEBUG-ONLY] . --
+
+    return filter_table
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.refreshFilterTable(window, item_group)
+
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+
+    local lua_player = window:getPlayer()
+    local menu       = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local filter_table = getFilterTable(menu)
+    local group_id     = item_group:getID()
+    local filters      = item_group:getFilters()
+
+    filter_table.clear()
+
+    for slot_index = 1, item_group:getVisibleFilterSlotCount() do
+        filter_table.add({
+            type               = "choose-elem-button",
+            name               = MOD_PREFIX .. "IG_options-filter-slot-" .. slot_index,
+            elem_type          = "item",
+            elem_value         = filters[slot_index],
+            raise_hover_events = true,
+            tags               = {
+                [GROUP_ID_TAG_NAME]    = group_id,
+                [FILTER_SLOT_TAG_NAME] = slot_index
+            }
+        })
+    end
+
+    recordEvent(lua_player.index, "HOVER", game.tick)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Open the group options menu at the cursor location.
 --
 --- -----
@@ -188,6 +295,7 @@ function factory.open(window, item_group, location)
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false, group_id)
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-down", "Move down", false, group_id)
     addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true, group_id)
+    addGroupAction(group_column, GUI_NAME.filter_toggle_button, "Filtering options  >", true, group_id)
     addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true, group_id)
 
     local filler = group_column.add({
@@ -199,41 +307,15 @@ function factory.open(window, item_group, location)
     filler.style.vertically_stretchable   = true
     filler.style.horizontally_stretchable = true
 
-    local sort_wrapper = columns_flow.add({
-        type               = "flow",
-        name               = GUI_NAME.sort_column_wrapper,
-        direction          = "horizontal",
-        visible            = false,
-        raise_hover_events = true
-    })
+    local sort_column = addRaisedColumn(
+        columns_flow,
+        GUI_NAME.sort_column_wrapper,
+        GUI_NAME.sort_outer_frame,
+        GUI_NAME.sort_inner_frame,
+        GUI_NAME.sort_column,
+        false
+    )
 
-    local sort_outer = sort_wrapper.add({
-        type               = "frame",
-        name               = GUI_NAME.sort_outer_frame,
-        direction          = "vertical",
-        style              = "inside_shallow_frame",
-        raise_hover_events = true
-    })
-
-    sort_outer.style.padding = 2
-
-    local sort_inner = sort_outer.add({
-        type               = "frame",
-        name               = GUI_NAME.sort_inner_frame,
-        direction          = "vertical",
-        raise_hover_events = true
-    })
-
-    sort_inner.style.padding = 2
-
-    local sort_column = sort_inner.add({
-        type               = "flow",
-        name               = GUI_NAME.sort_column,
-        direction          = "vertical",
-        raise_hover_events = true
-    })
-
-    sort_column.style.vertical_spacing = 2
     addColumnTitle(sort_column, menu, GUI_NAME.sort_title, "Sort options", false)
 
     for sort_mode = SortMode.standard, SortMode.custom do
@@ -265,6 +347,41 @@ function factory.open(window, item_group, location)
         button.style.horizontally_stretchable = true
     end
 
+    local filter_column = addRaisedColumn(
+        columns_flow,
+        GUI_NAME.filter_column_wrapper,
+        GUI_NAME.filter_outer_frame,
+        GUI_NAME.filter_inner_frame,
+        GUI_NAME.filter_column,
+        false
+    )
+
+    addColumnTitle(filter_column, menu, GUI_NAME.filter_title, "Filter options", false)
+
+    filter_column.add({
+        type                = "switch",
+        name                = GUI_NAME.filter_switch,
+        switch_state        = item_group:getFilterMode() == FilterMode.blacklist and "left" or "right",
+        allow_none_state    = false,
+        left_label_caption  = "Blacklist",
+        right_label_caption = "Whitelist",
+        raise_hover_events  = true,
+        tags                = {
+            [GROUP_ID_TAG_NAME] = group_id
+        }
+    })
+
+    local filter_table = filter_column.add({
+        type         = "table",
+        name         = GUI_NAME.filter_table,
+        column_count = 10
+    })
+
+    filter_table.style.horizontal_spacing = 0
+    filter_table.style.vertical_spacing   = 0
+
+    factory.refreshFilterTable(window, item_group)
+
     recordEvent(lua_player.index, "HOVER", game.tick)
     menu.bring_to_front()
 end
@@ -286,6 +403,25 @@ function factory.toggleSortColumn(player)
     assert(sort_wrapper, "Sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
     sort_wrapper.visible = not sort_wrapper.visible
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.toggleFilterColumn(player)
+
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local columns_flow   = menu[GUI_NAME.columns_flow]
+    local filter_wrapper = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
+
+    assert(filter_wrapper, "Filter options wrapper must exist here !")      -- [DEBUG-ONLY] . --
+
+    filter_wrapper.visible = not filter_wrapper.visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
