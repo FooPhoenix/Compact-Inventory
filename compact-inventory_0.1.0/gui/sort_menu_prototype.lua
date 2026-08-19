@@ -106,7 +106,16 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function addColumnTitle(parent, menu, name, caption)
-    local title = parent.add({
+    local title_flow = parent.add({
+        type               = "flow",
+        direction          = "horizontal",
+        raise_hover_events = true
+    })
+
+    title_flow.style.horizontal_spacing       = 4
+    title_flow.style.horizontally_stretchable = true
+
+    local title = title_flow.add({
         type               = "label",
         name               = name,
         caption            = caption,
@@ -116,7 +125,17 @@ local function addColumnTitle(parent, menu, name, caption)
 
     title.drag_target = menu
 
-    return title
+    local dragger = title_flow.add({
+        type               = "empty-widget",
+        style              = "draggable_space",
+        raise_hover_events = true
+    })
+
+    dragger.style.horizontally_stretchable = true
+    dragger.style.height = 16
+    dragger.drag_target  = menu
+
+    return title_flow
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -207,12 +226,17 @@ function factory.open(window, location)
 
     sort_wrapper.style.horizontal_spacing = 4
 
-    sort_wrapper.add({
-        type               = "line",
+    local separator = sort_wrapper.add({
+        type               = "frame",
         name               = GUI_NAME.sort_separator,
         direction          = "vertical",
+        style              = "inside_shallow_frame",
         raise_hover_events = true
     })
+
+    separator.style.width                  = 2
+    separator.style.vertically_stretchable = true
+    separator.style.padding                = 0
 
     local sort_column = sort_wrapper.add({
         type               = "flow",
