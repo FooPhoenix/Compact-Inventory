@@ -107,6 +107,13 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == gui_names.add_button then
         window:createItemGroup()
 
+    elseif event.element.name == gui_names.lock_button then
+        ItemGroupMenuFactory.close(event.player_index)
+        window:setLocked(true)
+
+    elseif event.element.name == gui_names.group_unlock_button then
+        window:setLocked(false)
+
     elseif event.element.name == gui_names.group_rename_button then
         window:startRename(event.element.tags[gui_names.group_id_tag_name])
 
@@ -275,7 +282,12 @@ script.on_event(defines.events.on_lua_shortcut, function(event)
         ItemGroupMenuFactory.close(event.player_index)
 
         if WindowsManager.hasWindowMainInventory(event.player_index) then
-            WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
+            local window = WindowsManager.getWindowMainInventory(event.player_index)
+            window:toggleVisibility()
+
+            if window:isVisible() then
+                window:setLocked(window:isLocked())
+            end
         else
             WindowsManager.createWindowMainInventory(event.player_index)
         end

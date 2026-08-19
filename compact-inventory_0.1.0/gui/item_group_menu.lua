@@ -96,18 +96,6 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getItemGroupIndex(window, item_group)
-    for index, current_group in ipairs(window:getItemGroups()) do
-        if current_group == item_group then
-            return index
-        end
-    end
-
-    return nil
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 local function addColumnTitle(parent, menu, name, caption, with_dragger)
     local title_flow = parent.add({
         type               = "flow",
@@ -219,54 +207,24 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.refreshMoveButtons(window, item_group)
-
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
-    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
-
-    local menu = window:getPlayer().gui.screen[GUI_NAME.menu]
-
-    if not menu then
-        return
-    end
-
+local function refreshMoveButtons(menu, item_group, window)
     local group_column = menu[GUI_NAME.columns_flow][GUI_NAME.group_column]
-    local group_index  = getItemGroupIndex(window, item_group)
-    local group_count  = #window:getItemGroups()
+    local move_up      = group_column[GUI_NAME.move_up_button]
+    local move_down    = group_column[GUI_NAME.move_down_button]
+    local group_index
 
-    assert(group_index, "ItemGroup must exist in the window !")                    -- [DEBUG-ONLY] . --
-    assert(group_column, "Group options column must exist here !")                 -- [DEBUG-ONLY] . --
-    assert(group_column[GUI_NAME.move_up_button], "Move up button must exist !")    -- [DEBUG-ONLY] . --
-    assert(group_column[GUI_NAME.move_down_button], "Move down button must exist !") -- [DEBUG-ONLY] . --
-
-    group_column[GUI_NAME.move_up_button].enabled   = group_index > 1
-    group_column[GUI_NAME.move_down_button].enabled = group_index < group_count
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function factory.moveItemGroup(window, item_group, offset)
-
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
-    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
-    assert(offset == -1 or offset == 1, "ItemGroup move offset must be -1 or 1 !")                              -- [DEBUG-ONLY] . --
-
-    local item_groups = window:getItemGroups()
-    local group_index = getItemGroupIndex(window, item_group)
-
-    assert(group_index, "ItemGroup must exist in the window !")      -- [DEBUG-ONLY] . --
-
-    local target_index = group_index + offset
-
-    if target_index < 1 or target_index > #item_groups then
-        return false
+    for index, group in ipairs(window:getItemGroups()) do
+        if group == item_group then
+            group_index = index
+            break
+        end
     end
 
-    item_groups[group_index], item_groups[target_index] = item_groups[target_index], item_groups[group_index]
-    window:getGroupsContainer().swap_children(group_index, target_index)
-    factory.refreshMoveButtons(window, item_group)
+    assert(group_index, "ItemGroup must exist in InventoryWindow here !")      -- [DEBUG-ONLY] . --
+    assert(move_up and move_down, "ItemGroup move buttons must exist here !")  -- [DEBUG-ONLY] . --
 
-    return true
+    move_up.enabled   = group_index > 1
+    move_down.enabled = group_index < #window:getItemGroups()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -309,6 +267,42 @@ function factory.refreshFilterTable(window, item_group)
                 [FILTER_SLOT_TAG_NAME] = slot_index
             }
         })
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.moveItemGroup(window, item_group, offset)
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+    assert(offset == -1 or offset == 1, "ItemGroup move offset must be -1 or 1 !")                               -- [DEBUG-ONLY] . --
+
+    local item_groups = window:getItemGroups()
+    local group_index
+
+    for index, group in ipairs(item_groups) do
+        if group == item_group then
+            group_index = index
+            break
+        end
+    end
+
+    assert(group_index, "ItemGroup must exist in InventoryWindow here !")      -- [DEBUG-ONLY] . --
+
+    local target_index = group_index + offset
+
+    if target_index < 1 or target_index > #item_groups then
+        return
+    end
+
+    item_groups[group_index], item_groups[target_index] = item_groups[target_index], item_groups[group_index]
+    window:getGroupsContainer().swap_children(group_index, target_index)
+    window:refreshLockGUI()
+
+    local menu = window:getPlayer().gui.screen[GUI_NAME.menu]
+
+    if menu then
+        refreshMoveButtons(menu, item_group, window)
     end
 end
 
@@ -366,18 +360,14 @@ function factory.open(window, item_group, location)
     group_column.style.vertical_spacing       = 2
     group_column.style.vertically_stretchable = true
 
-    local group_index = getItemGroupIndex(window, item_group)
-    local group_count = #window:getItemGroups()
-
-    assert(group_index, "ItemGroup must exist in the window !")      -- [DEBUG-ONLY] . --
-
     addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options", true)
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false, group_id)
-    addGroupAction(group_column, GUI_NAME.move_up_button, "Move up", group_index > 1, group_id)
-    addGroupAction(group_column, GUI_NAME.move_down_button, "Move down", group_index < group_count, group_id)
+    addGroupAction(group_column, GUI_NAME.move_up_button, "Move up", true, group_id)
+    addGroupAction(group_column, GUI_NAME.move_down_button, "Move down", true, group_id)
     addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true, group_id)
     addGroupAction(group_column, GUI_NAME.filter_toggle_button, "Filtering options  >", true, group_id)
     addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true, group_id)
+    refreshMoveButtons(menu, item_group, window)
 
     local filler = group_column.add({
         type               = "empty-widget",
