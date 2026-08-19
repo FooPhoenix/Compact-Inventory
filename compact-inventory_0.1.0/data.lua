@@ -23,11 +23,10 @@ gui_style[MOD_PREFIX .. "locked-content-frame"] = {
 
 data:extend({
     {
-        type                = "custom-input",
-        name                = MOD_PREFIX .. "cancel-rename",
-        key_sequence        = "",
-        linked_game_control = "toggle-menu",
-        consuming           = "none"
+        type = "sprite",
+        name = MOD_PREFIX .. "cancel",
+        filename = "__core__/graphics/cancel.png",
+        size = 64
     },
     {
         type = "sprite",

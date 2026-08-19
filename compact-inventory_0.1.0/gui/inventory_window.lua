@@ -22,6 +22,7 @@ local GUI_NAME = {
     group_rename_button  = MOD_PREFIX .. "IG_rename-button",
     group_name_field     = MOD_PREFIX .. "IG_name-field",
     group_confirm_button = MOD_PREFIX .. "IG_confirm-button",
+    group_cancel_button  = MOD_PREFIX .. "IG_cancel-button",
     group_spacer         = MOD_PREFIX .. "IG_spacer",
     group_sort_icon      = MOD_PREFIX .. "IG_sort-icon",
     group_menu_button    = MOD_PREFIX .. "IG_menu-button",
@@ -286,8 +287,9 @@ function metatable:startRename(group_id)
     local rename_button = header[GUI_NAME.group_rename_button]
     local name_field    = header[GUI_NAME.group_name_field]
     local confirm       = header[GUI_NAME.group_confirm_button]
+    local cancel        = header[GUI_NAME.group_cancel_button]
 
-    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
+    assert(title and rename_button and name_field and confirm and cancel, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
     name_field.text = item_group:getName()
 
@@ -295,6 +297,7 @@ function metatable:startRename(group_id)
     rename_button.visible = false
     name_field.visible    = true
     confirm.visible       = true
+    cancel.visible        = true
 
     name_field.focus()
     name_field.select_all()
@@ -312,8 +315,9 @@ function metatable:cancelRename(group_id)
     local rename_button = header[GUI_NAME.group_rename_button]
     local name_field    = header[GUI_NAME.group_name_field]
     local confirm       = header[GUI_NAME.group_confirm_button]
+    local cancel        = header[GUI_NAME.group_cancel_button]
 
-    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
+    assert(title and rename_button and name_field and confirm and cancel, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
     name_field.text = item_group:getName()
     title.caption   = item_group:getName()
@@ -322,6 +326,7 @@ function metatable:cancelRename(group_id)
     rename_button.visible = not self:isLocked()
     name_field.visible    = false
     confirm.visible       = false
+    cancel.visible        = false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -336,8 +341,9 @@ function metatable:confirmRename(group_id)
     local rename_button = header[GUI_NAME.group_rename_button]
     local name_field    = header[GUI_NAME.group_name_field]
     local confirm       = header[GUI_NAME.group_confirm_button]
+    local cancel        = header[GUI_NAME.group_cancel_button]
 
-    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
+    assert(title and rename_button and name_field and confirm and cancel, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
     item_group:setName(name_field.text)
     title.caption = item_group:getName()
@@ -346,6 +352,7 @@ function metatable:confirmRename(group_id)
     rename_button.visible = true
     name_field.visible    = false
     confirm.visible       = false
+    cancel.visible        = false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -482,6 +489,7 @@ factory = {
         group_rename_button  = GUI_NAME.group_rename_button,
         group_name_field     = GUI_NAME.group_name_field,
         group_confirm_button = GUI_NAME.group_confirm_button,
+        group_cancel_button  = GUI_NAME.group_cancel_button,
         group_menu_button    = GUI_NAME.group_menu_button,
         group_unlock_button  = GUI_NAME.group_unlock_button,
         shortcut_button      = GUI_NAME.shortcut_button,
@@ -612,6 +620,20 @@ function factory.createItemGroupGUI(window, item_group)                         
     confirm.style.width   = 28
     confirm.style.height  = 28
     confirm.style.padding = 0
+
+    local cancel = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_cancel_button,
+        sprite  = MOD_PREFIX .. "cancel",
+        style   = "button",
+        tooltip = "Cancel group rename",
+        visible = false,
+        tags    = tags
+    })
+
+    cancel.style.width   = 28
+    cancel.style.height  = 28
+    cancel.style.padding = 0
 
     local spacer = header.add({
         type = "empty-widget",
