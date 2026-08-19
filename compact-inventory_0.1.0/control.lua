@@ -2,9 +2,12 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder               = require("util.item_order")
+local InventoryViewFactory    = require("inventory.inventory_view")
 local InventoryManagerFactory = require("inventory.inventory_manager")
 local WindowsManager          = require("gui.windows_manager")
 local ItemGroupMenuFactory    = require("gui.item_group_menu")
+
+local FilterMode = InventoryViewFactory.filter_modes
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -122,6 +125,23 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == menu_names.sort_toggle_button then
         ItemGroupMenuFactory.toggleSortColumn(event.player_index)
 
+    elseif event.element.name == menu_names.filter_toggle_button then
+        ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
+
+    elseif event.element.tags[menu_names.filter_slot_tag_name]
+        and event.button == defines.mouse_button_type.right then
+
+        local slot_index = event.element.tags[menu_names.filter_slot_tag_name]
+        local group_id   = event.element.tags[menu_names.group_id_tag_name]
+        local item_group = window:getItemGroupByID(group_id)
+
+        assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+        event.element.elem_value = nil
+        item_group:setFilter(slot_index, nil)
+        window:refreshGroup(item_group)
+        ItemGroupMenuFactory.refreshFilterTable(window, item_group)
+
     elseif event.element.name == menu_names.delete_group_button then
         local group_id = event.element.tags[menu_names.group_id_tag_name]
 
@@ -140,6 +160,51 @@ script.on_event(defines.events.on_gui_click, function(event)
         window:setSortMode(group_id, sort_mode)
         ItemGroupMenuFactory.close(event.player_index)
     end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_gui_elem_changed, function(event)
+
+    local menu_names = ItemGroupMenuFactory.exposed_gui_names
+    local slot_index = event.element.tags[menu_names.filter_slot_tag_name]
+
+    if not slot_index then
+        return
+    end
+
+    local window     = WindowsManager.getWindowMainInventory(event.player_index)
+    local group_id   = event.element.tags[menu_names.group_id_tag_name]
+    local item_group = window:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    item_group:setFilter(slot_index, event.element.elem_value)
+    window:refreshGroup(item_group)
+    ItemGroupMenuFactory.refreshFilterTable(window, item_group)
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_gui_switch_state_changed, function(event)
+
+    local menu_names = ItemGroupMenuFactory.exposed_gui_names
+
+    if event.element.name ~= menu_names.filter_switch then
+        return
+    end
+
+    local window     = WindowsManager.getWindowMainInventory(event.player_index)
+    local group_id   = event.element.tags[menu_names.group_id_tag_name]
+    local item_group = window:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    item_group:setFilterMode(
+        event.element.switch_state == "left" and FilterMode.blacklist or FilterMode.whitelist
+    )
+
+    window:refreshGroup(item_group)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
