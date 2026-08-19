@@ -302,6 +302,30 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:cancelRename(group_id)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+    local header        = getGroupHeader(self, item_group)
+    local title         = header[GUI_NAME.group_title]
+    local rename_button = header[GUI_NAME.group_rename_button]
+    local name_field    = header[GUI_NAME.group_name_field]
+    local confirm       = header[GUI_NAME.group_confirm_button]
+
+    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
+
+    name_field.text = item_group:getName()
+    title.caption   = item_group:getName()
+
+    title.visible         = true
+    rename_button.visible = not self:isLocked()
+    name_field.visible    = false
+    confirm.visible       = false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:confirmRename(group_id)
     local item_group = self:getItemGroupByID(group_id)
 
@@ -388,6 +412,12 @@ function metatable:setLocked(locked)
     end
 
     self.locked = locked
+
+    if locked then
+        for _, item_group in ipairs(self:getItemGroups()) do
+            self:cancelRename(item_group:getID())
+        end
+    end
 
     local frame     = self:getFrame()
     local title_bar = frame[GUI_NAME.title_bar]
