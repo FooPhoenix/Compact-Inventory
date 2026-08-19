@@ -1,6 +1,27 @@
 
 local MOD_PREFIX = "FooPhoenix_CI_"
 
+-- [TEST-ONLY] Experimental styles used to validate whether frame backgrounds can be removed at runtime. --
+local gui_style = data.raw["gui-style"].default
+
+gui_style[MOD_PREFIX .. "locked-window-frame"] = {
+    type                     = "frame_style",
+    parent                   = "frame",
+    graphical_set            = { },
+    background_graphical_set = { },
+    header_background        = { },
+    padding                  = 0
+}
+
+gui_style[MOD_PREFIX .. "locked-content-frame"] = {
+    type                     = "frame_style",
+    parent                   = "inside_shallow_frame",
+    graphical_set            = { },
+    background_graphical_set = { },
+    header_background        = { },
+    padding                  = 0
+}
+
 data:extend({
     {
         type = "sprite",
