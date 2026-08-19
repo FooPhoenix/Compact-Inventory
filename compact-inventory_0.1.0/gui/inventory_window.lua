@@ -4,31 +4,28 @@ local ItemGroupFactory      = require("gui.item_group")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ Constant Declaration.                                                                                          ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
-    main_frame              = MOD_PREFIX .. "IW_frame",
-    title_bar               = MOD_PREFIX .. "IW_titlebar",
-    title                   = MOD_PREFIX .. "IW_title",
-    dragger                 = MOD_PREFIX .. "IW_dragger",
-    close_button            = MOD_PREFIX .. "IW_close",
-    sort_toolbar_button     = MOD_PREFIX .. "IW_sort-toolbar-button",
-    content_flow            = MOD_PREFIX .. "IW_content-flow",
-    sort_toolbar            = MOD_PREFIX .. "IW_sort-toolbar",
-    sort_standard_button    = MOD_PREFIX .. "IW_sort-standard",
-    sort_count_asc_button   = MOD_PREFIX .. "IW_sort-count-asc",
-    sort_count_desc_button  = MOD_PREFIX .. "IW_sort-count-desc",
-    sort_inventory_button   = MOD_PREFIX .. "IW_sort-inventory",
-    sort_last_change_button = MOD_PREFIX .. "IW_sort-last-change",
-    sort_custom_button      = MOD_PREFIX .. "IW_sort-custom",
-    inventory_grid          = MOD_PREFIX .. "IW_grid",
-    group_frame             = MOD_PREFIX .. "IG_frame",
-    shortcut_button         = MOD_PREFIX .. "main-window-toggle"
+    main_frame           = MOD_PREFIX .. "IW_frame",
+    title_bar            = MOD_PREFIX .. "IW_titlebar",
+    dragger              = MOD_PREFIX .. "IW_dragger",
+    add_button           = MOD_PREFIX .. "IW_add-button",
+    lock_button          = MOD_PREFIX .. "IW_lock-button",
+    close_button         = MOD_PREFIX .. "IW_close",
+    content_frame        = MOD_PREFIX .. "IW_content-frame",
+    group_frame          = MOD_PREFIX .. "IG_frame",
+    group_header         = MOD_PREFIX .. "IG_header",
+    group_title          = MOD_PREFIX .. "IG_title",
+    group_rename_button  = MOD_PREFIX .. "IG_rename-button",
+    group_name_field     = MOD_PREFIX .. "IG_name-field",
+    group_confirm_button = MOD_PREFIX .. "IG_confirm-button",
+    group_spacer         = MOD_PREFIX .. "IG_spacer",
+    group_sort_icon      = MOD_PREFIX .. "IG_sort-icon",
+    group_menu_button    = MOD_PREFIX .. "IG_menu-button",
+    inventory_grid       = MOD_PREFIX .. "IW_grid",
+    shortcut_button      = MOD_PREFIX .. "main-window-toggle"
 }
-
-local SortMode = InventoryViewFactory.sort_modes
 
 local SORT_SPRITE = {
     [SortMode.standard]         = MOD_PREFIX .. "sort-standard",
@@ -58,13 +55,9 @@ local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
 --
 local metatable = { }
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 metatable.object_name = "InventoryWindow"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.register_metatable(MOD_PREFIX .. "InventoryWindowMetatable", metatable)
+
 metatable.__index = function(self, key)                                         ---@private
     if key == "valid" then
         return metatable.isValid(self)
@@ -75,57 +68,21 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Refresh the buttons state matching the current sorting mode.
---
---- -----
---- @param window InventoryWindow      The window to refresh.
---
-local function metatable_refreshSortButton(window)
-
-    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
-
-    local sort_mode = window:getDefaultItemGroup():getSortMode()
-    local toolbar   = window:getToolbar()
-
-    window:getFrame()[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].sprite = SORT_SPRITE[sort_mode]
-
-    for _, button in pairs(toolbar.children) do
-        button.toggled = ( button.tags[SORT_TAG_NAME] == sort_mode )  -- Just added useless parenthesis, but it is for the sake of readability.
-    end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:getPlayer()
-
     assert(self.lua_player and self.lua_player.valid and self.lua_player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
-
     return self.lua_player
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get all item groups displayed by the window.
---
---- -----
---- @return ItemGroup[]      @ The ordered item groups displayed by the window.
---
 function metatable:getItemGroups()
-
     assert(self.item_groups and #self.item_groups > 0, "InventoryWindow must contain at least one ItemGroup !")      -- [DEBUG-ONLY] . --
-
     return self.item_groups
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the default item group of the window.
---
---- -----
---- @return ItemGroup      @ The default item group.
---
 function metatable:getDefaultItemGroup()
-
     local item_group = self:getItemGroups()[1]
 
     assert(item_group and item_group.object_name == "ItemGroup", "Default ItemGroup must be valid here !")      -- [DEBUG-ONLY] . --
@@ -136,40 +93,36 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getFrame()
-
     local lua_player = self:getPlayer()
+    local frame = lua_player.gui.screen[GUI_NAME.main_frame]
 
-    assert(lua_player.gui.screen[GUI_NAME.main_frame], "GUI frame does not exist!")      -- [DEBUG-ONLY] . --
+    assert(frame, "GUI frame does not exist !")      -- [DEBUG-ONLY] . --
 
-    return lua_player.gui.screen[GUI_NAME.main_frame]
+    return frame
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:getToolbar()
-
-    local content = self:getFrame()[GUI_NAME.content_flow]
+local function getGroupHeader(window)
+    local content = window:getFrame()[GUI_NAME.content_frame]
     local group   = content and content[GUI_NAME.group_frame]
-    local toolbar = (group and group[GUI_NAME.sort_toolbar]) or (content and content[GUI_NAME.sort_toolbar])
+    local header  = group and group[GUI_NAME.group_header]
 
-    assert(toolbar, "GUI toolbar does not exist!")      -- [DEBUG-ONLY] . --
+    assert(header, "ItemGroup header must exist here !")      -- [DEBUG-ONLY] . --
 
-    return toolbar
+    return header
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:isValid()                                                    ---@private
+    local lua_player = self.lua_player
 
-    local lua_player = self.lua_player      -- Do not use getPlayer() here because of internal assert !
-
-    if not lua_player then
-        return false
-    elseif not lua_player.valid then
+    if not lua_player or not lua_player.valid then
         return false
     end
 
-    assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] In any way this should never happen. --
+    assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] . --
 
     if not self.item_groups or #self.item_groups == 0 then
         return false
@@ -181,22 +134,17 @@ function metatable:isValid()                                                    
         end
     end
 
-    if not lua_player.gui.screen[GUI_NAME.main_frame] then
-        return false
-    end
-
-    return true
+    return lua_player.gui.screen[GUI_NAME.main_frame] ~= nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:refresh()
-
-    local content = self:getFrame()[GUI_NAME.content_flow]
+    local content = self:getFrame()[GUI_NAME.content_frame]
     local group   = content and content[GUI_NAME.group_frame]
-    local grid    = (group and group[GUI_NAME.inventory_grid]) or (content and content[GUI_NAME.inventory_grid])
+    local grid    = group and group[GUI_NAME.inventory_grid]
 
-    assert(grid, "GUI inventory grid does not exist!")      -- [DEBUG-ONLY] . --
+    assert(grid, "GUI inventory grid does not exist !")      -- [DEBUG-ONLY] . --
 
     grid.clear()
 
@@ -220,132 +168,114 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set the sorting mode of the default item group.
---
---- -----
---- @param sort_mode SortMode      The sorting mode to activate.
---
+function metatable:refreshSortIcon()
+    local icon = getGroupHeader(self)[GUI_NAME.group_sort_icon]
+
+    assert(icon, "ItemGroup sort icon must exist here !")      -- [DEBUG-ONLY] . --
+
+    icon.sprite = SORT_SPRITE[self:getDefaultItemGroup():getSortMode()]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setSortMode(sort_mode)
     self:getDefaultItemGroup():setSortMode(sort_mode)
-    metatable_refreshSortButton(self)
+    self:refreshSortIcon()
     self:refresh()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Set the visibility of the sorting toolbar.
---
---- -----
---- @param visible boolean      The visibility of the toolbar.
---
-function metatable:setToolbarVisibility(visible)
+function metatable:startRename()
+    local header        = getGroupHeader(self)
+    local title         = header[GUI_NAME.group_title]
+    local rename_button = header[GUI_NAME.group_rename_button]
+    local name_field    = header[GUI_NAME.group_name_field]
+    local confirm       = header[GUI_NAME.group_confirm_button]
 
-    local frame   = self:getFrame()
-    local toolbar = self:getToolbar()
+    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
-    toolbar.visible = visible
-    frame[GUI_NAME.title_bar][GUI_NAME.sort_toolbar_button].toggled = visible
+    name_field.text = self:getDefaultItemGroup():getName()
+
+    title.visible         = false
+    rename_button.visible = false
+    name_field.visible    = true
+    confirm.visible       = true
+
+    name_field.focus()
+    name_field.select_all()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the visibility of the sorting toolbar.
---
---- -----
---- @return boolean      @ The visibility of the toolbar.
---
-function metatable:isToolbarVisible()
-    return self:getToolbar().visible
+function metatable:confirmRename()
+    local header        = getGroupHeader(self)
+    local title         = header[GUI_NAME.group_title]
+    local rename_button = header[GUI_NAME.group_rename_button]
+    local name_field    = header[GUI_NAME.group_name_field]
+    local confirm       = header[GUI_NAME.group_confirm_button]
+
+    assert(title and rename_button and name_field and confirm, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
+
+    local item_group = self:getDefaultItemGroup()
+
+    item_group:setName(name_field.text)
+    title.caption = item_group:getName()
+
+    title.visible         = true
+    rename_button.visible = true
+    name_field.visible    = false
+    confirm.visible       = false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Toggle the visibility of the sorting toolbar.
---
-function metatable:toggleToolbarVisibility()
-    self:setToolbarVisibility(not self:isToolbarVisible())
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
---- ### Set the visibility of the window.
---
---- -----
---- @param visible boolean      The visibility of the window.
---
 function metatable:setVisible(visible)
-    if visible == true then
+    if visible then
         self:refresh()
     end
+
     self:getFrame().visible = visible
     self:getPlayer().set_shortcut_toggled(GUI_NAME.shortcut_button, visible)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the visibility of the window.
---
---- -----
---- @return boolean      @ The visibility of the window.
---
 function metatable:isVisible()
-    return self:getFrame().visible  -- The truth come from the frame, not the shortcut.
+    return self:getFrame().visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Toggle the visibility of the window.
---
 function metatable:toggleVisibility()
     self:setVisible(not self:isVisible())
 end
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ InventoryWindow.                                                                                               ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
----
---- @class InventoryWindow: InventoryWindowMetatable
----
---- ### This class is an inventory window instance.
----
-
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventoryWindowFactory.                                                                                        ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
----
---- @class InventoryWindowFactory
----
---- ### This class groups all functions used to create and manage an inventory window.
----
---
 local factory = {
     exposed_gui_names = {
-        close_button        = GUI_NAME.close_button,
-        sort_toolbar_button = GUI_NAME.sort_toolbar_button,
-        shortcut_button     = GUI_NAME.shortcut_button,
-        sort_tag_name       = SORT_TAG_NAME
+        close_button         = GUI_NAME.close_button,
+        add_button           = GUI_NAME.add_button,
+        lock_button          = GUI_NAME.lock_button,
+        group_rename_button  = GUI_NAME.group_rename_button,
+        group_name_field     = GUI_NAME.group_name_field,
+        group_confirm_button = GUI_NAME.group_confirm_button,
+        group_menu_button    = GUI_NAME.group_menu_button,
+        shortcut_button      = GUI_NAME.shortcut_button,
+        sort_tag_name        = SORT_TAG_NAME
     }
 }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Create a new inventory window.
---
---- -----
---- @param player integer|LuaPlayer      The player that will own the window.
---- @param inventory Inventory           The logical inventory displayed by the window.
---
---- @return InventoryWindow              @ Returns the created window.
---
 function factory.create(player, inventory)
-
     local player_index, lua_player = resolve_player(player)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
-    ---@diagnostic disable-next-line: missing-fields
     local window = {                                        ---@type InventoryWindow
         lua_player  = lua_player,
         item_groups = {
@@ -354,10 +284,9 @@ function factory.create(player, inventory)
     }
 
     setmetatable(window, metatable)
-
     factory.createGUI(window)
 
-    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists!")      -- [DEBUG-ONLY] . --
+    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists !")      -- [DEBUG-ONLY] . --
 
     storage.windows.main_inventory[player_index] = window
 
@@ -367,7 +296,6 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.destroy(player)
-
     local player_index, lua_player = resolve_player(player)
     local window = storage.windows.main_inventory[player_index]                 ---@type InventoryWindow
 
@@ -385,19 +313,10 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Create the GUI of the inventory window.
---- [_private_]
---
---- -----
---- @param window InventoryWindow       The window that will own the GUI.
---
---- @return LuaGuiElement               @ Returns the created GUI frame.
---
-function factory.createGUI(window)          ---@private
-
+function factory.createGUI(window)                                              ---@private
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                                  -- [DEBUG-ONLY] . --
     assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists!")                                        -- [DEBUG-ONLY] . --
+    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists !")                                       -- [DEBUG-ONLY] . --
 
     local frame = window.lua_player.gui.screen.add({
         type      = "frame",
@@ -405,21 +324,19 @@ function factory.createGUI(window)          ---@private
         direction = "vertical"
     })
 
+    frame.style.left_padding   = 4
+    frame.style.right_padding  = 4
+    frame.style.top_padding    = 3
+    frame.style.bottom_padding = 4
+
     local title_bar = frame.add({
         type      = "flow",
         name      = GUI_NAME.title_bar,
         direction = "horizontal"
     })
 
-    title_bar.style.horizontal_spacing       = 8
+    title_bar.style.horizontal_spacing       = 2
     title_bar.style.horizontally_stretchable = true
-
-    title_bar.add({
-        type    = "label",
-        name    = GUI_NAME.title,
-        caption = "Inventory",
-        style   = "frame_title"
-    })
 
     local dragger = title_bar.add({
         type  = "empty-widget",
@@ -428,18 +345,34 @@ function factory.createGUI(window)          ---@private
     })
 
     dragger.style.horizontally_stretchable = true
-    dragger.style.height = 24
+    dragger.style.height = 16
     dragger.drag_target  = frame
 
-    title_bar.add({
+    local add_button = title_bar.add({
         type    = "sprite-button",
-        name    = GUI_NAME.sort_toolbar_button,
-        sprite  = SORT_SPRITE[window:getDefaultItemGroup():getSortMode()],
+        name    = GUI_NAME.add_button,
+        sprite  = "utility/add_white",
         style   = "frame_action_button",
-        tooltip = "Sorting"
+        tooltip = "Add group (not implemented yet)"
     })
 
-    title_bar.add({
+    add_button.style.width   = 16
+    add_button.style.height  = 16
+    add_button.style.padding = 0
+
+    local lock = title_bar.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.lock_button,
+        sprite  = MOD_PREFIX .. "window-unlock",
+        style   = "frame_action_button",
+        tooltip = "Lock window (not implemented yet)"
+    })
+
+    lock.style.width   = 16
+    lock.style.height  = 16
+    lock.style.padding = 0
+
+    local close = title_bar.add({
         type           = "sprite-button",
         name           = GUI_NAME.close_button,
         sprite         = "utility/close",
@@ -449,43 +382,117 @@ function factory.createGUI(window)          ---@private
         tooltip        = "Close"
     })
 
+    close.style.width   = 16
+    close.style.height  = 16
+    close.style.padding = 0
+
     local content = frame.add({
-        type      = "flow",
-        name      = GUI_NAME.content_flow,
-        direction = "horizontal"
+        type      = "frame",
+        name      = GUI_NAME.content_frame,
+        direction = "vertical",
+        style     = "inside_shallow_frame"
     })
 
-    content.style.horizontal_spacing = 4
+    content.style.padding                  = 2
+    content.style.horizontally_stretchable = true
 
-    local toolbar = content.add({
-        type      = "flow",
-        name      = GUI_NAME.sort_toolbar,
+    local group = content.add({
+        type      = "frame",
+        name      = GUI_NAME.group_frame,
         direction = "vertical"
     })
 
-    toolbar.style.vertical_spacing = 0
+    group.style.padding                  = 2
+    group.style.horizontally_stretchable = true
 
-    local function addSortButton(name, sort_mode, tooltip)
-        toolbar.add({
-            type    = "sprite-button",
-            name    = name,
-            sprite  = SORT_SPRITE[sort_mode],
-            style   = "frame_action_button",
-            tooltip = tooltip,
-            tags    = {
-                [SORT_TAG_NAME] = sort_mode
-            }
-        })
-    end
+    local header = group.add({
+        type      = "flow",
+        name      = GUI_NAME.group_header,
+        direction = "horizontal"
+    })
 
-    addSortButton(GUI_NAME.sort_standard_button,    SortMode.standard,         "Standard sorting")
-    addSortButton(GUI_NAME.sort_count_asc_button,   SortMode.count_ascending,  "Sort by quantity ascending")
-    addSortButton(GUI_NAME.sort_count_desc_button,  SortMode.count_descending, "Sort by quantity descending")
-    addSortButton(GUI_NAME.sort_inventory_button,   SortMode.inventory,        "Inventory order")
-    addSortButton(GUI_NAME.sort_last_change_button, SortMode.last_change,      "Sort by last change")
-    addSortButton(GUI_NAME.sort_custom_button,      SortMode.custom,           "Custom sorting")
+    header.style.horizontal_spacing       = 2
+    header.style.horizontally_stretchable = true
+    header.style.vertical_align           = "center"
 
-    local grid = content.add({
+    local item_group = window:getDefaultItemGroup()
+
+    local group_title = header.add({
+        type    = "label",
+        name    = GUI_NAME.group_title,
+        caption = item_group:getName()
+    })
+
+    group_title.style.top_margin    = 0
+    group_title.style.bottom_margin = 0
+
+    local rename_button = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_rename_button,
+        sprite  = "utility/rename_icon",
+        style   = "button",
+        tooltip = "Rename group"
+    })
+
+    rename_button.style.width   = 16
+    rename_button.style.height  = 16
+    rename_button.style.padding = 0
+
+    local name_field = header.add({
+        type                  = "textfield",
+        name                  = GUI_NAME.group_name_field,
+        text                  = item_group:getName(),
+        icon_selector         = true,
+        lose_focus_on_confirm = true,
+        visible               = false
+    })
+
+    name_field.style.width  = 180
+    name_field.style.height = 28
+
+    local confirm = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_confirm_button,
+        sprite  = "utility/enter",
+        style   = "green_button",
+        tooltip = "Confirm group name",
+        visible = false
+    })
+
+    confirm.style.width   = 28
+    confirm.style.height  = 28
+    confirm.style.padding = 0
+
+    local spacer = header.add({
+        type = "empty-widget",
+        name = GUI_NAME.group_spacer
+    })
+
+    spacer.style.horizontally_stretchable = true
+
+    local sort_icon = header.add({
+        type    = "sprite",
+        name    = GUI_NAME.group_sort_icon,
+        sprite  = SORT_SPRITE[item_group:getSortMode()],
+        tooltip = "Current sorting"
+    })
+
+    sort_icon.style.width  = 22
+    sort_icon.style.height = 22
+
+    local menu_button = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_menu_button,
+        sprite  = MOD_PREFIX .. "group-menu",
+        style   = "frame_action_button",
+        tooltip = "Group options"
+    })
+
+    menu_button.style.width   = 22
+    menu_button.style.height  = 22
+    menu_button.style.padding = 0
+
+    local grid = group.add({
         type         = "table",
         name         = GUI_NAME.inventory_grid,
         column_count = 10
@@ -495,9 +502,6 @@ function factory.createGUI(window)          ---@private
     grid.style.vertical_spacing   = 0
 
     frame.auto_center = true
-
-    metatable_refreshSortButton(window)
-    window:setToolbarVisibility(false)
     window:setVisible(true)
 
     return frame
