@@ -12,6 +12,7 @@ local InventoryViewFactory = require("inventory.inventory_view")
 ---
 --- ### This class groups all functions used to manage an item group.
 ---
+--- @field private id             integer            The stable group identifier inside its window.
 --- @field private inventory_view InventoryView      The inventory projection displayed by the group.
 --- @field private name           string             The displayed group name.
 ---
@@ -26,6 +27,18 @@ metatable.object_name = "ItemGroup"
 
 script.register_metatable(MOD_PREFIX .. "ItemGroupMetatable", metatable)
 metatable.__index = metatable
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the stable group identifier inside its window.
+--
+--- -----
+--- @return integer      @ The group identifier.
+--
+function metatable:getID()
+    assert(type(self.id) == "number" and self.id > 0, "ItemGroup ID must be a positive integer !")      -- [DEBUG-ONLY] . --
+    return self.id
+end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -125,14 +138,17 @@ local factory = { }
 --
 --- -----
 --- @param inventory Inventory      The logical inventory projected by the group.
+--- @param id integer               The stable identifier inside its window.
 --
 --- @return ItemGroup              @ Returns the created item group.
 --
-function factory.new(inventory)
+function factory.new(inventory, id)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
+    assert(type(id) == "number" and id > 0, "ItemGroup ID must be a positive integer !")                        -- [DEBUG-ONLY] . --
 
     local item_group = {                                  ---@type ItemGroup
+        id             = id,
         inventory_view = InventoryViewFactory.new(inventory),
         name           = "Inventory"
     }
