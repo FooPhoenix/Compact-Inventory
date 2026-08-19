@@ -111,6 +111,62 @@ function metatable:setSortMode(sort_mode)
     self:getView():setSortMode(sort_mode)
 end
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the filtering mode used by the group.
+--
+--- -----
+--- @return FilterMode      @ The current filtering mode.
+--
+function metatable:getFilterMode()
+    return self:getView():getFilterMode()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Set the filtering mode used by the group.
+--
+--- -----
+--- @param filter_mode FilterMode      The filtering mode to activate.
+--
+function metatable:setFilterMode(filter_mode)
+    self:getView():setFilterMode(filter_mode)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get all positioned item filters.
+--
+--- -----
+--- @return table<integer, string>      @ The positioned item filters.
+--
+function metatable:getFilters()
+    return self:getView():getFilters()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Set one positioned item filter.
+--
+--- -----
+--- @param slot_index integer      The filter slot index.
+--- @param item_name string|nil    The item name, or nil to clear the slot.
+--
+function metatable:setFilter(slot_index, item_name)
+    self:getView():setFilter(slot_index, item_name)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the number of filter slots that should currently be visible.
+--
+--- -----
+--- @return integer      @ The number of visible filter slots.
+--
+function metatable:getVisibleFilterSlotCount()
+    return self:getView():getVisibleFilterSlotCount()
+end
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ ItemGroup.                                                                                                     ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
