@@ -1,6 +1,7 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder               = require("util.item_order")
+local DebugLogger             = require("util.debug_logger")
 local InventoryViewFactory    = require("inventory.inventory_view")
 local InventoryManagerFactory = require("inventory.inventory_manager")
 local WindowsManager          = require("gui.windows_manager")
@@ -62,7 +63,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function printGuiHoverDebug(event, event_name)
+local function writeGuiHoverDebug(event, event_name)
     local path = getGuiDebugPath(event.element)
 
     if not path then
@@ -72,13 +73,28 @@ local function printGuiHoverDebug(event, event_name)
     local lua_player = game.get_player(event.player_index)
 
     if lua_player then
-        lua_player.print("[Hover] t=" .. event.tick .. " " .. event_name .. " " .. path)      -- [DEBUG-ONLY] . --
+        DebugLogger.write(lua_player, "[Hover] t=" .. event.tick .. " " .. event_name .. " " .. path)      -- [DEBUG-ONLY] . --
     end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function getFilterDebugString(item_group)
+    local filters = { }
+
+    for slot_index, item_name in pairs(item_group:getFilters()) do
+        filters[#filters + 1] = tostring(slot_index) .. "=" .. tostring(item_name)
+    end
+
+    table.sort(filters)
+
+    return "{" .. table.concat(filters, ",") .. "}"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 script.on_init(function()
+    DebugLogger.clear()      -- [DEBUG-ONLY] . --
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
@@ -89,6 +105,8 @@ end)
 script.on_configuration_changed(function()
 
     -- [DEBUG-ONLY] Used only to reinit the mod for the moment. --
+
+    DebugLogger.clear()      -- [DEBUG-ONLY] . --
 
     for _, lua_player in pairs(game.players) do
         local screen = lua_player.gui.screen
@@ -154,8 +172,18 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == gui_names.group_menu_button then
         local group_id   = event.element.tags[gui_names.group_id_tag_name]
         local item_group = window:getItemGroupByID(group_id)
+        local lua_player = game.get_player(event.player_index)
 
         assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+        DebugLogger.write(
+            lua_player,
+            "[Filter] t=" .. event.tick
+                .. " OPEN group=" .. tostring(group_id)
+                .. " view=" .. tostring(item_group:getView())
+                .. " filters=" .. getFilterDebugString(item_group)
+                .. " visible_slots=" .. tostring(item_group:getVisibleFilterSlotCount())
+        )      -- [DEBUG-ONLY] . --
 
         ItemGroupMenuFactory.open(window, item_group, event.cursor_display_location)
 
@@ -168,7 +196,10 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.tags[menu_names.filter_slot_tag_name]
         and event.button == defines.mouse_button_type.left then
 
-        game.get_player(event.player_index).print(
+        local lua_player = game.get_player(event.player_index)
+
+        DebugLogger.write(
+            lua_player,
             "[Filter] t=" .. event.tick
                 .. " CLICK group=" .. tostring(event.element.tags[menu_names.group_id_tag_name])
                 .. " slot=" .. tostring(event.element.tags[menu_names.filter_slot_tag_name])
@@ -229,18 +260,22 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
 
     assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
 
-    lua_player.print(
+    DebugLogger.write(
+        lua_player,
         "[Filter] t=" .. event.tick
             .. " ELEM_CHANGED group=" .. tostring(group_id)
             .. " slot=" .. tostring(slot_index)
             .. " value=" .. tostring(event.element.elem_value)
+            .. " view=" .. tostring(item_group:getView())
     )      -- [DEBUG-ONLY] . --
 
     item_group:setFilter(slot_index, event.element.elem_value)
 
-    lua_player.print(
+    DebugLogger.write(
+        lua_player,
         "[Filter] stored=" .. tostring(item_group:getFilters()[slot_index])
-            .. " visible_slots=" .. item_group:getVisibleFilterSlotCount()
+            .. " filters=" .. getFilterDebugString(item_group)
+            .. " visible_slots=" .. tostring(item_group:getVisibleFilterSlotCount())
     )      -- [DEBUG-ONLY] . --
 
     window:refreshGroup(item_group)
@@ -285,14 +320,14 @@ end)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_hover, function(event)
-    printGuiHoverDebug(event, "HOVER")      -- [DEBUG-ONLY] . --
+    writeGuiHoverDebug(event, "HOVER")      -- [DEBUG-ONLY] . --
     ItemGroupMenuFactory.onHover(event)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_leave, function(event)
-    printGuiHoverDebug(event, "LEAVE")      -- [DEBUG-ONLY] . --
+    writeGuiHoverDebug(event, "LEAVE")      -- [DEBUG-ONLY] . --
     ItemGroupMenuFactory.onLeave(event)
 end)
 
