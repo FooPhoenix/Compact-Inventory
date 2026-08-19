@@ -120,6 +120,16 @@ script.on_event(defines.events.on_gui_click, function(event)
         SortMenuPrototypeFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
 
+    elseif event.element.name == layout_names.group_rename_button then
+        ItemGroupLayoutPrototypeFactory.startRename(
+            WindowsManager.getWindowMainInventory(event.player_index)
+        )
+
+    elseif event.element.name == layout_names.group_confirm_button then
+        ItemGroupLayoutPrototypeFactory.confirmRename(
+            WindowsManager.getWindowMainInventory(event.player_index)
+        )
+
     elseif event.element.name == layout_names.group_menu_button then
         SortMenuPrototypeFactory.open(
             WindowsManager.getWindowMainInventory(event.player_index),
@@ -139,6 +149,16 @@ script.on_event(defines.events.on_gui_click, function(event)
         window:setSortMode(event.element.tags[gui_names.sort_tag_name])
         ItemGroupLayoutPrototypeFactory.refreshSortButton(window)
         SortMenuPrototypeFactory.close(event.player_index)
+    end
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_gui_confirmed, function(event)
+    if event.element.name == ItemGroupLayoutPrototypeFactory.exposed_gui_names.group_name_field then
+        ItemGroupLayoutPrototypeFactory.confirmRename(
+            WindowsManager.getWindowMainInventory(event.player_index)
+        )
     end
 end)
 
