@@ -259,7 +259,7 @@ function factory.attach(window)
         type    = "sprite-button",
         name    = GUI_NAME.group_rename_button,
         sprite  = "utility/rename_icon",
-        style   = "frame_action_button",
+        style   = "button",
         tooltip = "Rename group"
     })
 
@@ -282,8 +282,8 @@ function factory.attach(window)
     local confirm = header.add({
         type    = "sprite-button",
         name    = GUI_NAME.group_confirm_button,
-        sprite  = "utility/check_mark",
-        style   = "frame_action_button",
+        sprite  = "utility/enter",
+        style   = "green_button",
         tooltip = "Confirm group name",
         visible = false
     })
