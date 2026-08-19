@@ -8,6 +8,7 @@ local WindowsManager          = require("gui.windows_manager")
 local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
 local FilterMode = InventoryViewFactory.filter_modes
+local FILTER_WRAPPER_GUI_NAME = MOD_PREFIX .. "IG_options-filter-wrapper"
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -321,14 +322,20 @@ end)
 
 script.on_event(defines.events.on_gui_hover, function(event)
     writeGuiHoverDebug(event, "HOVER")      -- [DEBUG-ONLY] . --
-    ItemGroupMenuFactory.onHover(event)
+
+    if event.element.name ~= FILTER_WRAPPER_GUI_NAME then
+        ItemGroupMenuFactory.onHover(event)
+    end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_leave, function(event)
     writeGuiHoverDebug(event, "LEAVE")      -- [DEBUG-ONLY] . --
-    ItemGroupMenuFactory.onLeave(event)
+
+    if event.element.name ~= FILTER_WRAPPER_GUI_NAME then
+        ItemGroupMenuFactory.onLeave(event)
+    end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
