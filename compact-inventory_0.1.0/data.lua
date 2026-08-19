@@ -57,6 +57,12 @@ data:extend({
         size = 64
     },
     {
+        type = "sprite",
+        name = MOD_PREFIX .. "group-menu",
+        filename = "__core__/graphics/icons/mip/expand-panel-white.png",
+        size = 32
+    },
+    {
         type = "shortcut",
         name = MOD_PREFIX .. "main-window-toggle",
         action = "lua",
