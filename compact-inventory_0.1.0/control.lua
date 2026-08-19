@@ -121,6 +121,17 @@ script.on_event(defines.events.on_gui_click, function(event)
 
         ItemGroupMenuFactory.open(window, item_group, event.cursor_display_location)
 
+    elseif event.element.name == menu_names.move_up_button
+        or event.element.name == menu_names.move_down_button then
+
+        local group_id   = event.element.tags[menu_names.group_id_tag_name]
+        local item_group = window:getItemGroupByID(group_id)
+        local offset     = event.element.name == menu_names.move_up_button and -1 or 1
+
+        assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+        ItemGroupMenuFactory.moveItemGroup(window, item_group, offset)
+
     elseif event.element.name == menu_names.sort_toggle_button then
         ItemGroupMenuFactory.toggleSortColumn(event.player_index)
 
