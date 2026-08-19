@@ -9,13 +9,12 @@ local GUI_NAME = {
     menu                 = MOD_PREFIX .. "IG_options-menu",
     group_column         = MOD_PREFIX .. "IG_options-group-column",
     group_title          = MOD_PREFIX .. "IG_options-group-title",
-    sort_toggle_button   = MOD_PREFIX .. "IG_options-sort-toggle",
-    delete_group_button  = MOD_PREFIX .. "IG_options-delete-group",
     sort_column_wrapper  = MOD_PREFIX .. "IG_options-sort-wrapper",
     sort_separator       = MOD_PREFIX .. "IG_options-sort-separator",
     sort_column          = MOD_PREFIX .. "IG_options-sort-column",
     sort_title           = MOD_PREFIX .. "IG_options-sort-title",
-    sort_entries         = MOD_PREFIX .. "IG_options-sort-entries"
+    sort_toggle_button   = MOD_PREFIX .. "IG_options-sort-toggle",
+    delete_group_button  = MOD_PREFIX .. "IG_options-delete-group"
 }
 
 local SORT_SPRITE = {
@@ -46,7 +45,7 @@ local hover_state = { }
 
 local factory = {
     exposed_gui_names = {
-        sort_menu           = GUI_NAME.menu,
+        menu                = GUI_NAME.menu,
         sort_toggle_button  = GUI_NAME.sort_toggle_button,
         delete_group_button = GUI_NAME.delete_group_button
     }
@@ -111,10 +110,10 @@ local function addColumnTitle(parent, menu, name, caption)
         type               = "label",
         name               = name,
         caption            = caption,
+        style              = "frame_title",
         raise_hover_events = true
     })
 
-    title.style.font = "default-bold"
     title.drag_target = menu
 
     return title
@@ -138,7 +137,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Attach the experimental floating options menu to an InventoryWindow.
+--- ### Attach the experimental floating group menu to an InventoryWindow.
 --
 --- -----
 --- @param window InventoryWindow      The window that receives the prototype menu.
@@ -179,8 +178,6 @@ function factory.open(window, location)
         x = location.x - 4,
         y = location.y - 4
     }
-
-    menu.style.horizontal_spacing = 4
 
     local group_column = menu.add({
         type               = "flow",
@@ -228,32 +225,24 @@ function factory.open(window, location)
 
     addColumnTitle(sort_column, menu, GUI_NAME.sort_title, "Sort options")
 
-    local entries = sort_column.add({
-        type               = "table",
-        name               = GUI_NAME.sort_entries,
-        column_count       = 2,
-        raise_hover_events = true
-    })
-
-    entries.style.horizontal_spacing = 4
-    entries.style.vertical_spacing   = 0
-
     for sort_mode = SortMode.standard, SortMode.custom do
-        entries.add({
-            type               = "sprite-button",
-            name               = MOD_PREFIX .. "IG_options-sort-icon-" .. sort_mode,
-            sprite             = SORT_SPRITE[sort_mode],
-            style              = "frame_action_button",
-            tooltip            = SORT_CAPTION[sort_mode],
-            raise_hover_events = true,
-            tags               = {
-                [SORT_TAG_NAME] = sort_mode
-            }
+        local row = sort_column.add({
+            type               = "flow",
+            direction          = "horizontal",
+            raise_hover_events = true
         })
 
-        local button = entries.add({
+        row.style.horizontal_spacing = 4
+
+        row.add({
+            type               = "sprite",
+            sprite             = SORT_SPRITE[sort_mode],
+            resize_to_sprite    = false,
+            raise_hover_events = true
+        }).style.size = 32
+
+        local button = row.add({
             type               = "button",
-            name               = MOD_PREFIX .. "IG_options-sort-button-" .. sort_mode,
             caption            = SORT_CAPTION[sort_mode],
             raise_hover_events = true,
             tags               = {
@@ -276,30 +265,25 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Toggle the sorting options column.
---
---- -----
---- @param player integer|LuaPlayer      The player that owns the menu.
---
 function factory.toggleSortColumn(player)
 
     local _, lua_player = resolve_player(player)
     local menu = lua_player.gui.screen[GUI_NAME.menu]
 
-    assert(menu, "Group options menu must exist here !")      -- [DEBUG-ONLY] . --
+    if not menu then
+        return
+    end
 
-    local wrapper = menu[GUI_NAME.sort_column_wrapper]
-    local button  = menu[GUI_NAME.group_column][GUI_NAME.sort_toggle_button]
+    local sort_wrapper = menu[GUI_NAME.sort_column_wrapper]
 
-    assert(wrapper and button, "Group options sorting controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(sort_wrapper, "Sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
-    wrapper.visible = not wrapper.visible
-    button.caption = wrapper.visible and "Sorting options  <" or "Sorting options  >"
+    sort_wrapper.visible = not sort_wrapper.visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Close the experimental group options menu if it exists.
+--- ### Close the experimental group menu if it exists.
 --
 --- -----
 --- @param player integer|LuaPlayer      The player that owns the menu.
