@@ -17,6 +17,15 @@ local SortMode = {
     custom           = 6
 }
 
+---@enum FilterMode
+local FilterMode = {
+    blacklist = 1,
+    whitelist = 2
+}
+
+local FILTER_COLUMNS = 10
+local MIN_FILTER_ROWS = 2
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventoryViewMetatable.                                                                                       ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -26,8 +35,10 @@ local SortMode = {
 ---
 --- ### This class groups all functions used to project an Inventory for display.
 ---
---- @field private inventory Inventory      The logical inventory projected by the view.
---- @field private sort_mode SortMode       The current sorting mode.
+--- @field private inventory   Inventory      The logical inventory projected by the view.
+--- @field private sort_mode   SortMode       The current sorting mode.
+--- @field private filter_mode FilterMode     The current filtering mode.
+--- @field private filters     table<integer, string> The positioned item filters.
 ---
 --
 local metatable = { }
@@ -82,7 +93,114 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the projected inventory content according to the current sorting mode.
+--- ### Get the current filtering mode.
+--
+--- -----
+--- @return FilterMode      @ The current filtering mode.
+--
+function metatable:getFilterMode()
+    return self.filter_mode
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Set the filtering mode.
+--
+--- -----
+--- @param filter_mode FilterMode      The filtering mode to activate.
+--
+function metatable:setFilterMode(filter_mode)
+
+    assert(filter_mode == FilterMode.blacklist or filter_mode == FilterMode.whitelist, "Filter mode must be valid !")      -- [DEBUG-ONLY] . --
+
+    self.filter_mode = filter_mode
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get all positioned item filters.
+--
+--- -----
+--- @return table<integer, string>      @ The positioned item filters.
+--
+function metatable:getFilters()
+    assert(type(self.filters) == "table", "InventoryView filters must be a table !")      -- [DEBUG-ONLY] . --
+    return self.filters
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Set one positioned item filter.
+--
+--- -----
+--- @param slot_index integer      The filter slot index.
+--- @param item_name string|nil    The item name, or nil to clear the slot.
+--
+function metatable:setFilter(slot_index, item_name)
+
+    assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
+    assert(item_name == nil or type(item_name) == "string", "Filter item must be a string or nil !")                                      -- [DEBUG-ONLY] . --
+
+    self.filters[slot_index] = item_name
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the number of visible filter slots needed by the filter editor.
+--
+--- Keeps at least two rows visible and always adds one empty row below the last row containing a filter.
+--
+--- -----
+--- @return integer      @ The number of visible filter slots.
+--
+function metatable:getVisibleFilterSlotCount()
+
+    local last_used_slot = 0
+
+    for slot_index, item_name in pairs(self:getFilters()) do
+        if item_name and slot_index > last_used_slot then
+            last_used_slot = slot_index
+        end
+    end
+
+    local visible_rows = math.floor(last_used_slot / FILTER_COLUMNS) + 1
+
+    if visible_rows < MIN_FILTER_ROWS then
+        visible_rows = MIN_FILTER_ROWS
+    end
+
+    return visible_rows * FILTER_COLUMNS
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function filterItems(view, items)
+
+    local filter_lookup = { }
+
+    for _, item_name in pairs(view:getFilters()) do
+        if item_name then
+            filter_lookup[item_name] = true
+        end
+    end
+
+    local filtered_items = { }
+    local whitelist      = (view:getFilterMode() == FilterMode.whitelist)
+
+    for _, item in ipairs(items) do
+        local matched = filter_lookup[item.name] == true
+
+        if matched == whitelist then
+            filtered_items[#filtered_items + 1] = item
+        end
+    end
+
+    return filtered_items
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the projected inventory content according to the current filtering and sorting modes.
 --
 --- -----
 --- @return table      @ The item list to display.
@@ -90,7 +208,7 @@ end
 function metatable:getContent()
 
     local inventory = self:getInventory()
-    local items     = inventory:getContent()
+    local items     = filterItems(self, inventory:getContent())
 
     if self.sort_mode == SortMode.standard then
         return items
@@ -181,7 +299,8 @@ end
 --- ### This class groups all functions used to create inventory views.
 ---
 local factory = {
-    sort_modes = SortMode
+    sort_modes   = SortMode,
+    filter_modes = FilterMode
 }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -198,8 +317,10 @@ function factory.new(inventory)
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     local view = {                                      ---@type InventoryView
-        inventory = inventory,
-        sort_mode = SortMode.standard
+        inventory   = inventory,
+        sort_mode   = SortMode.standard,
+        filter_mode = FilterMode.blacklist,
+        filters     = { }
     }
 
     setmetatable(view, metatable)
