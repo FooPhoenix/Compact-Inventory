@@ -10,6 +10,7 @@ local GUI_NAME = {
     title               = MOD_PREFIX .. "IW_title",
     dragger             = MOD_PREFIX .. "IW_dragger",
     close_button        = MOD_PREFIX .. "IW_close",
+    lock_button         = MOD_PREFIX .. "IW_lock-button",
     sort_toolbar_button = MOD_PREFIX .. "IW_sort-toolbar-button",
     content_flow        = MOD_PREFIX .. "IW_content-flow",
     sort_toolbar        = MOD_PREFIX .. "IW_sort-toolbar",
@@ -18,7 +19,8 @@ local GUI_NAME = {
     group_header        = MOD_PREFIX .. "IG_header",
     group_title         = MOD_PREFIX .. "IG_title",
     group_spacer        = MOD_PREFIX .. "IG_spacer",
-    group_sort_button   = MOD_PREFIX .. "IG_sort-button"
+    group_sort_button   = MOD_PREFIX .. "IG_sort-button",
+    group_close_button  = MOD_PREFIX .. "IG_close-button"
 }
 
 local SORT_SPRITE = {
@@ -36,7 +38,9 @@ local SORT_SPRITE = {
 
 local factory = {
     exposed_gui_names = {
-        group_sort_button = GUI_NAME.group_sort_button
+        lock_button        = GUI_NAME.lock_button,
+        group_sort_button  = GUI_NAME.group_sort_button,
+        group_close_button = GUI_NAME.group_close_button
     }
 }
 
@@ -96,6 +100,20 @@ function factory.attach(window)
     close.style.width   = 16
     close.style.height  = 16
     close.style.padding = 0
+
+    local lock = title_bar.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.lock_button,
+        sprite  = MOD_PREFIX .. "window-unlock",
+        style   = "frame_action_button",
+        tooltip = "Lock window (not implemented yet)"
+    })
+
+    lock.style.width   = 16
+    lock.style.height  = 16
+    lock.style.padding = 0
+
+    title_bar.swap_children(lock.get_index_in_parent(), close.get_index_in_parent())
 
     content.destroy()
 
@@ -163,6 +181,18 @@ function factory.attach(window)
     sort_button.style.width   = 20
     sort_button.style.height  = 20
     sort_button.style.padding = 0
+
+    local close_group = header.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.group_close_button,
+        sprite  = MOD_PREFIX .. "group-delete",
+        style   = "frame_action_button",
+        tooltip = "Delete group"
+    })
+
+    close_group.style.width   = 20
+    close_group.style.height  = 20
+    close_group.style.padding = 0
 
     local grid = group.add({
         type         = "table",
