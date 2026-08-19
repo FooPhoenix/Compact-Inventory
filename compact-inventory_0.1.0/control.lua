@@ -1,4 +1,3 @@
-
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder               = require("util.item_order")
@@ -127,6 +126,11 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == menu_names.filter_toggle_button then
         ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
+
+    elseif event.element.tags[menu_names.filter_slot_tag_name]
+        and event.button == defines.mouse_button_type.left then
+
+        ItemGroupMenuFactory.suspendHoverUntilReenter(event.player_index)
 
     elseif event.element.tags[menu_names.filter_slot_tag_name]
         and event.button == defines.mouse_button_type.right then
