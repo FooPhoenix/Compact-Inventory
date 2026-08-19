@@ -40,6 +40,44 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function getGuiDebugPath(lua_element)
+    local menu_name = ItemGroupMenuFactory.exposed_gui_names.menu
+    local path      = { }
+    local in_menu   = false
+
+    while lua_element do
+        local name = lua_element.name ~= "" and lua_element.name or "<unnamed>"
+        path[#path + 1] = lua_element.type .. ":" .. name
+
+        if lua_element.name == menu_name then
+            in_menu = true
+            break
+        end
+
+        lua_element = lua_element.parent
+    end
+
+    return in_menu and table.concat(path, " <- ") or nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function printGuiHoverDebug(event, event_name)
+    local path = getGuiDebugPath(event.element)
+
+    if not path then
+        return
+    end
+
+    local lua_player = game.get_player(event.player_index)
+
+    if lua_player then
+        lua_player.print("[Hover] t=" .. event.tick .. " " .. event_name .. " " .. path)      -- [DEBUG-ONLY] . --
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 script.on_init(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
@@ -130,6 +168,13 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.tags[menu_names.filter_slot_tag_name]
         and event.button == defines.mouse_button_type.left then
 
+        game.get_player(event.player_index).print(
+            "[Filter] t=" .. event.tick
+                .. " CLICK group=" .. tostring(event.element.tags[menu_names.group_id_tag_name])
+                .. " slot=" .. tostring(event.element.tags[menu_names.filter_slot_tag_name])
+                .. " value=" .. tostring(event.element.elem_value)
+        )      -- [DEBUG-ONLY] . --
+
         ItemGroupMenuFactory.suspendHoverUntilReenter(event.player_index)
 
     elseif event.element.tags[menu_names.filter_slot_tag_name]
@@ -180,10 +225,24 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
     local window     = WindowsManager.getWindowMainInventory(event.player_index)
     local group_id   = event.element.tags[menu_names.group_id_tag_name]
     local item_group = window:getItemGroupByID(group_id)
+    local lua_player = game.get_player(event.player_index)
 
     assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
 
+    lua_player.print(
+        "[Filter] t=" .. event.tick
+            .. " ELEM_CHANGED group=" .. tostring(group_id)
+            .. " slot=" .. tostring(slot_index)
+            .. " value=" .. tostring(event.element.elem_value)
+    )      -- [DEBUG-ONLY] . --
+
     item_group:setFilter(slot_index, event.element.elem_value)
+
+    lua_player.print(
+        "[Filter] stored=" .. tostring(item_group:getFilters()[slot_index])
+            .. " visible_slots=" .. item_group:getVisibleFilterSlotCount()
+    )      -- [DEBUG-ONLY] . --
+
     window:refreshGroup(item_group)
     ItemGroupMenuFactory.refreshFilterTable(window, item_group)
 end)
@@ -226,12 +285,14 @@ end)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_hover, function(event)
+    printGuiHoverDebug(event, "HOVER")      -- [DEBUG-ONLY] . --
     ItemGroupMenuFactory.onHover(event)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_leave, function(event)
+    printGuiHoverDebug(event, "LEAVE")      -- [DEBUG-ONLY] . --
     ItemGroupMenuFactory.onLeave(event)
 end)
 
