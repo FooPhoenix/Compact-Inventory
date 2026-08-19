@@ -23,6 +23,13 @@ gui_style[MOD_PREFIX .. "locked-content-frame"] = {
 
 data:extend({
     {
+        type                = "custom-input",
+        name                = MOD_PREFIX .. "cancel-rename",
+        key_sequence        = "",
+        linked_game_control = "close-menu",
+        consuming           = "none"
+    },
+    {
         type = "sprite",
         name = MOD_PREFIX .. "sort-standard",
         filename = "__compact-inventory__/graphics/sort-standard.png",
