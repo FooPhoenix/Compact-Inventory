@@ -12,6 +12,8 @@ local GUI_NAME = {
     group_column           = MOD_PREFIX .. "IG_options-group-column",
     group_title            = MOD_PREFIX .. "IG_options-group-title",
     group_filler           = MOD_PREFIX .. "IG_options-group-filler",
+    move_up_button         = MOD_PREFIX .. "IG_options-move-up",
+    move_down_button       = MOD_PREFIX .. "IG_options-move-down",
     sort_column_wrapper    = MOD_PREFIX .. "IG_options-sort-wrapper",
     sort_outer_frame       = MOD_PREFIX .. "IG_options-sort-outer-frame",
     sort_inner_frame       = MOD_PREFIX .. "IG_options-sort-inner-frame",
@@ -58,6 +60,8 @@ local hover_trackers       = { }
 local factory = {
     exposed_gui_names = {
         menu                 = GUI_NAME.menu,
+        move_up_button       = GUI_NAME.move_up_button,
+        move_down_button     = GUI_NAME.move_down_button,
         sort_toggle_button   = GUI_NAME.sort_toggle_button,
         filter_toggle_button = GUI_NAME.filter_toggle_button,
         filter_switch        = GUI_NAME.filter_switch,
@@ -88,6 +92,18 @@ local function isNonAuthoritativeLeaveElement(lua_element)
     return lua_element.name == GUI_NAME.filter_blacklist_label
         or lua_element.name == GUI_NAME.filter_whitelist_label
         or lua_element.name == GUI_NAME.filter_switch
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getItemGroupIndex(window, item_group)
+    for index, current_group in ipairs(window:getItemGroups()) do
+        if current_group == item_group then
+            return index
+        end
+    end
+
+    return nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -203,6 +219,58 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function factory.refreshMoveButtons(window, item_group)
+
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+
+    local menu = window:getPlayer().gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local group_column = menu[GUI_NAME.columns_flow][GUI_NAME.group_column]
+    local group_index  = getItemGroupIndex(window, item_group)
+    local group_count  = #window:getItemGroups()
+
+    assert(group_index, "ItemGroup must exist in the window !")                    -- [DEBUG-ONLY] . --
+    assert(group_column, "Group options column must exist here !")                 -- [DEBUG-ONLY] . --
+    assert(group_column[GUI_NAME.move_up_button], "Move up button must exist !")    -- [DEBUG-ONLY] . --
+    assert(group_column[GUI_NAME.move_down_button], "Move down button must exist !") -- [DEBUG-ONLY] . --
+
+    group_column[GUI_NAME.move_up_button].enabled   = group_index > 1
+    group_column[GUI_NAME.move_down_button].enabled = group_index < group_count
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.moveItemGroup(window, item_group, offset)
+
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+    assert(offset == -1 or offset == 1, "ItemGroup move offset must be -1 or 1 !")                              -- [DEBUG-ONLY] . --
+
+    local item_groups = window:getItemGroups()
+    local group_index = getItemGroupIndex(window, item_group)
+
+    assert(group_index, "ItemGroup must exist in the window !")      -- [DEBUG-ONLY] . --
+
+    local target_index = group_index + offset
+
+    if target_index < 1 or target_index > #item_groups then
+        return false
+    end
+
+    item_groups[group_index], item_groups[target_index] = item_groups[target_index], item_groups[group_index]
+    window:getGroupsContainer().swap_children(group_index, target_index)
+    factory.refreshMoveButtons(window, item_group)
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function factory.refreshFilterTable(window, item_group)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
@@ -298,10 +366,15 @@ function factory.open(window, item_group, location)
     group_column.style.vertical_spacing       = 2
     group_column.style.vertically_stretchable = true
 
+    local group_index = getItemGroupIndex(window, item_group)
+    local group_count = #window:getItemGroups()
+
+    assert(group_index, "ItemGroup must exist in the window !")      -- [DEBUG-ONLY] . --
+
     addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options", true)
     addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false, group_id)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false, group_id)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-down", "Move down", false, group_id)
+    addGroupAction(group_column, GUI_NAME.move_up_button, "Move up", group_index > 1, group_id)
+    addGroupAction(group_column, GUI_NAME.move_down_button, "Move down", group_index < group_count, group_id)
     addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true, group_id)
     addGroupAction(group_column, GUI_NAME.filter_toggle_button, "Filtering options  >", true, group_id)
     addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true, group_id)
