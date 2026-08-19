@@ -120,7 +120,9 @@ function metatable:getVisibleFilterSlotCount()
         end
     end
 
-    local visible_rows = math.floor(last_used_slot / FILTER_COLUMNS) + 1
+    local visible_rows = last_used_slot > 0
+        and math.floor((last_used_slot - 1) / FILTER_COLUMNS) + 2
+        or MIN_FILTER_ROWS
 
     if visible_rows < MIN_FILTER_ROWS then
         visible_rows = MIN_FILTER_ROWS
