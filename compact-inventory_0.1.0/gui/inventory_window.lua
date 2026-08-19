@@ -370,6 +370,16 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:refreshLockGUI()
+    local locked = self:isLocked()
+
+    for index, item_group in ipairs(self:getItemGroups()) do
+        setGroupLockGUI(self:getGroupFrame(item_group), locked, index == 1)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setLocked(locked)
     assert(type(locked) == "boolean", "Locked state must be a boolean !")      -- [DEBUG-ONLY] . --
 
@@ -397,9 +407,7 @@ function metatable:setLocked(locked)
     content.style.padding                  = locked and 0 or 2
     content.style.horizontally_stretchable = true
 
-    for index, item_group in ipairs(self:getItemGroups()) do
-        setGroupLockGUI(self:getGroupFrame(item_group), locked, index == 1)
-    end
+    self:refreshLockGUI()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
