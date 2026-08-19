@@ -39,12 +39,16 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function attachPrototypesToWindow(window)
+    ItemGroupLayoutPrototypeFactory.attach(window)
+    SortMenuPrototypeFactory.attach(window)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function attachPrototypes()
     for _, lua_player in pairs(game.players) do
-        local window = WindowsManager.getWindowMainInventory(lua_player)
-
-        ItemGroupLayoutPrototypeFactory.attach(window)
-        SortMenuPrototypeFactory.attach(window)
+        attachPrototypesToWindow(WindowsManager.getWindowMainInventory(lua_player))
     end
 end
 
@@ -82,10 +86,7 @@ script.on_event(defines.events.on_player_created, function(event)
     InventoryManagerFactory.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
 
-    local window = WindowsManager.getWindowMainInventory(event.player_index)
-
-    ItemGroupLayoutPrototypeFactory.attach(window)
-    SortMenuPrototypeFactory.attach(window)
+    attachPrototypesToWindow(WindowsManager.getWindowMainInventory(event.player_index))
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -93,14 +94,17 @@ end)
 script.on_event(defines.events.on_player_main_inventory_changed, function(event)
     local _, lua_player = resolve_player(event.player_index)
     local lua_inventory = lua_player.get_main_inventory()
-    local window = WindowsManager.getWindowMainInventory(event.player_index)
 
     if lua_inventory then
         InventoryManagerFactory.get(lua_player):updateInventory(lua_inventory)
     end
 
-    if window:isVisible() then
-        window:refresh()
+    if WindowsManager.hasWindowMainInventory(lua_player) then
+        local window = WindowsManager.getWindowMainInventory(lua_player)
+
+        if window:isVisible() then
+            window:refresh()
+        end
     end
 end)
 
@@ -114,6 +118,10 @@ script.on_event(defines.events.on_gui_click, function(event)
     if event.element.name == gui_names.close_button then
         SortMenuPrototypeFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
+
+    elseif event.element.name == prototype_names.group_close_button then
+        SortMenuPrototypeFactory.close(event.player_index)
+        WindowsManager.destroyWindowMainInventory(event.player_index)
 
     elseif event.element.name == prototype_names.group_sort_button then
         SortMenuPrototypeFactory.open(
@@ -153,6 +161,12 @@ end)
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == WindowsManager.exposed_gui_names.InventoryWindow.shortcut_button then
         SortMenuPrototypeFactory.close(event.player_index)
-        WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
+
+        if WindowsManager.hasWindowMainInventory(event.player_index) then
+            WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
+        else
+            local window = WindowsManager.createWindowMainInventory(event.player_index)
+            attachPrototypesToWindow(window)
+        end
     end
 end)
