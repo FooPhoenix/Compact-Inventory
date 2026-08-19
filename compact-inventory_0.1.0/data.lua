@@ -1,7 +1,6 @@
 
 local MOD_PREFIX = "FooPhoenix_CI_"
 
--- [TEST-ONLY] Experimental styles used to validate whether frame backgrounds can be removed at runtime. --
 local gui_style = data.raw["gui-style"].default
 
 gui_style[MOD_PREFIX .. "locked-window-frame"] = {
