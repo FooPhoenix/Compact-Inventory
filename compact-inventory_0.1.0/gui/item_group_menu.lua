@@ -1,5 +1,5 @@
-
 local InventoryViewFactory = require("inventory.inventory_view")
+local HoverTrackerFactory  = require("gui.hover_tracker")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -50,7 +50,7 @@ local SORT_CAPTION = {
 local SORT_TAG_NAME        = MOD_PREFIX .. "SortID"
 local GROUP_ID_TAG_NAME    = MOD_PREFIX .. "ItemGroupID"
 local FILTER_SLOT_TAG_NAME = MOD_PREFIX .. "FilterSlot"
-local hover_state          = { }
+local hover_trackers       = { }
 
 local factory = {
     exposed_gui_names = {
@@ -77,15 +77,6 @@ local function isMenuElement(lua_element)
     end
 
     return false
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-local function recordEvent(player_index, event_name, tick)
-    hover_state[player_index] = {
-        last_event      = event_name,
-        last_event_tick = tick
-    }
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -232,8 +223,6 @@ function factory.refreshFilterTable(window, item_group)
             }
         })
     end
-
-    recordEvent(lua_player.index, "HOVER", game.tick)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -243,7 +232,7 @@ end
 --- -----
 --- @param window InventoryWindow      The affected inventory window.
 --- @param item_group ItemGroup        The affected item group.
---- @param location GuiLocation       The cursor display location.
+--- @param location GuiLocation        The cursor display location.
 --
 function factory.open(window, item_group, location)
 
@@ -358,23 +347,44 @@ function factory.open(window, item_group, location)
 
     addColumnTitle(filter_column, menu, GUI_NAME.filter_title, "Filter options", false)
 
-    filter_column.add({
-        type                = "switch",
-        name                = GUI_NAME.filter_switch,
-        switch_state        = item_group:getFilterMode() == FilterMode.blacklist and "left" or "right",
-        allow_none_state    = false,
-        left_label_caption  = "Blacklist",
-        right_label_caption = "Whitelist",
-        raise_hover_events  = true,
-        tags                = {
+    local filter_mode_flow = filter_column.add({
+        type               = "flow",
+        direction          = "horizontal",
+        raise_hover_events = true
+    })
+
+    filter_mode_flow.style.horizontal_spacing       = 4
+    filter_mode_flow.style.horizontally_stretchable = true
+    filter_mode_flow.style.vertical_align           = "center"
+
+    filter_mode_flow.add({
+        type               = "label",
+        caption            = "Blacklist",
+        raise_hover_events = true
+    })
+
+    filter_mode_flow.add({
+        type               = "switch",
+        name               = GUI_NAME.filter_switch,
+        switch_state       = item_group:getFilterMode() == FilterMode.blacklist and "left" or "right",
+        allow_none_state   = false,
+        raise_hover_events = true,
+        tags               = {
             [GROUP_ID_TAG_NAME] = group_id
         }
     })
 
+    filter_mode_flow.add({
+        type               = "label",
+        caption            = "Whitelist",
+        raise_hover_events = true
+    })
+
     local filter_table = filter_column.add({
-        type         = "table",
-        name         = GUI_NAME.filter_table,
-        column_count = 10
+        type               = "table",
+        name               = GUI_NAME.filter_table,
+        column_count       = 10,
+        raise_hover_events = true
     })
 
     filter_table.style.horizontal_spacing = 0
@@ -382,7 +392,10 @@ function factory.open(window, item_group, location)
 
     factory.refreshFilterTable(window, item_group)
 
-    recordEvent(lua_player.index, "HOVER", game.tick)
+    local tracker = HoverTrackerFactory.new()
+    tracker:onHover(game.tick)
+    hover_trackers[lua_player.index] = tracker
+
     menu.bring_to_front()
 end
 
@@ -426,6 +439,17 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function factory.suspendHoverUntilReenter(player)
+    local player_index = resolve_player(player)
+    local tracker = hover_trackers[player_index]
+
+    if tracker then
+        tracker:suspendUntilReenter()
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function factory.close(player)
 
     local player_index, lua_player = resolve_player(player)
@@ -435,36 +459,48 @@ function factory.close(player)
         menu.destroy()
     end
 
-    hover_state[player_index] = nil
+    hover_trackers[player_index] = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onHover(event)
-    if isMenuElement(event.element) then
-        recordEvent(event.player_index, "HOVER", event.tick)
+    if not isMenuElement(event.element) then
+        return
+    end
+
+    local tracker = hover_trackers[event.player_index]
+
+    if tracker then
+        tracker:onHover(event.tick)
     end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onLeave(event)
-    if isMenuElement(event.element) then
-        recordEvent(event.player_index, "LEAVE", event.tick)
+    if not isMenuElement(event.element) then
+        return
+    end
+
+    local tracker = hover_trackers[event.player_index]
+
+    if tracker then
+        tracker:onLeave(event.tick)
     end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onTick(event)
-    for player_index, state in pairs(hover_state) do
-        if state.last_event_tick == event.tick - 1 and state.last_event == "LEAVE" then
+    for player_index, tracker in pairs(hover_trackers) do
+        if tracker:shouldClose(event.tick) then
             local lua_player = game.get_player(player_index)
 
             if lua_player then
                 factory.close(lua_player)
             else
-                hover_state[player_index] = nil
+                hover_trackers[player_index] = nil
             end
         end
     end
