@@ -38,14 +38,17 @@ local SORT_CAPTION = {
     [SortMode.custom]           = "Custom sorting"
 }
 
-local SORT_TAG_NAME = MOD_PREFIX .. "SortID"
-local hover_state   = { }
+local SORT_TAG_NAME     = MOD_PREFIX .. "SortID"
+local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
+local hover_state       = { }
 
 local factory = {
     exposed_gui_names = {
         menu                = GUI_NAME.menu,
         sort_toggle_button  = GUI_NAME.sort_toggle_button,
-        delete_group_button = GUI_NAME.delete_group_button
+        delete_group_button = GUI_NAME.delete_group_button,
+        sort_tag_name       = SORT_TAG_NAME,
+        group_id_tag_name   = GROUP_ID_TAG_NAME
     }
 }
 
@@ -111,13 +114,16 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function addGroupAction(parent, name, caption, enabled)
+local function addGroupAction(parent, name, caption, enabled, group_id)
     local button = parent.add({
         type               = "button",
         name               = name,
         caption            = caption,
         enabled            = enabled,
-        raise_hover_events = true
+        raise_hover_events = true,
+        tags               = {
+            [GROUP_ID_TAG_NAME] = group_id
+        }
     })
 
     button.style.horizontally_stretchable = true
@@ -129,14 +135,17 @@ end
 --
 --- -----
 --- @param window InventoryWindow      The affected inventory window.
+--- @param item_group ItemGroup        The affected item group.
 --- @param location GuiLocation       The cursor display location.
 --
-function factory.open(window, location)
+function factory.open(window, item_group, location)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
     assert(location and location.x and location.y, "Cursor display location must be valid here !")            -- [DEBUG-ONLY] . --
 
     local lua_player = window:getPlayer()
+    local group_id   = item_group:getID()
 
     factory.close(lua_player)
 
@@ -144,7 +153,10 @@ function factory.open(window, location)
         type               = "frame",
         name               = GUI_NAME.menu,
         direction          = "horizontal",
-        raise_hover_events = true
+        raise_hover_events = true,
+        tags               = {
+            [GROUP_ID_TAG_NAME] = group_id
+        }
     })
 
     menu.location = {
@@ -172,11 +184,11 @@ function factory.open(window, location)
     group_column.style.vertically_stretchable = true
 
     addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options", true)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-down", "Move down", false)
-    addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true)
-    addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true)
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false, group_id)
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-up", "Move up", false, group_id)
+    addGroupAction(group_column, MOD_PREFIX .. "IG_options-move-down", "Move down", false, group_id)
+    addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true, group_id)
+    addGroupAction(group_column, GUI_NAME.delete_group_button, "Delete group", true, group_id)
 
     local filler = group_column.add({
         type               = "empty-widget",
@@ -245,7 +257,8 @@ function factory.open(window, location)
             caption            = SORT_CAPTION[sort_mode],
             raise_hover_events = true,
             tags               = {
-                [SORT_TAG_NAME] = sort_mode
+                [SORT_TAG_NAME]     = sort_mode,
+                [GROUP_ID_TAG_NAME] = group_id
             }
         })
 
