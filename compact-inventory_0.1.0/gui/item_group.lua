@@ -13,6 +13,7 @@ local InventoryViewFactory = require("inventory.inventory_view")
 --- ### This class groups all functions used to manage an item group.
 ---
 --- @field private inventory_view InventoryView      The inventory projection displayed by the group.
+--- @field private name           string             The displayed group name.
 ---
 --
 local metatable = { }
@@ -38,6 +39,30 @@ function metatable:getView()
     assert(self.inventory_view and self.inventory_view.object_name == "InventoryView", "ItemGroup must have a valid InventoryView !")      -- [DEBUG-ONLY] . --
 
     return self.inventory_view
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the displayed group name.
+--
+--- -----
+--- @return string      @ The group name.
+--
+function metatable:getName()
+    assert(type(self.name) == "string", "ItemGroup name must be a string !")      -- [DEBUG-ONLY] . --
+    return self.name
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Set the displayed group name.
+--
+--- -----
+--- @param name string      The new group name.
+--
+function metatable:setName(name)
+    assert(type(name) == "string", "ItemGroup name must be a string !")      -- [DEBUG-ONLY] . --
+    self.name = name
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -108,7 +133,8 @@ function factory.new(inventory)
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     local item_group = {                                  ---@type ItemGroup
-        inventory_view = InventoryViewFactory.new(inventory)
+        inventory_view = InventoryViewFactory.new(inventory),
+        name           = "Inventory"
     }
 
     setmetatable(item_group, metatable)
