@@ -87,6 +87,7 @@ end
 local function isNonAuthoritativeLeaveElement(lua_element)
     return lua_element.name == GUI_NAME.filter_blacklist_label
         or lua_element.name == GUI_NAME.filter_whitelist_label
+        or lua_element.name == GUI_NAME.filter_switch
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -233,7 +234,7 @@ function factory.refreshFilterTable(window, item_group)
             type               = "choose-elem-button",
             name               = MOD_PREFIX .. "IG_options-filter-slot-" .. slot_index,
             elem_type          = "item",
-            elem_value         = filters[slot_index],
+            item               = filters[slot_index],
             raise_hover_events = true,
             tags               = {
                 [GROUP_ID_TAG_NAME]    = group_id,
