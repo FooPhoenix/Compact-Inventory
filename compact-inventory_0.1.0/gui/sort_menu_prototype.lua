@@ -7,6 +7,7 @@ local SortMode = InventoryViewFactory.sort_modes
 
 local GUI_NAME = {
     menu                = MOD_PREFIX .. "IG_options-menu",
+    columns_flow        = MOD_PREFIX .. "IG_options-columns-flow",
     group_column        = MOD_PREFIX .. "IG_options-group-column",
     group_title         = MOD_PREFIX .. "IG_options-group-title",
     group_filler        = MOD_PREFIX .. "IG_options-group-filler",
@@ -204,7 +205,16 @@ function factory.open(window, location)
         y = location.y - 4
     }
 
-    local group_column = menu.add({
+    local columns_flow = menu.add({
+        type               = "flow",
+        name               = GUI_NAME.columns_flow,
+        direction          = "horizontal",
+        raise_hover_events = true
+    })
+
+    columns_flow.style.horizontal_spacing = 0
+
+    local group_column = columns_flow.add({
         type               = "flow",
         name               = GUI_NAME.group_column,
         direction          = "vertical",
@@ -232,7 +242,7 @@ function factory.open(window, location)
     filler.style.vertically_stretchable   = true
     filler.style.horizontally_stretchable = true
 
-    local sort_wrapper = menu.add({
+    local sort_wrapper = columns_flow.add({
         type               = "flow",
         name               = GUI_NAME.sort_column_wrapper,
         direction          = "horizontal",
@@ -319,7 +329,8 @@ function factory.toggleSortColumn(player)
         return
     end
 
-    local sort_wrapper = menu[GUI_NAME.sort_column_wrapper]
+    local columns_flow = menu[GUI_NAME.columns_flow]
+    local sort_wrapper = columns_flow and columns_flow[GUI_NAME.sort_column_wrapper]
 
     assert(sort_wrapper, "Sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
