@@ -1,11 +1,10 @@
 
 MOD_PREFIX = "FooPhoenix_CI_"
 
-local ItemOrder                       = require("util.item_order")
-local InventoryManagerFactory         = require("inventory.inventory_manager")
-local WindowsManager                  = require("gui.windows_manager")
-local SortMenuPrototypeFactory        = require("gui.sort_menu_prototype")
-local ItemGroupLayoutPrototypeFactory = require("gui.item_group_layout_prototype")
+local ItemOrder               = require("util.item_order")
+local InventoryManagerFactory = require("inventory.inventory_manager")
+local WindowsManager          = require("gui.windows_manager")
+local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -39,26 +38,10 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function attachPrototypesToWindow(window)
-    ItemGroupLayoutPrototypeFactory.attach(window)
-    SortMenuPrototypeFactory.attach(window)
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-local function attachPrototypes()
-    for _, lua_player in pairs(game.players) do
-        attachPrototypesToWindow(WindowsManager.getWindowMainInventory(lua_player))
-    end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.on_init(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachPrototypes()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -77,7 +60,6 @@ script.on_configuration_changed(function()
     ItemOrder.initialize()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
-    attachPrototypes()
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -85,8 +67,6 @@ end)
 script.on_event(defines.events.on_player_created, function(event)
     InventoryManagerFactory.initializePlayer(event.player_index)
     WindowsManager.initializePlayer(event.player_index)
-
-    attachPrototypesToWindow(WindowsManager.getWindowMainInventory(event.player_index))
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -112,85 +92,78 @@ end)
 
 script.on_event(defines.events.on_gui_click, function(event)
 
-    local gui_names       = WindowsManager.exposed_gui_names.InventoryWindow
-    local layout_names    = ItemGroupLayoutPrototypeFactory.exposed_gui_names
-    local menu_names      = SortMenuPrototypeFactory.exposed_gui_names
+    local gui_names  = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names = ItemGroupMenuFactory.exposed_gui_names
 
     if event.element.name == gui_names.close_button then
-        SortMenuPrototypeFactory.close(event.player_index)
+        ItemGroupMenuFactory.close(event.player_index)
         WindowsManager.getWindowMainInventory(event.player_index):setVisible(false)
 
-    elseif event.element.name == layout_names.group_rename_button then
-        ItemGroupLayoutPrototypeFactory.startRename(
-            WindowsManager.getWindowMainInventory(event.player_index)
-        )
+    elseif event.element.name == gui_names.group_rename_button then
+        WindowsManager.getWindowMainInventory(event.player_index):startRename()
 
-    elseif event.element.name == layout_names.group_confirm_button then
-        ItemGroupLayoutPrototypeFactory.confirmRename(
-            WindowsManager.getWindowMainInventory(event.player_index)
-        )
+    elseif event.element.name == gui_names.group_confirm_button then
+        WindowsManager.getWindowMainInventory(event.player_index):confirmRename()
 
-    elseif event.element.name == layout_names.group_menu_button then
-        SortMenuPrototypeFactory.open(
+    elseif event.element.name == gui_names.group_menu_button then
+        ItemGroupMenuFactory.open(
             WindowsManager.getWindowMainInventory(event.player_index),
             event.cursor_display_location
         )
 
     elseif event.element.name == menu_names.sort_toggle_button then
-        SortMenuPrototypeFactory.toggleSortColumn(event.player_index)
+        ItemGroupMenuFactory.toggleSortColumn(event.player_index)
 
     elseif event.element.name == menu_names.delete_group_button then
-        SortMenuPrototypeFactory.close(event.player_index)
+        ItemGroupMenuFactory.close(event.player_index)
         WindowsManager.destroyWindowMainInventory(event.player_index)
 
     elseif event.element.tags[gui_names.sort_tag_name] then
-        local window = WindowsManager.getWindowMainInventory(event.player_index)
-
-        window:setSortMode(event.element.tags[gui_names.sort_tag_name])
-        ItemGroupLayoutPrototypeFactory.refreshSortButton(window)
-        SortMenuPrototypeFactory.close(event.player_index)
+        WindowsManager.getWindowMainInventory(event.player_index):setSortMode(
+            event.element.tags[gui_names.sort_tag_name]
+        )
+        ItemGroupMenuFactory.close(event.player_index)
     end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_confirmed, function(event)
-    if event.element.name == ItemGroupLayoutPrototypeFactory.exposed_gui_names.group_name_field then
-        ItemGroupLayoutPrototypeFactory.confirmRename(
-            WindowsManager.getWindowMainInventory(event.player_index)
-        )
+    local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
+
+    if event.element.name == gui_names.group_name_field then
+        WindowsManager.getWindowMainInventory(event.player_index):confirmRename()
     end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_hover, function(event)
-    SortMenuPrototypeFactory.onHover(event)
+    ItemGroupMenuFactory.onHover(event)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_gui_leave, function(event)
-    SortMenuPrototypeFactory.onLeave(event)
+    ItemGroupMenuFactory.onLeave(event)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_tick, function(event)
-    SortMenuPrototypeFactory.onTick(event)
+    ItemGroupMenuFactory.onTick(event)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == WindowsManager.exposed_gui_names.InventoryWindow.shortcut_button then
-        SortMenuPrototypeFactory.close(event.player_index)
+        ItemGroupMenuFactory.close(event.player_index)
 
         if WindowsManager.hasWindowMainInventory(event.player_index) then
             WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
         else
-            local window = WindowsManager.createWindowMainInventory(event.player_index)
-            attachPrototypesToWindow(window)
+            WindowsManager.createWindowMainInventory(event.player_index)
         end
     end
 end)
