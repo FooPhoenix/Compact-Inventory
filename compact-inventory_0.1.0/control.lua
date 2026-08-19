@@ -282,7 +282,12 @@ script.on_event(defines.events.on_lua_shortcut, function(event)
         ItemGroupMenuFactory.close(event.player_index)
 
         if WindowsManager.hasWindowMainInventory(event.player_index) then
-            WindowsManager.getWindowMainInventory(event.player_index):toggleVisibility()
+            local window = WindowsManager.getWindowMainInventory(event.player_index)
+            window:toggleVisibility()
+
+            if window:isVisible() then
+                window:setLocked(window:isLocked())
+            end
         else
             WindowsManager.createWindowMainInventory(event.player_index)
         end
