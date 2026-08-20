@@ -262,9 +262,10 @@ local function getPresetElements(menu)
     local outer          = preset_wrapper and preset_wrapper[GUI_NAME.preset_outer_frame]
     local inner          = outer and outer[GUI_NAME.preset_inner_frame]
     local column         = inner and inner[GUI_NAME.preset_column]
+    local title_flow     = column and column.children[1]
+    local title          = title_flow and title_flow[GUI_NAME.preset_title]
     local input_flow     = column and column[GUI_NAME.preset_input_flow]
     local name_field     = input_flow and input_flow[GUI_NAME.preset_name_field]
-    local title          = column and column[GUI_NAME.preset_title]
     local scroll         = column and column[GUI_NAME.preset_scroll]
     local preset_table   = scroll and scroll[GUI_NAME.preset_table]
 
