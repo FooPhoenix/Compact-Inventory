@@ -74,12 +74,6 @@ end
 function factory.writeGuiEvent(event, event_name, root_name, file_name)
     local path = factory.getGuiPath(event.element, root_name)
 
-    -- [DEBUG-ONLY] During hover diagnostics, also log events outside the requested root so native/internal GUI
-    -- elements cannot silently disappear from the trace.
-    if not path and root_name then
-        path = factory.getGuiPath(event.element)
-    end
-
     if not path then
         return
     end
@@ -97,7 +91,7 @@ end
 --
 --- -----
 --- @param values table      The table to format.
----
+--
 --- @return string           @ A stable {index=value,...} representation.
 --
 function factory.formatIndexedTable(values)
