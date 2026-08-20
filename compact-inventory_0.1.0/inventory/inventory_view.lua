@@ -147,6 +147,24 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:setFilters(filters)
+
+    assert(type(filters) == "table", "InventoryView filters must be a table !")      -- [DEBUG-ONLY] . --
+
+    local new_filters = { }
+
+    for slot_index, item_name in pairs(filters) do
+        assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
+        assert(type(item_name) == "string", "Filter item must be a string !")                                                                  -- [DEBUG-ONLY] . --
+
+        new_filters[slot_index] = item_name
+    end
+
+    self.filters = new_filters
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setFilter(slot_index, item_name)
 
     assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
