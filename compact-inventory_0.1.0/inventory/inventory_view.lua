@@ -255,6 +255,36 @@ function metatable:getContent()
     elseif self.sort_mode == SortMode.last_change then
         sorted_items = inventory:sortByLastChange(items)
 
+    elseif self.sort_mode == SortMode.custom then
+
+        local items_by_base_id = { }
+        sorted_items           = { }
+
+        -- Inventory content is already in ItemOrder order, so appending variants to each base item preserves quality order.
+        for _, item in ipairs(items) do
+            local base_id = ItemOrder.get(item.name)
+            local variants = items_by_base_id[base_id]
+
+            if not variants then
+                variants = { }
+                items_by_base_id[base_id] = variants
+            end
+
+            variants[#variants + 1] = item
+        end
+
+        for _, base_id in ipairs(self:getCustomOrder()) do
+            local variants = items_by_base_id[base_id]
+
+            if variants then
+                for _, item in ipairs(variants) do
+                    sorted_items[#sorted_items + 1] = item
+                end
+            end
+        end
+
+        assert(#sorted_items == #items, "Custom sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
+
     elseif self.sort_mode == SortMode.count_ascending or self.sort_mode == SortMode.count_descending then
         sorted_items = { }
 
