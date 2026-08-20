@@ -1,15 +1,20 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
-local ItemOrder               = require("util.item_order")
-local InventoryViewFactory    = require("inventory.inventory_view")
-local InventoryManagerFactory = require("inventory.inventory_manager")
-local WindowsManager          = require("gui.windows_manager")
-local ItemGroupMenuFactory    = require("gui.item_group_menu")
+local ItemOrder                 = require("util.item_order")
+local PresetManagerFactory      = require("util.preset_manager")
+local InventoryViewFactory      = require("inventory.inventory_view")
+local InventoryManagerFactory   = require("inventory.inventory_manager")
+local WindowsManager            = require("gui.windows_manager")
+local ItemGroupMenuFactory      = require("gui.item_group_menu")
 
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
+local PRESET_CONTEXT_FILTER = "Filter"
+
 local custom_sort_selections = { }
+local preset_contexts        = { }
+local filter_preset_manager
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -43,8 +48,45 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function initializePresetStorage()
+    storage.presets = storage.presets or { }
+    storage.presets.filters = storage.presets.filters or { }
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getFilterPresetManager()
+    if not filter_preset_manager then
+        initializePresetStorage()
+        filter_preset_manager = PresetManagerFactory.new(storage.presets.filters)
+    end
+
+    return filter_preset_manager
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getFilterPresetData(item_group)
+    return {
+        mode    = item_group:getFilterMode(),
+        filters = item_group:getFilters()
+    }
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function applyFilterPreset(item_group, data)
+    assert(type(data) == "table", "Filter preset data must be a table !")      -- [DEBUG-ONLY] . --
+
+    item_group:setFilterMode(data.mode)
+    item_group:setFilters(data.filters)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 script.on_init(function()
     ItemOrder.initialize()
+    initializePresetStorage()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
 end)
@@ -63,6 +105,7 @@ script.on_configuration_changed(function()
     end
 
     ItemOrder.initialize()
+    initializePresetStorage()
     InventoryManagerFactory.initialize()
     WindowsManager.initialize()
 end)
@@ -152,13 +195,77 @@ script.on_event(defines.events.on_gui_click, function(event)
         ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
 
     elseif event.element.name == menu_names.preset_toggle_button then
-        ItemGroupMenuFactory.togglePresetColumn(
-            event.player_index,
-            event.element.tags[menu_names.preset_context_tag_name]
-        )
+        local context  = event.element.tags[menu_names.preset_context_tag_name]
+        local group_id = event.element.tags[menu_names.group_id_tag_name]
+
+        preset_contexts[event.player_index] = context
+        ItemGroupMenuFactory.togglePresetColumn(event.player_index, context)
+
+        if context == PRESET_CONTEXT_FILTER then
+            ItemGroupMenuFactory.refreshPresetList(
+                event.player_index,
+                getFilterPresetManager():list(),
+                context,
+                group_id
+            )
+        else
+            ItemGroupMenuFactory.refreshPresetList(event.player_index, { }, context, group_id)
+        end
+
+    elseif event.element.name == menu_names.preset_save_button then
+        local context = preset_contexts[event.player_index]
+        local name    = ItemGroupMenuFactory.getPresetName(event.player_index)
+
+        if context == PRESET_CONTEXT_FILTER and name and name ~= "" then
+            local group_id   = event.element.tags[menu_names.group_id_tag_name]
+            local item_group = window:getItemGroupByID(group_id)
+            local manager    = getFilterPresetManager()
+
+            assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+            local saved_name = manager:save(name, getFilterPresetData(item_group))
+
+            ItemGroupMenuFactory.refreshPresetList(
+                event.player_index,
+                manager:list(),
+                context,
+                group_id
+            )
+            ItemGroupMenuFactory.selectPreset(event.player_index, saved_name)
+        end
+
+    elseif event.element.tags[menu_names.preset_delete_tag_name] then
+        local context = event.element.tags[menu_names.preset_context_tag_name]
+
+        if context == PRESET_CONTEXT_FILTER then
+            local group_id = event.element.tags[menu_names.group_id_tag_name]
+            local manager  = getFilterPresetManager()
+
+            manager:delete(event.element.tags[menu_names.preset_delete_tag_name])
+            ItemGroupMenuFactory.refreshPresetList(
+                event.player_index,
+                manager:list(),
+                context,
+                group_id
+            )
+        end
 
     elseif event.element.tags[menu_names.preset_name_tag_name] then
-        ItemGroupMenuFactory.togglePresetSelection(event.player_index, event.element)
+        local context     = event.element.tags[menu_names.preset_context_tag_name]
+        local preset_name = ItemGroupMenuFactory.togglePresetSelection(event.player_index, event.element)
+
+        if context == PRESET_CONTEXT_FILTER and preset_name then
+            local group_id   = event.element.tags[menu_names.group_id_tag_name]
+            local item_group = window:getItemGroupByID(group_id)
+            local data       = getFilterPresetManager():load(preset_name)
+
+            assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+            assert(data, "Filter preset must exist here !")        -- [DEBUG-ONLY] . --
+
+            applyFilterPreset(item_group, data)
+            window:refreshGroup(item_group)
+            ItemGroupMenuFactory.refreshFilterEditor(window, item_group)
+        end
 
     elseif event.button == defines.mouse_button_type.left
         and event.element.parent
