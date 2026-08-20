@@ -99,10 +99,10 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function isNonAuthoritativeLeaveElement(lua_element)
-    return lua_element.name == GUI_NAME.filter_blacklist_label
-        or lua_element.name == GUI_NAME.filter_whitelist_label
-        or lua_element.name == GUI_NAME.filter_switch
-        or lua_element.name == GUI_NAME.custom_sort_scroll
+    -- Switches and scroll panes emit leave events while the cursor is still visually inside the control.
+    -- Ignore those leaves and let surrounding menu elements provide the authoritative exit event instead.
+    return lua_element.type == "switch"
+        or lua_element.type == "scroll-pane"
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
