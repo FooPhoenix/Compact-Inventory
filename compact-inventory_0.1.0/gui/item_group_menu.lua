@@ -241,17 +241,19 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getFilterTable(menu)
-    local columns_flow   = menu[GUI_NAME.columns_flow]
-    local filter_wrapper = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
-    local outer          = filter_wrapper and filter_wrapper[GUI_NAME.filter_outer_frame]
-    local inner          = outer and outer[GUI_NAME.filter_inner_frame]
-    local column         = inner and inner[GUI_NAME.filter_column]
-    local filter_table   = column and column[GUI_NAME.filter_table]
+local function getFilterElements(menu)
+    local columns_flow     = menu[GUI_NAME.columns_flow]
+    local filter_wrapper   = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
+    local outer            = filter_wrapper and filter_wrapper[GUI_NAME.filter_outer_frame]
+    local inner            = outer and outer[GUI_NAME.filter_inner_frame]
+    local column           = inner and inner[GUI_NAME.filter_column]
+    local filter_mode_flow = column and column[GUI_NAME.filter_mode_flow]
+    local filter_switch    = filter_mode_flow and filter_mode_flow[GUI_NAME.filter_switch]
+    local filter_table     = column and column[GUI_NAME.filter_table]
 
-    assert(filter_table, "Filter table must exist here !")      -- [DEBUG-ONLY] . --
+    assert(filter_switch and filter_table, "Filter controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    return filter_table
+    return filter_switch, filter_table
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -266,12 +268,13 @@ local function getPresetElements(menu)
     local title          = title_flow and title_flow[GUI_NAME.preset_title]
     local input_flow     = column and column[GUI_NAME.preset_input_flow]
     local name_field     = input_flow and input_flow[GUI_NAME.preset_name_field]
+    local save_button    = input_flow and input_flow[GUI_NAME.preset_save_button]
     local scroll         = column and column[GUI_NAME.preset_scroll]
     local preset_table   = scroll and scroll[GUI_NAME.preset_table]
 
-    assert(preset_wrapper and column and name_field and title and preset_table, "Preset controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(preset_wrapper and column and name_field and save_button and title and preset_table, "Preset controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    return preset_wrapper, title, name_field, preset_table
+    return preset_wrapper, title, name_field, save_button, preset_table
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -298,7 +301,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.refreshFilterTable(window, item_group)
+function factory.refreshFilterTable(window, item_group, force)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
     assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
@@ -310,12 +313,12 @@ function factory.refreshFilterTable(window, item_group)
         return
     end
 
-    local filter_table       = getFilterTable(menu)
+    local _, filter_table    = getFilterElements(menu)
     local visible_slot_count = item_group:getVisibleFilterSlotCount()
 
     -- Factorio already updates the choose-elem-button that triggered on_gui_elem_changed.
-    -- Rebuild the table only when the number of visible rows actually changed.
-    if #filter_table.children == visible_slot_count then
+    -- Rebuild the table only when the number of visible rows actually changed, unless a full refresh is requested.
+    if not force and #filter_table.children == visible_slot_count then
         return
     end
 
@@ -341,17 +344,38 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.refreshPresetList(player, presets)
-    local _, lua_player = resolve_player(player)
-    local menu = lua_player.gui.screen[GUI_NAME.menu]
+function factory.refreshFilterEditor(window, item_group)
 
-    assert(type(presets) == "table", "Preset metadata list must be a table !")      -- [DEBUG-ONLY] . --
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+
+    local menu = window:getPlayer().gui.screen[GUI_NAME.menu]
 
     if not menu then
         return
     end
 
-    local _, _, _, preset_table = getPresetElements(menu)
+    local filter_switch = getFilterElements(menu)
+
+    filter_switch.switch_state = item_group:getFilterMode() == FilterMode.blacklist and "left" or "right"
+    factory.refreshFilterTable(window, item_group, true)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.refreshPresetList(player, presets, context, group_id)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(type(presets) == "table", "Preset metadata list must be a table !")                         -- [DEBUG-ONLY] . --
+    assert(type(context) == "string" and context ~= "", "Preset context must be a non-empty string !")  -- [DEBUG-ONLY] . --
+    assert(type(group_id) == "number" and group_id > 0, "Preset group ID must be valid !")              -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return
+    end
+
+    local _, _, _, _, preset_table = getPresetElements(menu)
 
     preset_table.clear()
 
@@ -363,7 +387,9 @@ function factory.refreshPresetList(player, presets)
             caption            = preset.name,
             raise_hover_events = true,
             tags               = {
-                [PRESET_NAME_TAG_NAME] = preset.name
+                [GROUP_ID_TAG_NAME]       = group_id,
+                [PRESET_CONTEXT_TAG_NAME] = context,
+                [PRESET_NAME_TAG_NAME]    = preset.name
             }
         })
 
@@ -375,10 +401,27 @@ function factory.refreshPresetList(player, presets)
             enabled            = preset.builtin ~= true,
             raise_hover_events = true,
             tags               = {
-                [PRESET_DELETE_TAG_NAME] = preset.name
+                [GROUP_ID_TAG_NAME]       = group_id,
+                [PRESET_CONTEXT_TAG_NAME] = context,
+                [PRESET_DELETE_TAG_NAME]  = preset.name
             }
         })
     end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.getPresetName(player)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return nil
+    end
+
+    local _, _, name_field = getPresetElements(menu)
+
+    return name_field.text
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -391,13 +434,40 @@ function factory.clearPresetSelection(player)
         return
     end
 
-    local _, _, _, preset_table = getPresetElements(menu)
+    local _, _, _, _, preset_table = getPresetElements(menu)
 
     for _, element in ipairs(preset_table.children) do
         if element.tags[PRESET_NAME_TAG_NAME] then
             element.toggled = false
         end
     end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.selectPreset(player, preset_name)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(type(preset_name) == "string" and preset_name ~= "", "Preset name must be valid !")      -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return false
+    end
+
+    local _, _, name_field, _, preset_table = getPresetElements(menu)
+
+    factory.clearPresetSelection(lua_player)
+
+    for _, element in ipairs(preset_table.children) do
+        if element.tags[PRESET_NAME_TAG_NAME] == preset_name then
+            element.toggled = true
+            name_field.text = preset_name
+            return true
+        end
+    end
+
+    return false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -414,7 +484,6 @@ function factory.togglePresetSelection(player, lua_button)
 
     local preset_name = lua_button.tags[PRESET_NAME_TAG_NAME]
     local was_toggled = lua_button.toggled
-    local _, _, name_field = getPresetElements(menu)
 
     assert(type(preset_name) == "string" and preset_name ~= "", "Preset button must contain a preset name !")      -- [DEBUG-ONLY] . --
 
@@ -424,8 +493,7 @@ function factory.togglePresetSelection(player, lua_button)
         return nil
     end
 
-    lua_button.toggled = true
-    name_field.text = preset_name
+    factory.selectPreset(lua_player, preset_name)
 
     return preset_name
 end
