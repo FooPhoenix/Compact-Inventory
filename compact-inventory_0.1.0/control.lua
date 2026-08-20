@@ -151,6 +151,15 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == menu_names.filter_toggle_button then
         ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
 
+    elseif event.element.name == menu_names.preset_toggle_button then
+        ItemGroupMenuFactory.togglePresetColumn(
+            event.player_index,
+            event.element.tags[menu_names.preset_context_tag_name]
+        )
+
+    elseif event.element.tags[menu_names.preset_name_tag_name] then
+        ItemGroupMenuFactory.togglePresetSelection(event.player_index, event.element)
+
     elseif event.button == defines.mouse_button_type.left
         and event.element.parent
         and event.element.parent.name == MOD_PREFIX .. "IG_options-custom-sort-table" then
@@ -199,6 +208,7 @@ script.on_event(defines.events.on_gui_click, function(event)
             selected_button.toggled = false
             custom_sort_selections[event.player_index] = nil
             window:refreshGroup(item_group)
+            ItemGroupMenuFactory.clearPresetSelection(event.player_index)
         end
 
     elseif event.element.tags[menu_names.filter_slot_tag_name]
@@ -219,6 +229,7 @@ script.on_event(defines.events.on_gui_click, function(event)
         item_group:setFilter(slot_index, nil)
         window:refreshGroup(item_group)
         ItemGroupMenuFactory.refreshFilterTable(window, item_group)
+        ItemGroupMenuFactory.clearPresetSelection(event.player_index)
 
     elseif event.element.name == menu_names.delete_group_button then
         local group_id = event.element.tags[menu_names.group_id_tag_name]
@@ -265,6 +276,7 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
     item_group:setFilter(slot_index, event.element.elem_value)
     window:refreshGroup(item_group)
     ItemGroupMenuFactory.refreshFilterTable(window, item_group)
+    ItemGroupMenuFactory.clearPresetSelection(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -288,6 +300,17 @@ script.on_event(defines.events.on_gui_switch_state_changed, function(event)
     )
 
     window:refreshGroup(item_group)
+    ItemGroupMenuFactory.clearPresetSelection(event.player_index)
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_gui_text_changed, function(event)
+    local menu_names = ItemGroupMenuFactory.exposed_gui_names
+
+    if event.element.name == menu_names.preset_name_field then
+        ItemGroupMenuFactory.clearPresetSelection(event.player_index)
+    end
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
