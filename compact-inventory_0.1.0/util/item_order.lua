@@ -95,10 +95,16 @@ function ItemOrder.initialize()
 
     assert(#quality_prototypes < QUALITY_ORDER_GAP, "Too many quality prototypes for the item order gap !")      -- [DEBUG-ONLY] . --
 
-    storage.item_order = { }
+    storage.item_order       = { }
+    storage.item_order_ids   = { }
+    storage.item_order_names = { }
 
     for index, item_prototype in ipairs(item_prototypes) do
-        storage.item_order[item_prototype.name] = index * QUALITY_ORDER_GAP
+        local order = index * QUALITY_ORDER_GAP
+
+        storage.item_order[item_prototype.name] = order
+        storage.item_order_ids[index]           = order
+        storage.item_order_names[order]         = item_prototype.name
     end
 
     for index, quality_prototype in ipairs(quality_prototypes) do
@@ -132,6 +138,48 @@ function ItemOrder.get(item_name, quality_name)
     end
 
     return order
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the number of items contained in the global standard order.
+--
+--- -----
+--- @return integer      @ The number of item prototypes.
+--
+function ItemOrder.getItemCount()
+    assert(storage.item_order_ids, "Item order index is not initialized !")      -- [DEBUG-ONLY] . --
+    return #storage.item_order_ids
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the base item order identifier at one standard-order position.
+--
+--- -----
+--- @param index integer      The standard-order position.
+--
+--- @return integer           @ The base item order identifier without quality offset.
+--
+function ItemOrder.getItemID(index)
+    assert(storage.item_order_ids, "Item order index is not initialized !")                 -- [DEBUG-ONLY] . --
+    assert(storage.item_order_ids[index], "Item order index does not exist: " .. index)      -- [DEBUG-ONLY] . --
+    return storage.item_order_ids[index]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the item prototype name associated with a base item order identifier.
+--
+--- -----
+--- @param item_id integer      The base item order identifier without quality offset.
+--
+--- @return string              @ The item prototype name.
+--
+function ItemOrder.getName(item_id)
+    assert(storage.item_order_names, "Item order index is not initialized !")                              -- [DEBUG-ONLY] . --
+    assert(storage.item_order_names[item_id], "Base item order identifier does not exist: " .. item_id)     -- [DEBUG-ONLY] . --
+    return storage.item_order_names[item_id]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --

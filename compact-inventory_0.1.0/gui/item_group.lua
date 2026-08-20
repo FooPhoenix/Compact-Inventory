@@ -113,6 +113,17 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Get the custom item order used by the group.
+--
+--- -----
+--- @return integer[]      @ The custom base item identifiers in display order.
+--
+function metatable:getCustomOrder()
+    return self:getView():getCustomOrder()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Get the filtering mode used by the group.
 --
 --- -----

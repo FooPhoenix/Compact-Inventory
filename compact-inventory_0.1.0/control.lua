@@ -6,6 +6,7 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 local WindowsManager          = require("gui.windows_manager")
 local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
+local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -183,7 +184,12 @@ script.on_event(defines.events.on_gui_click, function(event)
         local group_id  = event.element.tags[menu_names.group_id_tag_name]
 
         window:setSortMode(group_id, sort_mode)
-        ItemGroupMenuFactory.close(event.player_index)
+
+        if sort_mode == SortMode.custom then
+            ItemGroupMenuFactory.toggleCustomSortColumn(event.player_index)
+        else
+            ItemGroupMenuFactory.close(event.player_index)
+        end
     end
 end)
 

@@ -35,10 +35,11 @@ local MIN_FILTER_ROWS = 2
 ---
 --- ### This class groups all functions used to project an Inventory for display.
 ---
---- @field private inventory   Inventory      The logical inventory projected by the view.
---- @field private sort_mode   SortMode       The current sorting mode.
---- @field private filter_mode FilterMode     The current filtering mode.
---- @field private filters     table<integer, string> The positioned item filters.
+--- @field private inventory    Inventory               The logical inventory projected by the view.
+--- @field private sort_mode    SortMode                The current sorting mode.
+--- @field private filter_mode  FilterMode              The current filtering mode.
+--- @field private filters      table<integer, string>  The positioned item filters.
+--- @field private custom_order integer[]               The custom item order using base ItemOrder identifiers.
 ---
 --
 local metatable = { }
@@ -74,6 +75,13 @@ function metatable:setSortMode(sort_mode)
     assert(type(sort_mode) == "number" and sort_mode >= 1 and sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")      -- [DEBUG-ONLY] . --
 
     self.sort_mode = sort_mode
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getCustomOrder()
+    assert(type(self.custom_order) == "table", "InventoryView custom order must be a table !")      -- [DEBUG-ONLY] . --
+    return self.custom_order
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -263,11 +271,18 @@ function factory.new(inventory)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
+    local custom_order = { }
+
+    for index = 1, ItemOrder.getItemCount() do
+        custom_order[index] = ItemOrder.getItemID(index)
+    end
+
     local view = {                                      ---@type InventoryView
-        inventory   = inventory,
-        sort_mode   = SortMode.standard,
-        filter_mode = FilterMode.blacklist,
-        filters     = { }
+        inventory    = inventory,
+        sort_mode    = SortMode.standard,
+        filter_mode  = FilterMode.blacklist,
+        filters      = { },
+        custom_order = custom_order
     }
 
     setmetatable(view, metatable)
