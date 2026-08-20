@@ -75,6 +75,30 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function ensureItemLists()
+    assert(storage.item_order, "Item order index is not initialized !")      -- [DEBUG-ONLY] . --
+
+    if storage.item_order_ids and storage.item_order_names then
+        return
+    end
+
+    storage.item_order_ids   = { }
+    storage.item_order_names = { }
+
+    for item_name in pairs(prototypes.item) do
+        local item_id = storage.item_order[item_name]
+
+        assert(item_id, "Item does not exist in the item order index: " .. item_name)      -- [DEBUG-ONLY] . --
+
+        storage.item_order_ids[#storage.item_order_ids + 1] = item_id
+        storage.item_order_names[item_id] = item_name
+    end
+
+    table.sort(storage.item_order_ids)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Build the global item and quality ordering indexes.
 --
 function ItemOrder.initialize()
@@ -148,7 +172,7 @@ end
 --- @return integer      @ The number of item prototypes.
 --
 function ItemOrder.getItemCount()
-    assert(storage.item_order_ids, "Item order index is not initialized !")      -- [DEBUG-ONLY] . --
+    ensureItemLists()
     return #storage.item_order_ids
 end
 
@@ -162,7 +186,7 @@ end
 --- @return integer           @ The base item order identifier without quality offset.
 --
 function ItemOrder.getItemID(index)
-    assert(storage.item_order_ids, "Item order index is not initialized !")                 -- [DEBUG-ONLY] . --
+    ensureItemLists()
     assert(storage.item_order_ids[index], "Item order index does not exist: " .. index)      -- [DEBUG-ONLY] . --
     return storage.item_order_ids[index]
 end
@@ -177,8 +201,8 @@ end
 --- @return string              @ The item prototype name.
 --
 function ItemOrder.getName(item_id)
-    assert(storage.item_order_names, "Item order index is not initialized !")                              -- [DEBUG-ONLY] . --
-    assert(storage.item_order_names[item_id], "Base item order identifier does not exist: " .. item_id)     -- [DEBUG-ONLY] . --
+    ensureItemLists()
+    assert(storage.item_order_names[item_id], "Base item order identifier does not exist: " .. item_id)      -- [DEBUG-ONLY] . --
     return storage.item_order_names[item_id]
 end
 

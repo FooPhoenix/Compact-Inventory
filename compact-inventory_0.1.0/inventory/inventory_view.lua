@@ -55,6 +55,18 @@ metatable.__index = metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function createDefaultCustomOrder()
+    local custom_order = { }
+
+    for index = 1, ItemOrder.getItemCount() do
+        custom_order[index] = ItemOrder.getItemID(index)
+    end
+
+    return custom_order
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getInventory()
 
     assert(self.inventory and self.inventory.object_name == "Inventory", "InventoryView must have a valid Inventory !")      -- [DEBUG-ONLY] . --
@@ -80,7 +92,12 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getCustomOrder()
+    if not self.custom_order then
+        self.custom_order = createDefaultCustomOrder()
+    end
+
     assert(type(self.custom_order) == "table", "InventoryView custom order must be a table !")      -- [DEBUG-ONLY] . --
+
     return self.custom_order
 end
 
@@ -271,18 +288,12 @@ function factory.new(inventory)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
-    local custom_order = { }
-
-    for index = 1, ItemOrder.getItemCount() do
-        custom_order[index] = ItemOrder.getItemID(index)
-    end
-
     local view = {                                      ---@type InventoryView
         inventory    = inventory,
         sort_mode    = SortMode.standard,
         filter_mode  = FilterMode.blacklist,
         filters      = { },
-        custom_order = custom_order
+        custom_order = createDefaultCustomOrder()
     }
 
     setmetatable(view, metatable)
