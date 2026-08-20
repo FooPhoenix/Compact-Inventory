@@ -7,7 +7,7 @@ local HoverTrackerFactory  = require("gui.hover_tracker")
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
-local CUSTOM_SORT_MAX_HEIGHT = 320      -- Approximately 10 item rows.
+local CUSTOM_SORT_MAX_HEIGHT = 405      -- Approximately 10 item rows.
 
 local GUI_NAME = {
     menu                       = MOD_PREFIX .. "IG_options-menu",
@@ -441,7 +441,8 @@ function factory.open(window, item_group, location)
     local custom_sort_scroll = custom_sort_column.add({
         type               = "scroll-pane",
         name               = GUI_NAME.custom_sort_scroll,
-        direction          = "vertical",
+        vertical_scroll_policy = "auto",
+        horizontal_scroll_policy = "never",
         raise_hover_events = true
     })
 
@@ -571,12 +572,12 @@ function factory.toggleCustomSortColumn(player)
         return
     end
 
-    local columns_flow        = menu[GUI_NAME.columns_flow]
-    local custom_sort_wrapper = columns_flow and columns_flow[GUI_NAME.custom_sort_column_wrapper]
+    local columns_flow = menu[GUI_NAME.columns_flow]
+    local wrapper      = columns_flow and columns_flow[GUI_NAME.custom_sort_column_wrapper]
 
-    assert(custom_sort_wrapper, "Custom sort wrapper must exist here !")      -- [DEBUG-ONLY] . --
+    assert(wrapper, "Custom sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
-    custom_sort_wrapper.visible = not custom_sort_wrapper.visible
+    wrapper.visible = not wrapper.visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
