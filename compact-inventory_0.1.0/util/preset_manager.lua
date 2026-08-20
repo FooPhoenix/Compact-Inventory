@@ -242,7 +242,7 @@ local factory = { }
 --- ### Create a preset manager bound to a persistent storage namespace.
 --
 --- An empty namespace is initialized automatically. The manager keeps the namespace by reference, therefore every
---- change is persisted directly in the supplied storage table.
+--- change is persisted directly in the supplied storage table. IDs below 100 are reserved for builtin presets.
 --
 --- -----
 --- @param storage table      The persistent storage namespace owned by this manager.
@@ -254,15 +254,15 @@ function factory.new(storage)
     assert(type(storage) == "table", "Preset manager storage must be a table !")      -- [DEBUG-ONLY] . --
 
     if storage.next_id == nil then
-        storage.next_id = 1
+        storage.next_id = 100
     end
 
     if storage.presets == nil then
         storage.presets = { }
     end
 
-    assert(type(storage.next_id) == "number" and storage.next_id > 0 and storage.next_id % 1 == 0, "Preset storage next ID must be a positive integer !")      -- [DEBUG-ONLY] . --
-    assert(type(storage.presets) == "table", "Preset storage presets must be a table !")                                                     -- [DEBUG-ONLY] . --
+    assert(type(storage.next_id) == "number" and storage.next_id >= 100 and storage.next_id % 1 == 0, "Preset storage next ID must be an integer >= 100 !")      -- [DEBUG-ONLY] . --
+    assert(type(storage.presets) == "table", "Preset storage presets must be a table !")                                                                     -- [DEBUG-ONLY] . --
 
     local manager = {                ---@type PresetManager
         storage = storage
