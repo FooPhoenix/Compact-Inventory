@@ -361,7 +361,6 @@ function factory.open(window, item_group, location)
     group_column.style.vertically_stretchable = true
 
     addColumnTitle(group_column, menu, GUI_NAME.group_title, "Group options", true)
-    addGroupAction(group_column, MOD_PREFIX .. "IG_options-rename", "Rename", false, group_id)
     addGroupAction(group_column, GUI_NAME.move_up_button, "Move up", true, group_id)
     addGroupAction(group_column, GUI_NAME.move_down_button, "Move down", true, group_id)
     addGroupAction(group_column, GUI_NAME.sort_toggle_button, "Sorting options  >", true, group_id)
