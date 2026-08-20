@@ -49,6 +49,29 @@ metatable.__index = metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function deepCopy(value, copies)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    copies = copies or { }
+
+    if copies[value] then
+        return copies[value]
+    end
+
+    local copy = { }
+    copies[value] = copy
+
+    for key, nested_value in pairs(value) do
+        copy[deepCopy(key, copies)] = deepCopy(nested_value, copies)
+    end
+
+    return copy
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function findPresetByName(storage, name)
     for _, preset in pairs(storage.presets) do
         if preset.name == name then
@@ -87,7 +110,7 @@ local function createPreset(storage, name, data)
         id      = id,
         name    = name,
         builtin = false,
-        data    = table.deepcopy(data)
+        data    = deepCopy(data)
     }
 
     return name
@@ -110,7 +133,7 @@ function metatable:load(name)
 
     local preset = findPresetByName(self.storage, name)
 
-    return preset and table.deepcopy(preset.data) or nil
+    return preset and deepCopy(preset.data) or nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -141,7 +164,7 @@ function metatable:save(name, data)
         return createPreset(self.storage, getAvailableName(self.storage, name), data)
     end
 
-    preset.data = table.deepcopy(data)
+    preset.data = deepCopy(data)
 
     return preset.name
 end
@@ -230,8 +253,13 @@ function factory.new(storage)
 
     assert(type(storage) == "table", "Preset manager storage must be a table !")      -- [DEBUG-ONLY] . --
 
-    storage.next_id = storage.next_id or 1
-    storage.presets = storage.presets or { }
+    if storage.next_id == nil then
+        storage.next_id = 1
+    end
+
+    if storage.presets == nil then
+        storage.presets = { }
+    end
 
     assert(type(storage.next_id) == "number" and storage.next_id > 0 and storage.next_id % 1 == 0, "Preset storage next ID must be a positive integer !")      -- [DEBUG-ONLY] . --
     assert(type(storage.presets) == "table", "Preset storage presets must be a table !")                                                     -- [DEBUG-ONLY] . --
