@@ -1,7 +1,6 @@
 local ItemOrder            = require("util.item_order")
 local InventoryViewFactory = require("inventory.inventory_view")
 local HoverTrackerFactory  = require("gui.hover_tracker")
-local DebugLoggerFactory   = require("util.debug_logger")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -103,6 +102,7 @@ local function isNonAuthoritativeLeaveElement(lua_element)
     return lua_element.name == GUI_NAME.filter_blacklist_label
         or lua_element.name == GUI_NAME.filter_whitelist_label
         or lua_element.name == GUI_NAME.filter_switch
+        or lua_element.name == GUI_NAME.custom_sort_scroll
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -628,8 +628,6 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onHover(event)
-    DebugLoggerFactory.writeGuiEvent(event, "HOVER", GUI_NAME.menu)
-
     if not isMenuElement(event.element) then
         return
     end
@@ -644,8 +642,6 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onLeave(event)
-    DebugLoggerFactory.writeGuiEvent(event, "LEAVE", GUI_NAME.menu)
-
     if not isMenuElement(event.element) or isNonAuthoritativeLeaveElement(event.element) then
         return
     end
