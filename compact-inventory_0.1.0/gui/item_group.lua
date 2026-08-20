@@ -113,6 +113,29 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Get the custom item order used by the group.
+--
+--- -----
+--- @return integer[]      @ The custom base item identifiers in display order.
+--
+function metatable:getCustomOrder()
+    return self:getView():getCustomOrder()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Move one custom-sort item immediately before another one.
+--
+--- -----
+--- @param source_index integer      The current item index.
+--- @param target_index integer      The target item index.
+--
+function metatable:moveCustomItem(source_index, target_index)
+    self:getView():moveCustomItem(source_index, target_index)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Get the filtering mode used by the group.
 --
 --- -----

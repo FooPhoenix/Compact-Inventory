@@ -6,7 +6,10 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 local WindowsManager          = require("gui.windows_manager")
 local ItemGroupMenuFactory    = require("gui.item_group_menu")
 
+local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
+
+local custom_sort_selections = { }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -148,6 +151,56 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == menu_names.filter_toggle_button then
         ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
 
+    elseif event.button == defines.mouse_button_type.left
+        and event.element.parent
+        and event.element.parent.name == MOD_PREFIX .. "IG_options-custom-sort-table" then
+
+        local custom_sort_table = event.element.parent
+        local selected_button   = custom_sort_selections[event.player_index]
+
+        if selected_button and not selected_button.valid then
+            selected_button = nil
+            custom_sort_selections[event.player_index] = nil
+        end
+
+        if not selected_button then
+            event.element.toggled = true
+            custom_sort_selections[event.player_index] = event.element
+
+        elseif selected_button == event.element then
+            event.element.toggled = false
+            custom_sort_selections[event.player_index] = nil
+
+        else
+            local source_index = selected_button.get_index_in_parent()
+            local target_index = event.element.get_index_in_parent()
+            local group_id     = event.element.tags[menu_names.group_id_tag_name]
+            local item_group   = window:getItemGroupByID(group_id)
+            local insert_index = target_index
+
+            assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+
+            if source_index < target_index then
+                insert_index = target_index - 1
+            end
+
+            item_group:moveCustomItem(source_index, target_index)
+
+            if source_index < insert_index then
+                for index = source_index, insert_index - 1 do
+                    custom_sort_table.swap_children(index, index + 1)
+                end
+            elseif source_index > insert_index then
+                for index = source_index, insert_index + 1, -1 do
+                    custom_sort_table.swap_children(index, index - 1)
+                end
+            end
+
+            selected_button.toggled = false
+            custom_sort_selections[event.player_index] = nil
+            window:refreshGroup(item_group)
+        end
+
     elseif event.element.tags[menu_names.filter_slot_tag_name]
         and event.button == defines.mouse_button_type.left then
 
@@ -183,7 +236,12 @@ script.on_event(defines.events.on_gui_click, function(event)
         local group_id  = event.element.tags[menu_names.group_id_tag_name]
 
         window:setSortMode(group_id, sort_mode)
-        ItemGroupMenuFactory.close(event.player_index)
+
+        if sort_mode == SortMode.custom then
+            ItemGroupMenuFactory.toggleCustomSortColumn(event.player_index)
+        else
+            ItemGroupMenuFactory.close(event.player_index)
+        end
     end
 end)
 

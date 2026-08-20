@@ -91,7 +91,7 @@ end
 --
 --- -----
 --- @param values table      The table to format.
----
+--
 --- @return string           @ A stable {index=value,...} representation.
 --
 function factory.formatIndexedTable(values)

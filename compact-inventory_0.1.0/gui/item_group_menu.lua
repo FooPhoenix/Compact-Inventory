@@ -1,3 +1,4 @@
+local ItemOrder            = require("util.item_order")
 local InventoryViewFactory = require("inventory.inventory_view")
 local HoverTrackerFactory  = require("gui.hover_tracker")
 
@@ -6,32 +7,41 @@ local HoverTrackerFactory  = require("gui.hover_tracker")
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
+local CUSTOM_SORT_MAX_HEIGHT = 408      -- Exactly 10 item rows in-game.
+
 local GUI_NAME = {
-    menu                   = MOD_PREFIX .. "IG_options-menu",
-    columns_flow           = MOD_PREFIX .. "IG_options-columns-flow",
-    group_column           = MOD_PREFIX .. "IG_options-group-column",
-    group_title            = MOD_PREFIX .. "IG_options-group-title",
-    group_filler           = MOD_PREFIX .. "IG_options-group-filler",
-    move_up_button         = MOD_PREFIX .. "IG_options-move-up",
-    move_down_button       = MOD_PREFIX .. "IG_options-move-down",
-    sort_column_wrapper    = MOD_PREFIX .. "IG_options-sort-wrapper",
-    sort_outer_frame       = MOD_PREFIX .. "IG_options-sort-outer-frame",
-    sort_inner_frame       = MOD_PREFIX .. "IG_options-sort-inner-frame",
-    sort_column            = MOD_PREFIX .. "IG_options-sort-column",
-    sort_title             = MOD_PREFIX .. "IG_options-sort-title",
-    sort_toggle_button     = MOD_PREFIX .. "IG_options-sort-toggle",
-    filter_column_wrapper  = MOD_PREFIX .. "IG_options-filter-wrapper",
-    filter_outer_frame     = MOD_PREFIX .. "IG_options-filter-outer-frame",
-    filter_inner_frame     = MOD_PREFIX .. "IG_options-filter-inner-frame",
-    filter_column          = MOD_PREFIX .. "IG_options-filter-column",
-    filter_title           = MOD_PREFIX .. "IG_options-filter-title",
-    filter_mode_flow       = MOD_PREFIX .. "IG_options-filter-mode-flow",
-    filter_blacklist_label = MOD_PREFIX .. "IG_options-filter-blacklist-label",
-    filter_switch          = MOD_PREFIX .. "IG_options-filter-switch",
-    filter_whitelist_label = MOD_PREFIX .. "IG_options-filter-whitelist-label",
-    filter_table           = MOD_PREFIX .. "IG_options-filter-table",
-    filter_toggle_button   = MOD_PREFIX .. "IG_options-filter-toggle",
-    delete_group_button    = MOD_PREFIX .. "IG_options-delete-group"
+    menu                       = MOD_PREFIX .. "IG_options-menu",
+    columns_flow               = MOD_PREFIX .. "IG_options-columns-flow",
+    group_column               = MOD_PREFIX .. "IG_options-group-column",
+    group_title                = MOD_PREFIX .. "IG_options-group-title",
+    group_filler               = MOD_PREFIX .. "IG_options-group-filler",
+    move_up_button             = MOD_PREFIX .. "IG_options-move-up",
+    move_down_button           = MOD_PREFIX .. "IG_options-move-down",
+    sort_column_wrapper        = MOD_PREFIX .. "IG_options-sort-wrapper",
+    sort_outer_frame           = MOD_PREFIX .. "IG_options-sort-outer-frame",
+    sort_inner_frame           = MOD_PREFIX .. "IG_options-sort-inner-frame",
+    sort_column                = MOD_PREFIX .. "IG_options-sort-column",
+    sort_title                 = MOD_PREFIX .. "IG_options-sort-title",
+    sort_toggle_button         = MOD_PREFIX .. "IG_options-sort-toggle",
+    custom_sort_column_wrapper = MOD_PREFIX .. "IG_options-custom-sort-wrapper",
+    custom_sort_outer_frame    = MOD_PREFIX .. "IG_options-custom-sort-outer-frame",
+    custom_sort_inner_frame    = MOD_PREFIX .. "IG_options-custom-sort-inner-frame",
+    custom_sort_column         = MOD_PREFIX .. "IG_options-custom-sort-column",
+    custom_sort_title          = MOD_PREFIX .. "IG_options-custom-sort-title",
+    custom_sort_scroll         = MOD_PREFIX .. "IG_options-custom-sort-scroll",
+    custom_sort_table          = MOD_PREFIX .. "IG_options-custom-sort-table",
+    filter_column_wrapper      = MOD_PREFIX .. "IG_options-filter-wrapper",
+    filter_outer_frame         = MOD_PREFIX .. "IG_options-filter-outer-frame",
+    filter_inner_frame         = MOD_PREFIX .. "IG_options-filter-inner-frame",
+    filter_column              = MOD_PREFIX .. "IG_options-filter-column",
+    filter_title               = MOD_PREFIX .. "IG_options-filter-title",
+    filter_mode_flow           = MOD_PREFIX .. "IG_options-filter-mode-flow",
+    filter_blacklist_label     = MOD_PREFIX .. "IG_options-filter-blacklist-label",
+    filter_switch              = MOD_PREFIX .. "IG_options-filter-switch",
+    filter_whitelist_label     = MOD_PREFIX .. "IG_options-filter-whitelist-label",
+    filter_table               = MOD_PREFIX .. "IG_options-filter-table",
+    filter_toggle_button       = MOD_PREFIX .. "IG_options-filter-toggle",
+    delete_group_button        = MOD_PREFIX .. "IG_options-delete-group"
 }
 
 local SORT_SPRITE = {
@@ -89,9 +99,10 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function isNonAuthoritativeLeaveElement(lua_element)
-    return lua_element.name == GUI_NAME.filter_blacklist_label
-        or lua_element.name == GUI_NAME.filter_whitelist_label
-        or lua_element.name == GUI_NAME.filter_switch
+    -- Switches and scroll panes emit leave events while the cursor is still visually inside the control.
+    -- Ignore those leaves and let surrounding menu elements provide the authoritative exit event instead.
+    return lua_element.type == "switch"
+        or lua_element.type == "scroll-pane"
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -417,6 +428,55 @@ function factory.open(window, item_group, location)
         button.style.horizontally_stretchable = true
     end
 
+    local custom_sort_column = addRaisedColumn(
+        columns_flow,
+        GUI_NAME.custom_sort_column_wrapper,
+        GUI_NAME.custom_sort_outer_frame,
+        GUI_NAME.custom_sort_inner_frame,
+        GUI_NAME.custom_sort_column,
+        false
+    )
+
+    addColumnTitle(custom_sort_column, menu, GUI_NAME.custom_sort_title, "Custom sort", false)
+
+    local custom_sort_scroll = custom_sort_column.add({
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.custom_sort_scroll,
+        vertical_scroll_policy   = "auto",
+        horizontal_scroll_policy = "never",
+        raise_hover_events       = true
+    })
+
+    custom_sort_scroll.style.maximal_height = CUSTOM_SORT_MAX_HEIGHT
+
+    local custom_sort_table = custom_sort_scroll.add({
+        type               = "table",
+        name               = GUI_NAME.custom_sort_table,
+        column_count       = 10,
+        raise_hover_events = true
+    })
+
+    custom_sort_table.style.horizontal_spacing = 0
+    custom_sort_table.style.vertical_spacing   = 0
+
+    for _, item_id in ipairs(item_group:getCustomOrder()) do
+        local item_name = ItemOrder.getName(item_id)
+
+        custom_sort_table.add({
+            type               = "sprite-button",
+            sprite             = "item/" .. item_name,
+            style              = "slot_button",
+            elem_tooltip       = {
+                type = "item",
+                name = item_name
+            },
+            raise_hover_events = true,
+            tags               = {
+                [GROUP_ID_TAG_NAME] = group_id
+            }
+        })
+    end
+
     local filter_column = addRaisedColumn(
         columns_flow,
         GUI_NAME.filter_column_wrapper,
@@ -500,6 +560,25 @@ function factory.toggleSortColumn(player)
     assert(sort_wrapper, "Sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
     sort_wrapper.visible = not sort_wrapper.visible
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.toggleCustomSortColumn(player)
+
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local columns_flow = menu[GUI_NAME.columns_flow]
+    local wrapper      = columns_flow and columns_flow[GUI_NAME.custom_sort_column_wrapper]
+
+    assert(wrapper, "Custom sort options wrapper must exist here !")      -- [DEBUG-ONLY] . --
+
+    wrapper.visible = not wrapper.visible
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --

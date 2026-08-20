@@ -35,10 +35,11 @@ local MIN_FILTER_ROWS = 2
 ---
 --- ### This class groups all functions used to project an Inventory for display.
 ---
---- @field private inventory   Inventory      The logical inventory projected by the view.
---- @field private sort_mode   SortMode       The current sorting mode.
---- @field private filter_mode FilterMode     The current filtering mode.
---- @field private filters     table<integer, string> The positioned item filters.
+--- @field private inventory    Inventory               The logical inventory projected by the view.
+--- @field private sort_mode    SortMode                The current sorting mode.
+--- @field private filter_mode  FilterMode              The current filtering mode.
+--- @field private filters      table<integer, string>  The positioned item filters.
+--- @field private custom_order integer[]               The custom item order using base ItemOrder identifiers.
 ---
 --
 local metatable = { }
@@ -51,6 +52,18 @@ metatable.object_name = "InventoryView"
 
 script.register_metatable(MOD_PREFIX .. "InventoryViewMetatable", metatable)
 metatable.__index = metatable
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function createDefaultCustomOrder()
+    local custom_order = { }
+
+    for index = 1, ItemOrder.getItemCount() do
+        custom_order[index] = ItemOrder.getItemID(index)
+    end
+
+    return custom_order
+end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -74,6 +87,40 @@ function metatable:setSortMode(sort_mode)
     assert(type(sort_mode) == "number" and sort_mode >= 1 and sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")      -- [DEBUG-ONLY] . --
 
     self.sort_mode = sort_mode
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getCustomOrder()
+    if not self.custom_order then
+        self.custom_order = createDefaultCustomOrder()
+    end
+
+    assert(type(self.custom_order) == "table", "InventoryView custom order must be a table !")      -- [DEBUG-ONLY] . --
+
+    return self.custom_order
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:moveCustomItem(source_index, target_index)
+
+    local custom_order = self:getCustomOrder()
+
+    assert(type(source_index) == "number" and source_index >= 1 and source_index <= #custom_order and source_index % 1 == 0, "Custom sort source index must be valid !")      -- [DEBUG-ONLY] . --
+    assert(type(target_index) == "number" and target_index >= 1 and target_index <= #custom_order and target_index % 1 == 0, "Custom sort target index must be valid !")      -- [DEBUG-ONLY] . --
+
+    if source_index == target_index then
+        return
+    end
+
+    local item_id = table.remove(custom_order, source_index)
+
+    if source_index < target_index then
+        target_index = target_index - 1
+    end
+
+    table.insert(custom_order, target_index, item_id)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -208,6 +255,36 @@ function metatable:getContent()
     elseif self.sort_mode == SortMode.last_change then
         sorted_items = inventory:sortByLastChange(items)
 
+    elseif self.sort_mode == SortMode.custom then
+
+        local items_by_base_id = { }
+        sorted_items           = { }
+
+        -- Inventory content is already in ItemOrder order, so appending variants to each base item preserves quality order.
+        for _, item in ipairs(items) do
+            local base_id = ItemOrder.get(item.name)
+            local variants = items_by_base_id[base_id]
+
+            if not variants then
+                variants = { }
+                items_by_base_id[base_id] = variants
+            end
+
+            variants[#variants + 1] = item
+        end
+
+        for _, base_id in ipairs(self:getCustomOrder()) do
+            local variants = items_by_base_id[base_id]
+
+            if variants then
+                for _, item in ipairs(variants) do
+                    sorted_items[#sorted_items + 1] = item
+                end
+            end
+        end
+
+        assert(#sorted_items == #items, "Custom sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
+
     elseif self.sort_mode == SortMode.count_ascending or self.sort_mode == SortMode.count_descending then
         sorted_items = { }
 
@@ -264,10 +341,11 @@ function factory.new(inventory)
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     local view = {                                      ---@type InventoryView
-        inventory   = inventory,
-        sort_mode   = SortMode.standard,
-        filter_mode = FilterMode.blacklist,
-        filters     = { }
+        inventory    = inventory,
+        sort_mode    = SortMode.standard,
+        filter_mode  = FilterMode.blacklist,
+        filters      = { },
+        custom_order = createDefaultCustomOrder()
     }
 
     setmetatable(view, metatable)
