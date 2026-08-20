@@ -1,13 +1,14 @@
 local ItemOrder            = require("util.item_order")
 local InventoryViewFactory = require("inventory.inventory_view")
 local HoverTrackerFactory  = require("gui.hover_tracker")
+local DebugLoggerFactory   = require("util.debug_logger")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
-local CUSTOM_SORT_MAX_HEIGHT = 405      -- Approximately 10 item rows.
+local CUSTOM_SORT_MAX_HEIGHT = 408      -- Exactly 10 item rows in-game.
 
 local GUI_NAME = {
     menu                       = MOD_PREFIX .. "IG_options-menu",
@@ -439,11 +440,11 @@ function factory.open(window, item_group, location)
     addColumnTitle(custom_sort_column, menu, GUI_NAME.custom_sort_title, "Custom sort", false)
 
     local custom_sort_scroll = custom_sort_column.add({
-        type               = "scroll-pane",
-        name               = GUI_NAME.custom_sort_scroll,
-        vertical_scroll_policy = "auto",
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.custom_sort_scroll,
+        vertical_scroll_policy   = "auto",
         horizontal_scroll_policy = "never",
-        raise_hover_events = true
+        raise_hover_events       = true
     })
 
     custom_sort_scroll.style.maximal_height = CUSTOM_SORT_MAX_HEIGHT
@@ -627,6 +628,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onHover(event)
+    DebugLoggerFactory.writeGuiEvent(event, "HOVER", GUI_NAME.menu)
+
     if not isMenuElement(event.element) then
         return
     end
@@ -641,6 +644,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onLeave(event)
+    DebugLoggerFactory.writeGuiEvent(event, "LEAVE", GUI_NAME.menu)
+
     if not isMenuElement(event.element) or isNonAuthoritativeLeaveElement(event.element) then
         return
     end
