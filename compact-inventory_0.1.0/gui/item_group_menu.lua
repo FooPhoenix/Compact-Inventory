@@ -8,6 +8,7 @@ local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
 local CUSTOM_SORT_MAX_HEIGHT = 408      -- Exactly 10 item rows in-game.
+local PRESET_MAX_HEIGHT      = 300      -- Approximately 10 preset rows in-game.
 
 local GUI_NAME = {
     menu                       = MOD_PREFIX .. "IG_options-menu",
@@ -41,6 +42,17 @@ local GUI_NAME = {
     filter_whitelist_label     = MOD_PREFIX .. "IG_options-filter-whitelist-label",
     filter_table               = MOD_PREFIX .. "IG_options-filter-table",
     filter_toggle_button       = MOD_PREFIX .. "IG_options-filter-toggle",
+    preset_toggle_button       = MOD_PREFIX .. "IG_options-preset-toggle",
+    preset_column_wrapper      = MOD_PREFIX .. "IG_options-preset-wrapper",
+    preset_outer_frame         = MOD_PREFIX .. "IG_options-preset-outer-frame",
+    preset_inner_frame         = MOD_PREFIX .. "IG_options-preset-inner-frame",
+    preset_column              = MOD_PREFIX .. "IG_options-preset-column",
+    preset_title               = MOD_PREFIX .. "IG_options-preset-title",
+    preset_input_flow          = MOD_PREFIX .. "IG_options-preset-input-flow",
+    preset_name_field          = MOD_PREFIX .. "IG_options-preset-name-field",
+    preset_save_button         = MOD_PREFIX .. "IG_options-preset-save",
+    preset_scroll              = MOD_PREFIX .. "IG_options-preset-scroll",
+    preset_table               = MOD_PREFIX .. "IG_options-preset-table",
     delete_group_button        = MOD_PREFIX .. "IG_options-delete-group"
 }
 
@@ -62,23 +74,32 @@ local SORT_CAPTION = {
     [SortMode.custom]           = "Custom sorting"
 }
 
-local SORT_TAG_NAME        = MOD_PREFIX .. "SortID"
-local GROUP_ID_TAG_NAME    = MOD_PREFIX .. "ItemGroupID"
-local FILTER_SLOT_TAG_NAME = MOD_PREFIX .. "FilterSlot"
-local hover_trackers       = { }
+local SORT_TAG_NAME           = MOD_PREFIX .. "SortID"
+local GROUP_ID_TAG_NAME       = MOD_PREFIX .. "ItemGroupID"
+local FILTER_SLOT_TAG_NAME    = MOD_PREFIX .. "FilterSlot"
+local PRESET_CONTEXT_TAG_NAME = MOD_PREFIX .. "PresetContext"
+local PRESET_NAME_TAG_NAME    = MOD_PREFIX .. "PresetName"
+local PRESET_DELETE_TAG_NAME  = MOD_PREFIX .. "PresetDelete"
+local hover_trackers          = { }
 
 local factory = {
     exposed_gui_names = {
-        menu                 = GUI_NAME.menu,
-        move_up_button       = GUI_NAME.move_up_button,
-        move_down_button     = GUI_NAME.move_down_button,
-        sort_toggle_button   = GUI_NAME.sort_toggle_button,
-        filter_toggle_button = GUI_NAME.filter_toggle_button,
-        filter_switch        = GUI_NAME.filter_switch,
-        delete_group_button  = GUI_NAME.delete_group_button,
-        sort_tag_name        = SORT_TAG_NAME,
-        group_id_tag_name    = GROUP_ID_TAG_NAME,
-        filter_slot_tag_name = FILTER_SLOT_TAG_NAME
+        menu                    = GUI_NAME.menu,
+        move_up_button          = GUI_NAME.move_up_button,
+        move_down_button        = GUI_NAME.move_down_button,
+        sort_toggle_button      = GUI_NAME.sort_toggle_button,
+        filter_toggle_button    = GUI_NAME.filter_toggle_button,
+        filter_switch           = GUI_NAME.filter_switch,
+        preset_toggle_button    = GUI_NAME.preset_toggle_button,
+        preset_name_field       = GUI_NAME.preset_name_field,
+        preset_save_button      = GUI_NAME.preset_save_button,
+        delete_group_button     = GUI_NAME.delete_group_button,
+        sort_tag_name           = SORT_TAG_NAME,
+        group_id_tag_name       = GROUP_ID_TAG_NAME,
+        filter_slot_tag_name    = FILTER_SLOT_TAG_NAME,
+        preset_context_tag_name = PRESET_CONTEXT_TAG_NAME,
+        preset_name_tag_name    = PRESET_NAME_TAG_NAME,
+        preset_delete_tag_name  = PRESET_DELETE_TAG_NAME
     }
 }
 
@@ -161,6 +182,23 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function addPresetAction(parent, context, group_id)
+    local button = parent.add({
+        type               = "button",
+        name               = GUI_NAME.preset_toggle_button,
+        caption            = "Presets  >",
+        raise_hover_events = true,
+        tags               = {
+            [GROUP_ID_TAG_NAME]       = group_id,
+            [PRESET_CONTEXT_TAG_NAME] = context
+        }
+    })
+
+    button.style.horizontally_stretchable = true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function addRaisedColumn(parent, wrapper_name, outer_name, inner_name, column_name, visible)
     local wrapper = parent.add({
         type               = "flow",
@@ -203,17 +241,40 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getFilterTable(menu)
+local function getFilterElements(menu)
+    local columns_flow     = menu[GUI_NAME.columns_flow]
+    local filter_wrapper   = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
+    local outer            = filter_wrapper and filter_wrapper[GUI_NAME.filter_outer_frame]
+    local inner            = outer and outer[GUI_NAME.filter_inner_frame]
+    local column           = inner and inner[GUI_NAME.filter_column]
+    local filter_mode_flow = column and column[GUI_NAME.filter_mode_flow]
+    local filter_switch    = filter_mode_flow and filter_mode_flow[GUI_NAME.filter_switch]
+    local filter_table     = column and column[GUI_NAME.filter_table]
+
+    assert(filter_switch and filter_table, "Filter controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    return filter_switch, filter_table
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getPresetElements(menu)
     local columns_flow   = menu[GUI_NAME.columns_flow]
-    local filter_wrapper = columns_flow and columns_flow[GUI_NAME.filter_column_wrapper]
-    local outer          = filter_wrapper and filter_wrapper[GUI_NAME.filter_outer_frame]
-    local inner          = outer and outer[GUI_NAME.filter_inner_frame]
-    local column         = inner and inner[GUI_NAME.filter_column]
-    local filter_table   = column and column[GUI_NAME.filter_table]
+    local preset_wrapper = columns_flow and columns_flow[GUI_NAME.preset_column_wrapper]
+    local outer          = preset_wrapper and preset_wrapper[GUI_NAME.preset_outer_frame]
+    local inner          = outer and outer[GUI_NAME.preset_inner_frame]
+    local column         = inner and inner[GUI_NAME.preset_column]
+    local title_flow     = column and column.children[1]
+    local title          = title_flow and title_flow[GUI_NAME.preset_title]
+    local input_flow     = column and column[GUI_NAME.preset_input_flow]
+    local name_field     = input_flow and input_flow[GUI_NAME.preset_name_field]
+    local save_button    = input_flow and input_flow[GUI_NAME.preset_save_button]
+    local scroll         = column and column[GUI_NAME.preset_scroll]
+    local preset_table   = scroll and scroll[GUI_NAME.preset_table]
 
-    assert(filter_table, "Filter table must exist here !")      -- [DEBUG-ONLY] . --
+    assert(preset_wrapper and column and name_field and save_button and title and preset_table, "Preset controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    return filter_table
+    return preset_wrapper, title, name_field, save_button, preset_table
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -240,7 +301,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.refreshFilterTable(window, item_group)
+function factory.refreshFilterTable(window, item_group, force)
 
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
     assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
@@ -252,12 +313,12 @@ function factory.refreshFilterTable(window, item_group)
         return
     end
 
-    local filter_table       = getFilterTable(menu)
+    local _, filter_table    = getFilterElements(menu)
     local visible_slot_count = item_group:getVisibleFilterSlotCount()
 
     -- Factorio already updates the choose-elem-button that triggered on_gui_elem_changed.
-    -- Rebuild the table only when the number of visible rows actually changed.
-    if #filter_table.children == visible_slot_count then
+    -- Rebuild the table only when the number of visible rows actually changed, unless a full refresh is requested.
+    if not force and #filter_table.children == visible_slot_count then
         return
     end
 
@@ -279,6 +340,162 @@ function factory.refreshFilterTable(window, item_group)
             }
         })
     end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.refreshFilterEditor(window, item_group)
+
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(item_group and item_group.object_name == "ItemGroup", "ItemGroup does not exist or is invalid !")  -- [DEBUG-ONLY] . --
+
+    local menu = window:getPlayer().gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local filter_switch = getFilterElements(menu)
+
+    filter_switch.switch_state = item_group:getFilterMode() == FilterMode.blacklist and "left" or "right"
+    factory.refreshFilterTable(window, item_group, true)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.refreshPresetList(player, presets, context, group_id)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(type(presets) == "table", "Preset metadata list must be a table !")                         -- [DEBUG-ONLY] . --
+    assert(type(context) == "string" and context ~= "", "Preset context must be a non-empty string !")  -- [DEBUG-ONLY] . --
+    assert(type(group_id) == "number" and group_id > 0, "Preset group ID must be valid !")              -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return
+    end
+
+    local _, _, _, _, preset_table = getPresetElements(menu)
+
+    preset_table.clear()
+
+    for _, preset in ipairs(presets) do
+        assert(type(preset.name) == "string" and preset.name ~= "", "Preset metadata name must be valid !")      -- [DEBUG-ONLY] . --
+
+        local name_button = preset_table.add({
+            type               = "button",
+            caption            = preset.name,
+            raise_hover_events = true,
+            tags               = {
+                [GROUP_ID_TAG_NAME]       = group_id,
+                [PRESET_CONTEXT_TAG_NAME] = context,
+                [PRESET_NAME_TAG_NAME]    = preset.name
+            }
+        })
+
+        name_button.style.horizontally_stretchable = true
+
+        preset_table.add({
+            type               = "button",
+            caption            = "Delete",
+            enabled            = preset.builtin ~= true,
+            raise_hover_events = true,
+            tags               = {
+                [GROUP_ID_TAG_NAME]       = group_id,
+                [PRESET_CONTEXT_TAG_NAME] = context,
+                [PRESET_DELETE_TAG_NAME]  = preset.name
+            }
+        })
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.getPresetName(player)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return nil
+    end
+
+    local _, _, name_field = getPresetElements(menu)
+
+    return name_field.text
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.clearPresetSelection(player)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    if not menu then
+        return
+    end
+
+    local _, _, _, _, preset_table = getPresetElements(menu)
+
+    for _, element in ipairs(preset_table.children) do
+        if element.tags[PRESET_NAME_TAG_NAME] then
+            element.toggled = false
+        end
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.selectPreset(player, preset_name)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(type(preset_name) == "string" and preset_name ~= "", "Preset name must be valid !")      -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return false
+    end
+
+    local _, _, name_field, _, preset_table = getPresetElements(menu)
+
+    factory.clearPresetSelection(lua_player)
+
+    for _, element in ipairs(preset_table.children) do
+        if element.tags[PRESET_NAME_TAG_NAME] == preset_name then
+            element.toggled = true
+            name_field.text = preset_name
+            return true
+        end
+    end
+
+    return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.togglePresetSelection(player, lua_button)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(lua_button and lua_button.valid and lua_button.type == "button", "Preset selection requires a valid button !")      -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return nil
+    end
+
+    local preset_name = lua_button.tags[PRESET_NAME_TAG_NAME]
+    local was_toggled = lua_button.toggled
+
+    assert(type(preset_name) == "string" and preset_name ~= "", "Preset button must contain a preset name !")      -- [DEBUG-ONLY] . --
+
+    factory.clearPresetSelection(lua_player)
+
+    if was_toggled then
+        return nil
+    end
+
+    factory.selectPreset(lua_player, preset_name)
+
+    return preset_name
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -438,6 +655,7 @@ function factory.open(window, item_group, location)
     )
 
     addColumnTitle(custom_sort_column, menu, GUI_NAME.custom_sort_title, "Custom sort", false)
+    addPresetAction(custom_sort_column, "Custom sort", group_id)
 
     local custom_sort_scroll = custom_sort_column.add({
         type                     = "scroll-pane",
@@ -487,6 +705,7 @@ function factory.open(window, item_group, location)
     )
 
     addColumnTitle(filter_column, menu, GUI_NAME.filter_title, "Filter options", false)
+    addPresetAction(filter_column, "Filter", group_id)
 
     local filter_mode_flow = filter_column.add({
         type               = "flow",
@@ -535,6 +754,64 @@ function factory.open(window, item_group, location)
     filter_table.style.vertical_spacing   = 0
 
     factory.refreshFilterTable(window, item_group)
+
+    local preset_column = addRaisedColumn(
+        columns_flow,
+        GUI_NAME.preset_column_wrapper,
+        GUI_NAME.preset_outer_frame,
+        GUI_NAME.preset_inner_frame,
+        GUI_NAME.preset_column,
+        false
+    )
+
+    addColumnTitle(preset_column, menu, GUI_NAME.preset_title, "Presets", false)
+
+    local preset_input_flow = preset_column.add({
+        type               = "flow",
+        name               = GUI_NAME.preset_input_flow,
+        direction          = "horizontal",
+        raise_hover_events = true
+    })
+
+    preset_input_flow.style.horizontal_spacing = 4
+
+    local preset_name_field = preset_input_flow.add({
+        type               = "textfield",
+        name               = GUI_NAME.preset_name_field,
+        raise_hover_events = true
+    })
+
+    preset_name_field.style.width = 170
+
+    preset_input_flow.add({
+        type               = "button",
+        name               = GUI_NAME.preset_save_button,
+        caption            = "Save",
+        raise_hover_events = true,
+        tags               = {
+            [GROUP_ID_TAG_NAME] = group_id
+        }
+    })
+
+    local preset_scroll = preset_column.add({
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.preset_scroll,
+        vertical_scroll_policy   = "auto",
+        horizontal_scroll_policy = "never",
+        raise_hover_events       = true
+    })
+
+    preset_scroll.style.maximal_height = PRESET_MAX_HEIGHT
+
+    local preset_table = preset_scroll.add({
+        type               = "table",
+        name               = GUI_NAME.preset_table,
+        column_count       = 2,
+        raise_hover_events = true
+    })
+
+    preset_table.style.horizontal_spacing = 4
+    preset_table.style.vertical_spacing   = 2
 
     local tracker = HoverTrackerFactory.new()
     tracker:onHover(game.tick)
@@ -598,6 +875,30 @@ function factory.toggleFilterColumn(player)
     assert(filter_wrapper, "Filter options wrapper must exist here !")      -- [DEBUG-ONLY] . --
 
     filter_wrapper.visible = not filter_wrapper.visible
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function factory.togglePresetColumn(player, context)
+    local _, lua_player = resolve_player(player)
+    local menu = lua_player.gui.screen[GUI_NAME.menu]
+
+    assert(type(context) == "string" and context ~= "", "Preset context must be a non-empty string !")      -- [DEBUG-ONLY] . --
+
+    if not menu then
+        return
+    end
+
+    local wrapper, title = getPresetElements(menu)
+    local caption = context .. " Presets"
+
+    if wrapper.visible and title.caption == caption then
+        wrapper.visible = false
+        return
+    end
+
+    title.caption = caption
+    wrapper.visible = true
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --

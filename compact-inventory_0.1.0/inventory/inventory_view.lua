@@ -3,10 +3,6 @@ local ItemOrder = require("util.item_order")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ Constant Declaration.                                                                                          ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
 ---@enum SortMode
 local SortMode = {
     standard         = 1,
@@ -26,34 +22,10 @@ local FilterMode = {
 local FILTER_COLUMNS = 10
 local MIN_FILTER_ROWS = 2
 
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ InventoryViewMetatable.                                                                                       ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
----
---- @class InventoryViewMetatable
----
---- ### This class groups all functions used to project an Inventory for display.
----
---- @field private inventory    Inventory               The logical inventory projected by the view.
---- @field private sort_mode    SortMode                The current sorting mode.
---- @field private filter_mode  FilterMode              The current filtering mode.
---- @field private filters      table<integer, string>  The positioned item filters.
---- @field private custom_order integer[]               The custom item order using base ItemOrder identifiers.
----
---
 local metatable = { }
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 metatable.object_name = "InventoryView"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.register_metatable(MOD_PREFIX .. "InventoryViewMetatable", metatable)
 metatable.__index = metatable
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function createDefaultCustomOrder()
     local custom_order = { }
@@ -65,31 +37,19 @@ local function createDefaultCustomOrder()
     return custom_order
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:getInventory()
-
     assert(self.inventory and self.inventory.object_name == "Inventory", "InventoryView must have a valid Inventory !")      -- [DEBUG-ONLY] . --
-
     return self.inventory
 end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getSortMode()
     return self.sort_mode
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:setSortMode(sort_mode)
-
     assert(type(sort_mode) == "number" and sort_mode >= 1 and sort_mode <= 6, "Sort mode must be a number between 1 and 6 !")      -- [DEBUG-ONLY] . --
-
     self.sort_mode = sort_mode
 end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getCustomOrder()
     if not self.custom_order then
@@ -97,14 +57,29 @@ function metatable:getCustomOrder()
     end
 
     assert(type(self.custom_order) == "table", "InventoryView custom order must be a table !")      -- [DEBUG-ONLY] . --
-
     return self.custom_order
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+function metatable:setCustomOrder(custom_order)
+    assert(type(custom_order) == "table", "InventoryView custom order must be a table !")      -- [DEBUG-ONLY] . --
+    assert(#custom_order == ItemOrder.getItemCount(), "Custom sort order must contain every item !")      -- [DEBUG-ONLY] . --
+
+    local new_order = { }
+    local seen      = { }
+
+    for index, item_id in ipairs(custom_order) do
+        assert(type(item_id) == "number", "Custom sort item ID must be a number !")      -- [DEBUG-ONLY] . --
+        assert(ItemOrder.getName(item_id), "Custom sort item ID must exist !")            -- [DEBUG-ONLY] . --
+        assert(not seen[item_id], "Custom sort item ID must be unique !")                  -- [DEBUG-ONLY] . --
+
+        seen[item_id] = true
+        new_order[index] = item_id
+    end
+
+    self.custom_order = new_order
+end
 
 function metatable:moveCustomItem(source_index, target_index)
-
     local custom_order = self:getCustomOrder()
 
     assert(type(source_index) == "number" and source_index >= 1 and source_index <= #custom_order and source_index % 1 == 0, "Custom sort source index must be valid !")      -- [DEBUG-ONLY] . --
@@ -123,42 +98,41 @@ function metatable:moveCustomItem(source_index, target_index)
     table.insert(custom_order, target_index, item_id)
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:getFilterMode()
     return self.filter_mode
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:setFilterMode(filter_mode)
-
     assert(filter_mode == FilterMode.blacklist or filter_mode == FilterMode.whitelist, "Filter mode must be valid !")      -- [DEBUG-ONLY] . --
-
     self.filter_mode = filter_mode
 end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getFilters()
     assert(type(self.filters) == "table", "InventoryView filters must be a table !")      -- [DEBUG-ONLY] . --
     return self.filters
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+function metatable:setFilters(filters)
+    assert(type(filters) == "table", "InventoryView filters must be a table !")      -- [DEBUG-ONLY] . --
+
+    local new_filters = { }
+
+    for slot_index, item_name in pairs(filters) do
+        assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
+        assert(type(item_name) == "string", "Filter item must be a string !")                                                                  -- [DEBUG-ONLY] . --
+        new_filters[slot_index] = item_name
+    end
+
+    self.filters = new_filters
+end
 
 function metatable:setFilter(slot_index, item_name)
-
     assert(type(slot_index) == "number" and slot_index > 0 and slot_index % 1 == 0, "Filter slot index must be a positive integer !")      -- [DEBUG-ONLY] . --
     assert(item_name == nil or type(item_name) == "string", "Filter item must be a string or nil !")                                      -- [DEBUG-ONLY] . --
-
     self.filters[slot_index] = item_name
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:getVisibleFilterSlotCount()
-
     local last_used_slot = 0
 
     for slot_index, item_name in pairs(self:getFilters()) do
@@ -178,10 +152,7 @@ function metatable:getVisibleFilterSlotCount()
     return visible_rows * FILTER_COLUMNS
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 local function filterItems(view, items)
-
     local filter_lookup = { }
 
     for _, item_name in pairs(view:getFilters()) do
@@ -204,18 +175,7 @@ local function filterItems(view, items)
     return filtered_items
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
---- ### Get the projected inventory content according to the current sorting and filtering modes.
---
---- Sorting always operates on the complete logical inventory. Filtering is applied afterwards so hiding an item never
---- alters or invalidates stateful ordering strategies such as last-change ordering.
---
---- -----
---- @return table      @ The item list to display.
---
 function metatable:getContent()
-
     local inventory = self:getInventory()
     local items     = inventory:getContent()
     local sorted_items
@@ -224,7 +184,6 @@ function metatable:getContent()
         sorted_items = items
 
     elseif self.sort_mode == SortMode.inventory then
-
         local items_by_order = { }
         sorted_items         = { }
 
@@ -256,13 +215,11 @@ function metatable:getContent()
         sorted_items = inventory:sortByLastChange(items)
 
     elseif self.sort_mode == SortMode.custom then
-
         local items_by_base_id = { }
         sorted_items           = { }
 
-        -- Inventory content is already in ItemOrder order, so appending variants to each base item preserves quality order.
         for _, item in ipairs(items) do
-            local base_id = ItemOrder.get(item.name)
+            local base_id  = ItemOrder.get(item.name)
             local variants = items_by_base_id[base_id]
 
             if not variants then
@@ -293,7 +250,6 @@ function metatable:getContent()
         end
 
         table.sort(sorted_items, function(item_a, item_b)
-
             if item_a.count ~= item_b.count then
                 if self.sort_mode == SortMode.count_ascending then
                     return item_a.count < item_b.count
@@ -302,12 +258,8 @@ function metatable:getContent()
                 end
             end
 
-            local order_a = ItemOrder.get(item_a.name, item_a.quality)
-            local order_b = ItemOrder.get(item_b.name, item_b.quality)
-
-            return order_a < order_b
+            return ItemOrder.get(item_a.name, item_a.quality) < ItemOrder.get(item_b.name, item_b.quality)
         end)
-
     else
         sorted_items = items
     end
@@ -315,29 +267,12 @@ function metatable:getContent()
     return filterItems(self, sorted_items)
 end
 
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ InventoryView.                                                                                                ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
----
---- @class InventoryView: InventoryViewMetatable
----
---- ### This class represents a display projection of a logical Inventory.
----
-
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ InventoryViewFactory.                                                                                         ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
 local factory = {
     sort_modes   = SortMode,
     filter_modes = FilterMode
 }
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function factory.new(inventory)
-
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
 
     local view = {                                      ---@type InventoryView
@@ -349,10 +284,7 @@ function factory.new(inventory)
     }
 
     setmetatable(view, metatable)
-
     return view
 end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 return factory
