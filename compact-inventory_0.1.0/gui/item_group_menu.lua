@@ -7,6 +7,8 @@ local HoverTrackerFactory  = require("gui.hover_tracker")
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
 
+local CUSTOM_SORT_MAX_HEIGHT = 320      -- Approximately 10 item rows.
+
 local GUI_NAME = {
     menu                       = MOD_PREFIX .. "IG_options-menu",
     columns_flow               = MOD_PREFIX .. "IG_options-columns-flow",
@@ -26,6 +28,7 @@ local GUI_NAME = {
     custom_sort_inner_frame    = MOD_PREFIX .. "IG_options-custom-sort-inner-frame",
     custom_sort_column         = MOD_PREFIX .. "IG_options-custom-sort-column",
     custom_sort_title          = MOD_PREFIX .. "IG_options-custom-sort-title",
+    custom_sort_scroll         = MOD_PREFIX .. "IG_options-custom-sort-scroll",
     custom_sort_table          = MOD_PREFIX .. "IG_options-custom-sort-table",
     filter_column_wrapper      = MOD_PREFIX .. "IG_options-filter-wrapper",
     filter_outer_frame         = MOD_PREFIX .. "IG_options-filter-outer-frame",
@@ -435,7 +438,16 @@ function factory.open(window, item_group, location)
 
     addColumnTitle(custom_sort_column, menu, GUI_NAME.custom_sort_title, "Custom sort", false)
 
-    local custom_sort_table = custom_sort_column.add({
+    local custom_sort_scroll = custom_sort_column.add({
+        type               = "scroll-pane",
+        name               = GUI_NAME.custom_sort_scroll,
+        direction          = "vertical",
+        raise_hover_events = true
+    })
+
+    custom_sort_scroll.style.maximal_height = CUSTOM_SORT_MAX_HEIGHT
+
+    local custom_sort_table = custom_sort_scroll.add({
         type               = "table",
         name               = GUI_NAME.custom_sort_table,
         column_count       = 10,
@@ -559,7 +571,7 @@ function factory.toggleCustomSortColumn(player)
         return
     end
 
-    local columns_flow       = menu[GUI_NAME.columns_flow]
+    local columns_flow        = menu[GUI_NAME.columns_flow]
     local custom_sort_wrapper = columns_flow and columns_flow[GUI_NAME.custom_sort_column_wrapper]
 
     assert(custom_sort_wrapper, "Custom sort wrapper must exist here !")      -- [DEBUG-ONLY] . --
