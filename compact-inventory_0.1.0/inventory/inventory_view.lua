@@ -103,6 +103,28 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:moveCustomItem(source_index, target_index)
+
+    local custom_order = self:getCustomOrder()
+
+    assert(type(source_index) == "number" and source_index >= 1 and source_index <= #custom_order and source_index % 1 == 0, "Custom sort source index must be valid !")      -- [DEBUG-ONLY] . --
+    assert(type(target_index) == "number" and target_index >= 1 and target_index <= #custom_order and target_index % 1 == 0, "Custom sort target index must be valid !")      -- [DEBUG-ONLY] . --
+
+    if source_index == target_index then
+        return
+    end
+
+    local item_id = table.remove(custom_order, source_index)
+
+    if source_index < target_index then
+        target_index = target_index - 1
+    end
+
+    table.insert(custom_order, target_index, item_id)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getFilterMode()
     return self.filter_mode
 end
