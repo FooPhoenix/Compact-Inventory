@@ -4,6 +4,8 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
+local TREE_INDENT             = 16
+local TREE_ACTION_WIDTH       = 44      -- Reserved for the future delete and show/hide actions.
 
 local GUI_NAME = {
     main_frame               = MOD_PREFIX .. "MW_frame",
@@ -15,6 +17,9 @@ local GUI_NAME = {
     windows_column           = MOD_PREFIX .. "MW_windows-column",
     windows_scroll           = MOD_PREFIX .. "MW_windows-scroll",
     windows_table            = MOD_PREFIX .. "MW_windows-table",
+    tree_inventory_toggle    = MOD_PREFIX .. "MW_tree-inventory-toggle",
+    tree_window_toggle       = MOD_PREFIX .. "MW_tree-window-toggle",
+    tree_label               = MOD_PREFIX .. "MW_tree-label",
     creation_column          = MOD_PREFIX .. "MW_creation-column",
     creation_title           = MOD_PREFIX .. "MW_creation-title",
     source_player            = MOD_PREFIX .. "MW_source-player",
@@ -26,6 +31,9 @@ local GUI_NAME = {
     shortcut_button          = MOD_PREFIX .. "main-window-toggle"
 }
 
+local INVENTORY_ID_TAG_NAME = MOD_PREFIX .. "MW_InventoryID"
+local WINDOW_ID_TAG_NAME    = MOD_PREFIX .. "MW_WindowID"
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ MainWindowMetatable.                                                                                           ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -33,9 +41,11 @@ local GUI_NAME = {
 ---
 --- @class MainWindowMetatable
 ---
---- @field private lua_player LuaPlayer
---- @field         valid      boolean
---- @field         object_name string
+--- @field private lua_player            LuaPlayer
+--- @field private expanded_inventories  table<integer, boolean>
+--- @field private expanded_windows      table<integer, table<integer, boolean>>
+--- @field         valid                 boolean
+--- @field         object_name           string
 ---
 local metatable = { }
 
@@ -48,6 +58,68 @@ metatable.__index = function(self, key)                                         
     end
 
     return metatable[key]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function isInventoryExpanded(window, inventory_id)
+    return window.expanded_inventories[inventory_id] ~= false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function isWindowExpanded(window, inventory_id, window_id)
+    local inventory_windows = window.expanded_windows[inventory_id]
+
+    return not inventory_windows or inventory_windows[window_id] ~= false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addTreeRow(parent, level, toggle_name, expanded, caption, tags)
+    local row = parent.add({
+        type      = "flow",
+        direction = "horizontal"
+    })
+
+    row.style.horizontal_spacing       = 2
+    row.style.horizontally_stretchable = true
+    row.style.vertical_align           = "center"
+
+    if level > 0 then
+        local indent = row.add({ type = "empty-widget" })
+        indent.style.width = TREE_INDENT * level
+    end
+
+    if toggle_name then
+        local toggle = row.add({
+            type    = "button",
+            name    = toggle_name,
+            caption = expanded and "⏷" or "⏵",
+            style   = MOD_PREFIX .. "tree-toggle-button",
+            tags    = tags
+        })
+
+        toggle.style.width = TREE_INDENT
+    else
+        local toggle_space = row.add({ type = "empty-widget" })
+        toggle_space.style.width = TREE_INDENT
+    end
+
+    local label = row.add({
+        type    = "button",
+        name    = GUI_NAME.tree_label,
+        caption = caption,
+        style   = MOD_PREFIX .. "tree-label-button",
+        tags    = tags
+    })
+
+    label.style.horizontally_stretchable = true
+
+    local action_space = row.add({ type = "empty-widget" })
+    action_space.style.width = TREE_ACTION_WIDTH
+
+    return row
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -106,26 +178,85 @@ function metatable:refresh()
     table.sort(inventory_ids)
 
     for _, inventory_id in ipairs(inventory_ids) do
-        local inventory = manager:getInventories()[inventory_id]
-        local window_ids = { }
+        local inventory          = manager:getInventories()[inventory_id]
+        local inventory_expanded = isInventoryExpanded(self, inventory_id)
+        local inventory_tags     = {
+            [INVENTORY_ID_TAG_NAME] = inventory_id
+        }
 
-        for window_id in pairs(inventory:getWindows()) do
-            window_ids[#window_ids + 1] = window_id
-        end
+        addTreeRow(
+            windows_table,
+            0,
+            GUI_NAME.tree_inventory_toggle,
+            inventory_expanded,
+            "Inventory " .. inventory_id,
+            inventory_tags
+        )
 
-        table.sort(window_ids)
+        if inventory_expanded then
+            local window_ids = { }
 
-        for _, window_id in ipairs(window_ids) do
-            local window = inventory:getWindow(window_id)
+            for window_id in pairs(inventory:getWindows()) do
+                window_ids[#window_ids + 1] = window_id
+            end
 
-            if window and window.valid then
-                windows_table.add({
-                    type    = "label",
-                    caption = "Inventory " .. inventory:getID() .. " / Window " .. window:getID()
-                })
+            table.sort(window_ids)
+
+            for _, window_id in ipairs(window_ids) do
+                local inventory_window = inventory:getWindow(window_id)
+
+                if inventory_window and inventory_window.valid then
+                    local window_expanded = isWindowExpanded(self, inventory_id, window_id)
+                    local window_tags     = {
+                        [INVENTORY_ID_TAG_NAME] = inventory_id,
+                        [WINDOW_ID_TAG_NAME]    = window_id
+                    }
+
+                    addTreeRow(
+                        windows_table,
+                        1,
+                        GUI_NAME.tree_window_toggle,
+                        window_expanded,
+                        "Window " .. window_id,
+                        window_tags
+                    )
+
+                    if window_expanded then
+                        for _, item_group in ipairs(inventory_window:getItemGroups()) do
+                            addTreeRow(
+                                windows_table,
+                                2,
+                                nil,
+                                false,
+                                item_group:getName(),
+                                window_tags
+                            )
+                        end
+                    end
+                end
             end
         end
     end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:toggleInventoryExpanded(inventory_id)
+    assert(type(inventory_id) == "number" and inventory_id > 0, "Inventory ID must be valid here !")      -- [DEBUG-ONLY] . --
+
+    self.expanded_inventories[inventory_id] = not isInventoryExpanded(self, inventory_id)
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:toggleWindowExpanded(inventory_id, window_id)
+    assert(type(inventory_id) == "number" and inventory_id > 0, "Inventory ID must be valid here !")           -- [DEBUG-ONLY] . --
+    assert(type(window_id) == "number" and window_id > 0, "InventoryWindow ID must be valid here !")           -- [DEBUG-ONLY] . --
+
+    self.expanded_windows[inventory_id] = self.expanded_windows[inventory_id] or { }
+    self.expanded_windows[inventory_id][window_id] = not isWindowExpanded(self, inventory_id, window_id)
+    self:refresh()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -152,8 +283,8 @@ function metatable:showCreationPanel()
 
     assert(windows_column and creation_column and source_player, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    source_player.state    = true
-    windows_column.visible = false
+    source_player.state     = true
+    windows_column.visible  = false
     creation_column.visible = true
 end
 
@@ -210,11 +341,15 @@ end
 
 local factory = {
     exposed_gui_names = {
-        add_button             = GUI_NAME.add_button,
-        close_button           = GUI_NAME.close_button,
-        creation_cancel_button = GUI_NAME.creation_cancel_button,
-        creation_create_button = GUI_NAME.creation_create_button,
-        shortcut_button        = GUI_NAME.shortcut_button
+        add_button               = GUI_NAME.add_button,
+        close_button             = GUI_NAME.close_button,
+        tree_inventory_toggle    = GUI_NAME.tree_inventory_toggle,
+        tree_window_toggle       = GUI_NAME.tree_window_toggle,
+        inventory_id_tag_name    = INVENTORY_ID_TAG_NAME,
+        window_id_tag_name       = WINDOW_ID_TAG_NAME,
+        creation_cancel_button   = GUI_NAME.creation_cancel_button,
+        creation_create_button   = GUI_NAME.creation_create_button,
+        shortcut_button          = GUI_NAME.shortcut_button
     }
 }
 
@@ -225,8 +360,10 @@ function factory.create(player)
 
     assert(storage.windows.main[player_index] == nil, "Main window already exists !")      -- [DEBUG-ONLY] . --
 
-    local window = {                 ---@type MainWindow
-        lua_player = lua_player
+    local window = {                              ---@type MainWindow
+        lua_player           = lua_player,
+        expanded_inventories = { },
+        expanded_windows     = { }
     }
 
     setmetatable(window, metatable)
@@ -249,7 +386,9 @@ function factory.destroy(player)
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.lua_player = nil
+    window.lua_player           = nil
+    window.expanded_inventories = nil
+    window.expanded_windows     = nil
 
     storage.windows.main[player_index] = nil
 end
