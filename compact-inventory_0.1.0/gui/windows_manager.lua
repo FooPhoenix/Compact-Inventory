@@ -1,8 +1,8 @@
-
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local MainWindowFactory       = require("gui.main_window")
 local InventoryWindowFactory  = require("gui.inventory_window")
 local InventorySourceFactory  = require("inventory.inventory_source")
 local InventoryManagerFactory = require("inventory.inventory_manager")
@@ -17,6 +17,7 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 --
 local manager = {
     exposed_gui_names = {
+        MainWindow      = MainWindowFactory.exposed_gui_names,
         InventoryWindow = InventoryWindowFactory.exposed_gui_names
     }
 }
@@ -26,6 +27,7 @@ local manager = {
 function manager.initialize()
 
     storage.windows = { }
+    storage.windows.main = { }
     storage.windows.main_inventory = { }
 
     for _, lua_player in pairs(game.players) do
@@ -46,7 +48,31 @@ function manager.initializePlayer(player)
     local inventory = InventoryManagerFactory.get(lua_player):monitorInventory(source)
 
     inventory:update()
+    MainWindowFactory.create(lua_player)
     InventoryWindowFactory.create(lua_player, inventory)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager.hasMainWindow(player)
+
+    local player_index = resolve_player(player)
+    local window = storage.windows.main[player_index]
+
+    return window ~= nil and window.valid
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager.getMainWindow(player)
+
+    local player_index = resolve_player(player)
+
+    assert(storage.windows.main[player_index], "Player does not have a main window !")                            -- [DEBUG-ONLY] . --
+    assert(storage.windows.main[player_index].valid, "Player does not have a valid main window !")               -- [DEBUG-ONLY] . --
+    assert(storage.windows.main[player_index].object_name == "MainWindow", "Player does not have a valid main window !")  -- [DEBUG-ONLY] . --
+
+    return storage.windows.main[player_index]
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
