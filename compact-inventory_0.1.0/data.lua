@@ -21,6 +21,19 @@ gui_style[MOD_PREFIX .. "locked-content-frame"] = {
     padding                  = 0
 }
 
+gui_style[MOD_PREFIX .. "tree-label-button"] = {
+    type    = "button_style",
+    parent  = "transparent_button",
+    padding = 0
+}
+
+gui_style[MOD_PREFIX .. "tree-toggle-button"] = {
+    type          = "button_style",
+    parent        = "transparent_button",
+    padding       = 0,
+    minimal_width = 16
+}
+
 data:extend({
     {
         type = "sprite",
