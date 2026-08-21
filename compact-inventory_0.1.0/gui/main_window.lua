@@ -79,7 +79,19 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function addTreeRow(parent, level, toggle_name, expanded, caption, tags)
+local function getInventorySourceTooltip(inventory)
+    local lines = { "Sources:" }
+
+    for _, lua_inventory in ipairs(inventory:getSource():getInventories()) do
+        lines[#lines + 1] = "- " .. tostring(lua_inventory.name)
+    end
+
+    return table.concat(lines, "\n")
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, info_tooltip)
     local row = parent.add({
         type      = "flow",
         direction = "horizontal"
@@ -124,6 +136,14 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags)
         row.add({
             type    = "label",
             caption = caption
+        })
+    end
+
+    if info_tooltip then
+        row.add({
+            type    = "sprite",
+            sprite  = "info",
+            tooltip = info_tooltip
         })
     end
 
@@ -204,7 +224,8 @@ function metatable:refresh()
             GUI_NAME.tree_inventory_toggle,
             inventory_expanded,
             "Inventory " .. inventory_id,
-            inventory_tags
+            inventory_tags,
+            getInventorySourceTooltip(inventory)
         )
 
         if inventory_expanded then
