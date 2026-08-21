@@ -1,12 +1,19 @@
+
+local InventoryManagerFactory = require("inventory.inventory_manager")
+
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
+local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
+
 local GUI_NAME = {
-    main_frame      = MOD_PREFIX .. "MW_frame",
-    title_bar       = MOD_PREFIX .. "MW_titlebar",
-    title           = MOD_PREFIX .. "MW_title",
-    dragger         = MOD_PREFIX .. "MW_dragger",
-    close_button    = MOD_PREFIX .. "MW_close",
-    shortcut_button = MOD_PREFIX .. "main-window-toggle"
+    main_frame       = MOD_PREFIX .. "MW_frame",
+    title_bar        = MOD_PREFIX .. "MW_titlebar",
+    title            = MOD_PREFIX .. "MW_title",
+    dragger          = MOD_PREFIX .. "MW_dragger",
+    close_button     = MOD_PREFIX .. "MW_close",
+    windows_scroll   = MOD_PREFIX .. "MW_windows-scroll",
+    windows_table    = MOD_PREFIX .. "MW_windows-table",
+    shortcut_button  = MOD_PREFIX .. "main-window-toggle"
 }
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -16,13 +23,10 @@ local GUI_NAME = {
 ---
 --- @class MainWindowMetatable
 ---
---- ### This class groups all functions used to create and manage the main Compact Inventory window.
+--- @field private lua_player LuaPlayer
+--- @field         valid      boolean
+--- @field         object_name string
 ---
---- @field private lua_player LuaPlayer      The player that owns the window.
---- @field         valid      boolean        Whether the window is valid or not.
---- @field         object_name string        The object name of the window.
----
---
 local metatable = { }
 
 metatable.object_name = "MainWindow"
@@ -55,6 +59,17 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:getWindowsTable()
+    local scroll = self:getFrame()[GUI_NAME.windows_scroll]
+    local windows_table = scroll and scroll[GUI_NAME.windows_table]
+
+    assert(windows_table, "Main window inventory list must exist here !")      -- [DEBUG-ONLY] . --
+
+    return windows_table
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:isValid()                                                    ---@private
     local lua_player = self.lua_player
 
@@ -66,8 +81,50 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:refresh()
+    local windows_table = self:getWindowsTable()
+    local manager       = InventoryManagerFactory.get(self:getPlayer())
+    local inventory_ids = { }
+
+    windows_table.clear()
+
+    for inventory_id in pairs(manager:getInventories()) do
+        inventory_ids[#inventory_ids + 1] = inventory_id
+    end
+
+    table.sort(inventory_ids)
+
+    for _, inventory_id in ipairs(inventory_ids) do
+        local inventory = manager:getInventories()[inventory_id]
+        local window_ids = { }
+
+        for window_id in pairs(inventory:getWindows()) do
+            window_ids[#window_ids + 1] = window_id
+        end
+
+        table.sort(window_ids)
+
+        for _, window_id in ipairs(window_ids) do
+            local window = inventory:getWindow(window_id)
+
+            if window and window.valid then
+                windows_table.add({
+                    type    = "label",
+                    caption = "Inventory " .. inventory:getID() .. " / Window " .. window:getID()
+                })
+            end
+        end
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setVisible(visible)
     assert(type(visible) == "boolean", "Main window visibility must be a boolean !")      -- [DEBUG-ONLY] . --
+
+    if visible then
+        self:refresh()
+    end
 
     self:getFrame().visible = visible
     self:getPlayer().set_shortcut_toggled(GUI_NAME.shortcut_button, visible)
@@ -84,16 +141,6 @@ end
 function metatable:toggleVisibility()
     self:setVisible(not self:isVisible())
 end
-
--- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
--- ║ MainWindow.                                                                                                    ║ --
--- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
-
----
---- @class MainWindow: MainWindowMetatable
----
---- ### This class represents the main Compact Inventory window.
----
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ MainWindowFactory.                                                                                             ║ --
@@ -198,7 +245,28 @@ function factory.createGUI(window)                                              
     close.style.height  = 16
     close.style.padding = 0
 
+    local scroll = frame.add({
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.windows_scroll,
+        direction                = "vertical",
+        vertical_scroll_policy   = "auto",
+        horizontal_scroll_policy = "never"
+    })
+
+    scroll.style.maximal_height          = WINDOW_LIST_MAX_HEIGHT
+    scroll.style.horizontally_stretchable = true
+
+    local windows_table = scroll.add({
+        type         = "table",
+        name         = GUI_NAME.windows_table,
+        column_count = 1
+    })
+
+    windows_table.style.horizontally_stretchable = true
+    windows_table.style.vertical_spacing = 2
+
     frame.auto_center = true
+    window:refresh()
     window:setVisible(false)
 
     return frame
