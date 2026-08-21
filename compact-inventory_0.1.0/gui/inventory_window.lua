@@ -40,8 +40,10 @@ local SORT_SPRITE = {
     [SortMode.custom]           = MOD_PREFIX .. "sort-custom"
 }
 
-local SORT_TAG_NAME     = MOD_PREFIX .. "SortID"
-local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
+local SORT_TAG_NAME         = MOD_PREFIX .. "SortID"
+local GROUP_ID_TAG_NAME     = MOD_PREFIX .. "ItemGroupID"
+local INVENTORY_ID_TAG_NAME = MOD_PREFIX .. "MenuInventoryID"
+local WINDOW_ID_TAG_NAME    = MOD_PREFIX .. "MenuWindowID"
 
 local factory = { }
 
@@ -717,7 +719,11 @@ function factory.createGUI(window)                                              
     local frame = window.lua_player.gui.screen.add({
         type      = "frame",
         name      = window:getFrameName(),
-        direction = "vertical"
+        direction = "vertical",
+        tags      = {
+            [INVENTORY_ID_TAG_NAME] = window:getInventory():getID(),
+            [WINDOW_ID_TAG_NAME]    = window:getID()
+        }
     })
 
     frame.style.left_padding   = 4
