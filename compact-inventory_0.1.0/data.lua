@@ -48,6 +48,26 @@ data:extend({
         size = 64
     },
     {
+        type         = "sprite",
+        name         = MOD_PREFIX .. "tree-expand",
+        filename     = "__compact-inventory__/graphics/treeview_expand_slim.png",
+        width        = 32,
+        height       = 16,
+        mipmap_count = 2,
+        flags        = { "gui-icon" },
+        scale        = 0.5
+    },
+    {
+        type         = "sprite",
+        name         = MOD_PREFIX .. "tree-collapse",
+        filename     = "__compact-inventory__/graphics/treeview_collapse_slim.png",
+        width        = 32,
+        height       = 16,
+        mipmap_count = 2,
+        flags        = { "gui-icon" },
+        scale        = 0.5
+    },
+    {
         type = "sprite",
         name = MOD_PREFIX .. "sort-standard",
         filename = "__compact-inventory__/graphics/sort-standard.png",
