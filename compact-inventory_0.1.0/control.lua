@@ -13,6 +13,10 @@ local FilterMode = InventoryViewFactory.filter_modes
 local PRESET_CONTEXT_FILTER      = "Filter"
 local PRESET_CONTEXT_CUSTOM_SORT = "Custom sort"
 
+local INVENTORY_WINDOW_FRAME_PREFIX = MOD_PREFIX .. "IW_frame-"
+local MENU_INVENTORY_ID_TAG_NAME    = MOD_PREFIX .. "MenuInventoryID"
+local MENU_WINDOW_ID_TAG_NAME       = MOD_PREFIX .. "MenuWindowID"
+
 local custom_sort_selections = { }
 local preset_contexts        = { }
 local filter_preset_manager
@@ -38,6 +42,70 @@ function resolve_player(player)
     end
 
     return player_index, player
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getInventoryWindow(player, inventory_id, window_id)
+    local manager   = InventoryManagerFactory.get(player)
+    local inventory = manager:getInventories()[inventory_id]
+    local window    = inventory and inventory:getWindow(window_id) or nil
+
+    return window and window.valid and window or nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function resolveInventoryWindowFromElement(player, lua_element)
+    local element = lua_element
+
+    while element do
+        local tags = element.tags
+        local inventory_id = tags and tags[MENU_INVENTORY_ID_TAG_NAME]
+        local window_id    = tags and tags[MENU_WINDOW_ID_TAG_NAME]
+
+        if inventory_id and window_id then
+            return getInventoryWindow(player, inventory_id, window_id)
+        end
+
+        local name = element.name
+
+        if name then
+            local parsed_inventory_id, parsed_window_id = name:match(
+                "^" .. INVENTORY_WINDOW_FRAME_PREFIX .. "(%d+)%-(%d+)$"
+            )
+
+            if parsed_inventory_id and parsed_window_id then
+                return getInventoryWindow(player, tonumber(parsed_inventory_id), tonumber(parsed_window_id))
+            end
+        end
+
+        element = element.parent
+    end
+
+    return nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function tagItemGroupMenu(window)
+    local menu_names = ItemGroupMenuFactory.exposed_gui_names
+    local menu       = window:getPlayer().gui.screen[menu_names.menu]
+
+    assert(menu, "ItemGroup menu must exist here !")      -- [DEBUG-ONLY] . --
+
+    local tags = menu.tags
+    tags[MENU_INVENTORY_ID_TAG_NAME] = window:getInventory():getID()
+    tags[MENU_WINDOW_ID_TAG_NAME]     = window:getID()
+    menu.tags = tags
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function refreshMainWindow(player)
+    if WindowsManager.hasMainWindow(player) then
+        WindowsManager.getMainWindow(player):refresh()
+    end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -232,15 +300,21 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
     local _, lua_player = resolve_player(event.player_index)
     local lua_inventory = lua_player.get_main_inventory()
 
-    if lua_inventory then
-        InventoryManagerFactory.get(lua_player):updateInventory(lua_inventory)
+    if not lua_inventory then
+        return
     end
 
-    if WindowsManager.hasWindowMainInventory(lua_player) then
-        local window = WindowsManager.getWindowMainInventory(lua_player)
+    local manager = InventoryManagerFactory.get(lua_player)
 
-        if window:isVisible() then
-            window:refresh()
+    manager:updateInventory(lua_inventory)
+
+    for _, inventory in pairs(manager:getInventories()) do
+        if inventory:getSource():containsInventory(lua_inventory) then
+            for _, window in pairs(inventory:getWindows()) do
+                if window.valid and window:isVisible() then
+                    window:refresh()
+                end
+            end
         end
     end
 end)
@@ -249,45 +323,63 @@ script.on_event(defines.events.on_gui_click, function(event)
     local main_gui_names = WindowsManager.exposed_gui_names.MainWindow
     local gui_names      = WindowsManager.exposed_gui_names.InventoryWindow
     local menu_names     = ItemGroupMenuFactory.exposed_gui_names
-    local window         = WindowsManager.hasWindowMainInventory(event.player_index)
-        and WindowsManager.getWindowMainInventory(event.player_index)
-        or nil
+    local window         = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
 
-    elseif event.element.name == gui_names.close_button then
+    elseif event.element.name == main_gui_names.add_button then
+        WindowsManager.getMainWindow(event.player_index):showCreationPanel()
+
+    elseif event.element.name == main_gui_names.creation_cancel_button then
+        WindowsManager.getMainWindow(event.player_index):showWindowsList()
+
+    elseif event.element.name == main_gui_names.creation_create_button then
+        local main_window   = WindowsManager.getMainWindow(event.player_index)
+        local configuration = main_window:getCreationConfiguration()
+        local inventory     = InventoryManagerFactory.get(event.player_index):monitorConfiguration(configuration)
+
+        assert(inventory, "Inventory creation configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
+
+        if inventory then
+            inventory:createWindow()
+        end
+
+        main_window:showWindowsList()
+
+    elseif event.element.name == gui_names.close_button and window then
         ItemGroupMenuFactory.close(event.player_index)
         window:setVisible(false)
 
-    elseif event.element.name == gui_names.add_button then
+    elseif event.element.name == gui_names.add_button and window then
         window:createItemGroup()
 
-    elseif event.element.name == gui_names.lock_button then
+    elseif event.element.name == gui_names.lock_button and window then
         ItemGroupMenuFactory.close(event.player_index)
         window:setLocked(true)
 
-    elseif event.element.name == gui_names.group_unlock_button then
+    elseif event.element.name == gui_names.group_unlock_button and window then
         window:setLocked(false)
 
-    elseif event.element.name == gui_names.group_rename_button then
+    elseif event.element.name == gui_names.group_rename_button and window then
         window:startRename(event.element.tags[gui_names.group_id_tag_name])
 
-    elseif event.element.name == gui_names.group_confirm_button then
+    elseif event.element.name == gui_names.group_confirm_button and window then
         window:confirmRename(event.element.tags[gui_names.group_id_tag_name])
 
-    elseif event.element.name == gui_names.group_cancel_button then
+    elseif event.element.name == gui_names.group_cancel_button and window then
         window:cancelRename(event.element.tags[gui_names.group_id_tag_name])
 
-    elseif event.element.name == gui_names.group_menu_button then
+    elseif event.element.name == gui_names.group_menu_button and window then
         local group_id   = event.element.tags[gui_names.group_id_tag_name]
         local item_group = window:getItemGroupByID(group_id)
 
         assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
         ItemGroupMenuFactory.open(window, item_group, event.cursor_display_location)
+        tagItemGroupMenu(window)
 
-    elseif event.element.name == menu_names.move_up_button
-        or event.element.name == menu_names.move_down_button then
+    elseif (event.element.name == menu_names.move_up_button
+        or event.element.name == menu_names.move_down_button) and window then
 
         local group_id   = event.element.tags[menu_names.group_id_tag_name]
         local item_group = window:getItemGroupByID(group_id)
@@ -302,7 +394,7 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == menu_names.filter_toggle_button then
         ItemGroupMenuFactory.toggleFilterColumn(event.player_index)
 
-    elseif event.element.name == menu_names.preset_toggle_button then
+    elseif event.element.name == menu_names.preset_toggle_button and window then
         local context    = event.element.tags[menu_names.preset_context_tag_name]
         local group_id   = event.element.tags[menu_names.group_id_tag_name]
         local item_group = window:getItemGroupByID(group_id)
@@ -321,7 +413,7 @@ script.on_event(defines.events.on_gui_click, function(event)
             ItemGroupMenuFactory.selectPreset(event.player_index, current_name)
         end
 
-    elseif event.element.name == menu_names.preset_save_button then
+    elseif event.element.name == menu_names.preset_save_button and window then
         local context = preset_contexts[event.player_index]
         local name    = ItemGroupMenuFactory.getPresetName(event.player_index)
         local manager = getPresetManager(context)
@@ -342,7 +434,7 @@ script.on_event(defines.events.on_gui_click, function(event)
             ItemGroupMenuFactory.selectPreset(event.player_index, saved_name)
         end
 
-    elseif event.element.tags[menu_names.preset_delete_tag_name] then
+    elseif event.element.tags[menu_names.preset_delete_tag_name] and window then
         local context     = event.element.tags[menu_names.preset_context_tag_name]
         local group_id    = event.element.tags[menu_names.group_id_tag_name]
         local preset_name = event.element.tags[menu_names.preset_delete_tag_name]
@@ -360,7 +452,7 @@ script.on_event(defines.events.on_gui_click, function(event)
             ItemGroupMenuFactory.refreshPresetList(event.player_index, manager:list(), context, group_id)
         end
 
-    elseif event.element.tags[menu_names.preset_name_tag_name] then
+    elseif event.element.tags[menu_names.preset_name_tag_name] and window then
         local context     = event.element.tags[menu_names.preset_context_tag_name]
         local group_id    = event.element.tags[menu_names.group_id_tag_name]
         local item_group  = window:getItemGroupByID(group_id)
@@ -390,7 +482,8 @@ script.on_event(defines.events.on_gui_click, function(event)
             window:refreshGroup(item_group)
         end
 
-    elseif event.button == defines.mouse_button_type.left
+    elseif window
+        and event.button == defines.mouse_button_type.left
         and event.element.parent
         and event.element.parent.name == MOD_PREFIX .. "IG_options-custom-sort-table" then
 
@@ -448,7 +541,8 @@ script.on_event(defines.events.on_gui_click, function(event)
         ItemGroupMenuFactory.suspendHoverUntilReenter(event.player_index)
 
     elseif event.element.tags[menu_names.filter_slot_tag_name]
-        and event.button == defines.mouse_button_type.right then
+        and event.button == defines.mouse_button_type.right
+        and window then
 
         local slot_index = event.element.tags[menu_names.filter_slot_tag_name]
         local group_id   = event.element.tags[menu_names.group_id_tag_name]
@@ -463,18 +557,19 @@ script.on_event(defines.events.on_gui_click, function(event)
         ItemGroupMenuFactory.refreshFilterTable(window, item_group)
         ItemGroupMenuFactory.clearPresetSelection(event.player_index)
 
-    elseif event.element.name == menu_names.delete_group_button then
+    elseif event.element.name == menu_names.delete_group_button and window then
         local group_id = event.element.tags[menu_names.group_id_tag_name]
 
         ItemGroupMenuFactory.close(event.player_index)
 
         if #window:getItemGroups() == 1 then
-            WindowsManager.destroyWindowMainInventory(event.player_index)
+            window:getInventory():removeWindow(window)
+            refreshMainWindow(event.player_index)
         else
             window:removeItemGroup(group_id)
         end
 
-    elseif event.element.tags[menu_names.sort_tag_name] then
+    elseif event.element.tags[menu_names.sort_tag_name] and window then
         local sort_mode = event.element.tags[menu_names.sort_tag_name]
         local group_id  = event.element.tags[menu_names.group_id_tag_name]
 
@@ -496,9 +591,9 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
         return
     end
 
-    local window     = WindowsManager.getWindowMainInventory(event.player_index)
+    local window     = resolveInventoryWindowFromElement(event.player_index, event.element)
     local group_id   = event.element.tags[menu_names.group_id_tag_name]
-    local item_group = window:getItemGroupByID(group_id)
+    local item_group = window and window:getItemGroupByID(group_id) or nil
 
     assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -516,9 +611,9 @@ script.on_event(defines.events.on_gui_switch_state_changed, function(event)
         return
     end
 
-    local window     = WindowsManager.getWindowMainInventory(event.player_index)
+    local window     = resolveInventoryWindowFromElement(event.player_index, event.element)
     local group_id   = event.element.tags[menu_names.group_id_tag_name]
-    local item_group = window:getItemGroupByID(group_id)
+    local item_group = window and window:getItemGroupByID(group_id) or nil
 
     assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -541,9 +636,7 @@ script.on_event(defines.events.on_gui_text_changed, function(event)
     ItemGroupMenuFactory.clearPresetSelection(event.player_index)
 
     local context = preset_contexts[event.player_index]
-    local window  = WindowsManager.hasWindowMainInventory(event.player_index)
-        and WindowsManager.getWindowMainInventory(event.player_index)
-        or nil
+    local window  = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if window and context then
         local menu     = event.element
@@ -569,9 +662,11 @@ script.on_event(defines.events.on_gui_confirmed, function(event)
     local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
 
     if event.element.name == gui_names.group_name_field then
-        WindowsManager.getWindowMainInventory(event.player_index):confirmRename(
-            event.element.tags[gui_names.group_id_tag_name]
-        )
+        local window = resolveInventoryWindowFromElement(event.player_index, event.element)
+
+        assert(window, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+
+        window:confirmRename(event.element.tags[gui_names.group_id_tag_name])
     end
 end)
 
@@ -588,8 +683,14 @@ script.on_event(defines.events.on_tick, function(event)
 end)
 
 local function updateWindowMaxHeight(player_index)
-    if WindowsManager.hasWindowMainInventory(player_index) then
-        WindowsManager.getWindowMainInventory(player_index):updateMaxHeight()
+    local manager = InventoryManagerFactory.get(player_index)
+
+    for _, inventory in pairs(manager:getInventories()) do
+        for _, window in pairs(inventory:getWindows()) do
+            if window.valid then
+                window:updateMaxHeight()
+            end
+        end
     end
 end
 
