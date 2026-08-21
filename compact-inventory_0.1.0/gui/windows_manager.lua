@@ -48,8 +48,8 @@ function manager.initializePlayer(player)
     local inventory = InventoryManagerFactory.get(lua_player):monitorInventory(source)
 
     inventory:update()
-    MainWindowFactory.create(lua_player)
     InventoryWindowFactory.create(lua_player, inventory)
+    MainWindowFactory.create(lua_player)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
