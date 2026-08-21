@@ -25,17 +25,19 @@ gui_style[MOD_PREFIX .. "tree-label-button"] = {
     type               = "button_style",
     parent             = "transparent_button",
     padding            = 0,
+    minimal_width      = 0,
+    minimal_height     = 0,
     default_font_color = { 1, 1, 1 },
     hovered_font_color = { 1, 1, 1 },
     clicked_font_color = { 1, 1, 1 }
 }
 
 gui_style[MOD_PREFIX .. "tree-toggle-button"] = {
-    type          = "button_style",
-    parent        = "transparent_button",
-    padding       = 0,
-    minimal_width = 16,
-    minimal_height = 16
+    type           = "button_style",
+    parent         = "transparent_button",
+    padding        = 0,
+    minimal_width  = 0,
+    minimal_height = 0
 }
 
 data:extend({
