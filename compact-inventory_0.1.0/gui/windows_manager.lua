@@ -55,6 +55,14 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function refreshMainWindow(player)
+    if manager.hasMainWindow(player) then
+        manager.getMainWindow(player):refresh()
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function manager.initialize()
     storage.windows = { }
     storage.windows.main = { }
@@ -115,7 +123,10 @@ function manager.createWindowMainInventory(player)
 
     assert(inventory, "No monitored Inventory contains the player's main LuaInventory !")      -- [DEBUG-ONLY] . --
 
-    return inventory:createWindow()
+    local window = inventory:createWindow()
+    refreshMainWindow(player)
+
+    return window
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -127,6 +138,7 @@ function manager.destroyWindowMainInventory(player)
     assert(window, "Player does not have a main inventory window !")      -- [DEBUG-ONLY] . --
 
     inventory:removeWindow(window)
+    refreshMainWindow(player)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
