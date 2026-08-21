@@ -33,6 +33,7 @@ local GUI_NAME = {
 
 local INVENTORY_ID_TAG_NAME = MOD_PREFIX .. "MW_InventoryID"
 local WINDOW_ID_TAG_NAME    = MOD_PREFIX .. "MW_WindowID"
+local GROUP_ID_TAG_NAME     = MOD_PREFIX .. "MW_GroupID"
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ MainWindowMetatable.                                                                                           ║ --
@@ -93,28 +94,39 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags)
 
     if toggle_name then
         local toggle = row.add({
-            type    = "button",
+            type    = "sprite-button",
             name    = toggle_name,
-            caption = expanded and "⏷" or "⏵",
+            sprite  = expanded and "utility/collapse" or "utility/expand",
             style   = MOD_PREFIX .. "tree-toggle-button",
+            tooltip = expanded and "Collapse" or "Expand",
             tags    = tags
         })
 
-        toggle.style.width = TREE_INDENT
+        toggle.style.width   = TREE_INDENT
+        toggle.style.height  = TREE_INDENT
+        toggle.style.padding = 0
     else
         local toggle_space = row.add({ type = "empty-widget" })
         toggle_space.style.width = TREE_INDENT
     end
 
-    local label = row.add({
-        type    = "button",
-        name    = GUI_NAME.tree_label,
-        caption = caption,
-        style   = MOD_PREFIX .. "tree-label-button",
-        tags    = tags
-    })
+    if toggle_name then
+        row.add({
+            type    = "button",
+            name    = GUI_NAME.tree_label,
+            caption = caption,
+            style   = MOD_PREFIX .. "tree-label-button",
+            tags    = tags
+        })
+    else
+        row.add({
+            type    = "label",
+            caption = caption
+        })
+    end
 
-    label.style.horizontally_stretchable = true
+    local spacer = row.add({ type = "empty-widget" })
+    spacer.style.horizontally_stretchable = true
 
     local action_space = row.add({ type = "empty-widget" })
     action_space.style.width = TREE_ACTION_WIDTH
@@ -223,13 +235,19 @@ function metatable:refresh()
 
                     if window_expanded then
                         for _, item_group in ipairs(inventory_window:getItemGroups()) do
+                            local group_tags = {
+                                [INVENTORY_ID_TAG_NAME] = inventory_id,
+                                [WINDOW_ID_TAG_NAME]    = window_id,
+                                [GROUP_ID_TAG_NAME]     = item_group:getID()
+                            }
+
                             addTreeRow(
                                 windows_table,
                                 2,
                                 nil,
                                 false,
                                 item_group:getName(),
-                                window_tags
+                                group_tags
                             )
                         end
                     end
@@ -345,8 +363,10 @@ local factory = {
         close_button             = GUI_NAME.close_button,
         tree_inventory_toggle    = GUI_NAME.tree_inventory_toggle,
         tree_window_toggle       = GUI_NAME.tree_window_toggle,
+        tree_label               = GUI_NAME.tree_label,
         inventory_id_tag_name    = INVENTORY_ID_TAG_NAME,
         window_id_tag_name       = WINDOW_ID_TAG_NAME,
+        group_id_tag_name        = GROUP_ID_TAG_NAME,
         creation_cancel_button   = GUI_NAME.creation_cancel_button,
         creation_create_button   = GUI_NAME.creation_create_button,
         shortcut_button          = GUI_NAME.shortcut_button
