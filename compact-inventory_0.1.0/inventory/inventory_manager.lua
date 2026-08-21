@@ -1,6 +1,7 @@
 
 local ItemOrder              = require("util.item_order")
 local InventoryWindowFactory = require("gui.inventory_window")
+local InventorySourceFactory = require("inventory.inventory_source")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -328,6 +329,100 @@ manager_metatable.object_name = "InventoryManager"
 
 script.register_metatable(MOD_PREFIX .. "InventoryManagerMetatable", manager_metatable)
 manager_metatable.__index = manager_metatable
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function sourcesMatch(source, lua_inventories)
+    local source_inventories = source:getInventories()
+
+    if #source_inventories ~= #lua_inventories then
+        return false
+    end
+
+    for _, lua_inventory in ipairs(lua_inventories) do
+        local found = false
+
+        for _, source_lua_inventory in ipairs(source_inventories) do
+            if source_lua_inventory == lua_inventory then
+                found = true
+                break
+            end
+        end
+
+        if not found then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function resolveConfiguration(configuration)
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
+    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+    assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
+
+    local lua_inventories = { }
+
+    for _, entity_configuration in ipairs(configuration.entities) do
+        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")                      -- [DEBUG-ONLY] . --
+        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")           -- [DEBUG-ONLY] . --
+        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")                      -- [DEBUG-ONLY] . --
+        assert(entity_configuration.options == nil or type(entity_configuration.options) == "table", "Inventory entity options must be a table !") -- [DEBUG-ONLY] . --
+
+        local entity = entity_configuration.entity
+
+        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+            assert(type(inventory_type) == "number", "Inventory type must be a defines.inventory value !")      -- [DEBUG-ONLY] . --
+
+            local lua_inventory = entity.get_inventory(inventory_type)
+
+            if lua_inventory and lua_inventory.valid then
+                local duplicate = false
+
+                for _, existing_inventory in ipairs(lua_inventories) do
+                    if existing_inventory == lua_inventory then
+                        duplicate = true
+                        break
+                    end
+                end
+
+                if not duplicate then
+                    lua_inventories[#lua_inventories + 1] = lua_inventory
+                end
+            end
+        end
+    end
+
+    return lua_inventories
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager_metatable:monitorConfiguration(configuration)
+    local lua_inventories = resolveConfiguration(configuration)
+
+    assert(#lua_inventories > 0, "Inventory configuration did not resolve any LuaInventory !")      -- [DEBUG-ONLY] . --
+
+    if #lua_inventories == 0 then
+        return nil
+    end
+
+    for _, inventory in pairs(self.inventories) do
+        if sourcesMatch(inventory:getSource(), lua_inventories) then
+            return inventory
+        end
+    end
+
+    local source = InventorySourceFactory.new(table.unpack(lua_inventories))
+    local inventory = self:monitorInventory(source)
+
+    inventory:update()
+
+    return inventory
+end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
