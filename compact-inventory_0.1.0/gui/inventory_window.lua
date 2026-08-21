@@ -298,6 +298,22 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:setItemGroupName(group_id, name)
+    local item_group = self:getItemGroupByID(group_id)
+
+    assert(item_group, "ItemGroup must exist here !")                  -- [DEBUG-ONLY] . --
+    assert(type(name) == "string", "ItemGroup name must be a string !") -- [DEBUG-ONLY] . --
+
+    item_group:setName(name)
+
+    local title = getGroupHeader(self, item_group)[GUI_NAME.group_title]
+
+    assert(title, "ItemGroup title must exist here !")      -- [DEBUG-ONLY] . --
+    title.caption = item_group:getName()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:startRename(group_id)
     local item_group = self:getItemGroupByID(group_id)
 
@@ -366,8 +382,7 @@ function metatable:confirmRename(group_id)
 
     assert(title and rename_button and name_field and confirm and cancel, "ItemGroup rename GUI must be complete here !")      -- [DEBUG-ONLY] . --
 
-    item_group:setName(name_field.text)
-    title.caption = item_group:getName()
+    self:setItemGroupName(group_id, name_field.text)
 
     title.visible         = true
     rename_button.visible = true

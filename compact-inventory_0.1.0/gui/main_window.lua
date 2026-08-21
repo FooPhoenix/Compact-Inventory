@@ -7,7 +7,7 @@ local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window row
 local TREE_INDENT             = 16
 local TREE_TOGGLE_WIDTH       = 16
 local TREE_TOGGLE_HEIGHT      = 8
-local TREE_ACTION_WIDTH       = 44      -- Reserved for the future delete and show/hide actions.
+local TREE_ACTION_SIZE        = 16
 
 local GUI_NAME = {
     main_frame               = MOD_PREFIX .. "MW_frame",
@@ -22,6 +22,13 @@ local GUI_NAME = {
     tree_inventory_toggle    = MOD_PREFIX .. "MW_tree-inventory-toggle",
     tree_window_toggle       = MOD_PREFIX .. "MW_tree-window-toggle",
     tree_label               = MOD_PREFIX .. "MW_tree-label",
+    tree_name_field          = MOD_PREFIX .. "MW_tree-name-field",
+    tree_edit_button         = MOD_PREFIX .. "MW_tree-edit",
+    tree_confirm_button      = MOD_PREFIX .. "MW_tree-confirm",
+    tree_cancel_button       = MOD_PREFIX .. "MW_tree-cancel",
+    tree_visibility_button   = MOD_PREFIX .. "MW_tree-visibility",
+    tree_lock_button         = MOD_PREFIX .. "MW_tree-lock",
+    tree_delete_button       = MOD_PREFIX .. "MW_tree-delete",
     creation_column          = MOD_PREFIX .. "MW_creation-column",
     creation_title           = MOD_PREFIX .. "MW_creation-title",
     source_player            = MOD_PREFIX .. "MW_source-player",
@@ -47,6 +54,7 @@ local GROUP_ID_TAG_NAME     = MOD_PREFIX .. "MW_GroupID"
 --- @field private lua_player            LuaPlayer
 --- @field private expanded_inventories  table<integer, boolean>
 --- @field private expanded_windows      table<integer, table<integer, boolean>>
+--- @field private rename_target         table?
 --- @field         valid                 boolean
 --- @field         object_name           string
 ---
@@ -79,6 +87,17 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function isRenameTarget(window, tags)
+    local target = window.rename_target
+
+    return target ~= nil
+        and target.inventory_id == tags[INVENTORY_ID_TAG_NAME]
+        and target.window_id == tags[WINDOW_ID_TAG_NAME]
+        and target.group_id == tags[GROUP_ID_TAG_NAME]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function getInventorySourceTooltip(inventory)
     local lines = { "Sources:" }
 
@@ -91,7 +110,49 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, info_tooltip)
+local function addActionSpace(row)
+    local space = row.add({ type = "empty-widget" })
+
+    space.style.width  = TREE_ACTION_SIZE
+    space.style.height = TREE_ACTION_SIZE
+
+    return space
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addActionButton(row, name, sprite, tooltip, tags, hovered_sprite, clicked_sprite, style)
+    local definition = {
+        type    = "sprite-button",
+        name    = name,
+        sprite  = sprite,
+        style   = style or "frame_action_button",
+        tooltip = tooltip,
+        tags    = tags
+    }
+
+    if hovered_sprite then
+        definition.hovered_sprite = hovered_sprite
+    end
+
+    if clicked_sprite then
+        definition.clicked_sprite = clicked_sprite
+    end
+
+    local button = row.add(definition)
+
+    button.style.width   = TREE_ACTION_SIZE
+    button.style.height  = TREE_ACTION_SIZE
+    button.style.padding = 0
+
+    return button
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, options)
+    options = options or { }
+
     local row = parent.add({
         type      = "flow",
         direction = "horizontal"
@@ -124,7 +185,19 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, i
         toggle_space.style.width = TREE_TOGGLE_WIDTH
     end
 
-    if toggle_name then
+    if options.renaming then
+        local name_field = row.add({
+            type                  = "textfield",
+            name                  = GUI_NAME.tree_name_field,
+            text                  = caption,
+            lose_focus_on_confirm = true,
+            tags                  = tags
+        })
+
+        name_field.style.width = 180
+        name_field.focus()
+        name_field.select_all()
+    elseif toggle_name then
         row.add({
             type    = "button",
             name    = GUI_NAME.tree_label,
@@ -139,19 +212,74 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, i
         })
     end
 
-    if info_tooltip then
+    if options.info_tooltip then
         row.add({
             type    = "sprite",
             sprite  = "info",
-            tooltip = info_tooltip
+            tooltip = options.info_tooltip
         })
     end
 
     local spacer = row.add({ type = "empty-widget" })
     spacer.style.horizontally_stretchable = true
 
-    local action_space = row.add({ type = "empty-widget" })
-    action_space.style.width = TREE_ACTION_WIDTH
+    if options.renaming then
+        addActionButton(row, GUI_NAME.tree_confirm_button, "utility/enter", "Confirm name", tags, nil, nil, "green_button")
+        addActionButton(row, GUI_NAME.tree_cancel_button, MOD_PREFIX .. "cancel", "Cancel rename", tags, nil, nil, "button")
+        addActionSpace(row)
+        addActionSpace(row)
+        return row
+    end
+
+    if options.edit then
+        addActionButton(row, GUI_NAME.tree_edit_button, "utility/rename_icon", "Rename", tags, nil, nil, "button")
+    else
+        addActionSpace(row)
+    end
+
+    if options.visible ~= nil then
+        if options.visible then
+            addActionButton(
+                row,
+                GUI_NAME.tree_visibility_button,
+                MOD_PREFIX .. "window-hide",
+                "Hide window",
+                tags,
+                MOD_PREFIX .. "window-hide-hover",
+                MOD_PREFIX .. "window-hide-hover"
+            )
+        else
+            addActionButton(
+                row,
+                GUI_NAME.tree_visibility_button,
+                MOD_PREFIX .. "window-show",
+                "Show window",
+                tags,
+                MOD_PREFIX .. "window-show-hover",
+                MOD_PREFIX .. "window-show-hover"
+            )
+        end
+    else
+        addActionSpace(row)
+    end
+
+    if options.locked ~= nil then
+        addActionButton(
+            row,
+            GUI_NAME.tree_lock_button,
+            MOD_PREFIX .. "window-unlock",
+            options.locked and "Unlock window" or "Lock window",
+            tags
+        )
+    else
+        addActionSpace(row)
+    end
+
+    if options.delete then
+        addActionButton(row, GUI_NAME.tree_delete_button, MOD_PREFIX .. "group-delete", "Delete", tags)
+    else
+        addActionSpace(row)
+    end
 
     return row
 end
@@ -223,9 +351,13 @@ function metatable:refresh()
             0,
             GUI_NAME.tree_inventory_toggle,
             inventory_expanded,
-            "Inventory " .. inventory_id,
+            inventory:getName(),
             inventory_tags,
-            getInventorySourceTooltip(inventory)
+            {
+                info_tooltip = getInventorySourceTooltip(inventory),
+                edit         = true,
+                renaming     = isRenameTarget(self, inventory_tags)
+            }
         )
 
         if inventory_expanded then
@@ -253,7 +385,12 @@ function metatable:refresh()
                         GUI_NAME.tree_window_toggle,
                         window_expanded,
                         "Window " .. window_id,
-                        window_tags
+                        window_tags,
+                        {
+                            visible = inventory_window:isVisible(),
+                            locked  = inventory_window:isLocked(),
+                            delete  = true
+                        }
                     )
 
                     if window_expanded then
@@ -270,7 +407,12 @@ function metatable:refresh()
                                 nil,
                                 false,
                                 item_group:getName(),
-                                group_tags
+                                group_tags,
+                                {
+                                    edit     = true,
+                                    delete   = true,
+                                    renaming = isRenameTarget(self, group_tags)
+                                }
                             )
                         end
                     end
@@ -302,6 +444,117 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:startRename(inventory_id, window_id, group_id)
+    assert(type(inventory_id) == "number" and inventory_id > 0, "Inventory ID must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(window_id == nil or type(window_id) == "number" and window_id > 0, "InventoryWindow ID must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(group_id == nil or type(group_id) == "number" and group_id > 0, "ItemGroup ID must be valid here !")      -- [DEBUG-ONLY] . --
+    assert(group_id == nil or window_id ~= nil, "ItemGroup rename requires an InventoryWindow !")      -- [DEBUG-ONLY] . --
+    assert(window_id == nil or group_id ~= nil, "InventoryWindow names are not editable !")             -- [DEBUG-ONLY] . --
+
+    self.rename_target = {
+        inventory_id = inventory_id,
+        window_id    = window_id,
+        group_id     = group_id
+    }
+
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:cancelRename()
+    self.rename_target = nil
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:confirmRename(inventory_id, window_id, group_id, name)
+    assert(type(name) == "string", "Renamed value must be a string !")      -- [DEBUG-ONLY] . --
+
+    local manager   = InventoryManagerFactory.get(self:getPlayer())
+    local inventory = manager:getInventories()[inventory_id]
+
+    assert(inventory and inventory.object_name == "Inventory", "Inventory must exist here !")      -- [DEBUG-ONLY] . --
+
+    if group_id then
+        local inventory_window = inventory:getWindow(window_id)
+
+        assert(inventory_window and inventory_window.valid, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+        inventory_window:setItemGroupName(group_id, name)
+    else
+        inventory:setName(name)
+    end
+
+    self.rename_target = nil
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:toggleWindowVisibility(inventory_id, window_id)
+    local inventory = InventoryManagerFactory.get(self:getPlayer()):getInventories()[inventory_id]
+    local window    = inventory and inventory:getWindow(window_id) or nil
+
+    assert(window and window.valid, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+
+    window:toggleVisibility()
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:toggleWindowLocked(inventory_id, window_id)
+    local inventory = InventoryManagerFactory.get(self:getPlayer()):getInventories()[inventory_id]
+    local window    = inventory and inventory:getWindow(window_id) or nil
+
+    assert(window and window.valid, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+
+    window:toggleLocked()
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:deleteWindow(inventory_id, window_id)
+    local manager   = InventoryManagerFactory.get(self:getPlayer())
+    local inventory = manager:getInventories()[inventory_id]
+    local window    = inventory and inventory:getWindow(window_id) or nil
+
+    assert(window and window.valid, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+
+    inventory:removeWindow(window)
+    self.expanded_windows[inventory_id] = self.expanded_windows[inventory_id] or { }
+    self.expanded_windows[inventory_id][window_id] = nil
+
+    if next(inventory:getWindows()) == nil then
+        self.expanded_inventories[inventory_id] = nil
+        self.expanded_windows[inventory_id] = nil
+        manager:unmonitorInventory(inventory)
+    end
+
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:deleteItemGroup(inventory_id, window_id, group_id)
+    local manager   = InventoryManagerFactory.get(self:getPlayer())
+    local inventory = manager:getInventories()[inventory_id]
+    local window    = inventory and inventory:getWindow(window_id) or nil
+
+    assert(window and window.valid, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
+
+    if #window:getItemGroups() == 1 then
+        self:deleteWindow(inventory_id, window_id)
+    else
+        window:removeItemGroup(group_id)
+        self:refresh()
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:showWindowsList()
     local frame           = self:getFrame()
     local windows_column  = frame[GUI_NAME.windows_column]
@@ -324,6 +577,7 @@ function metatable:showCreationPanel()
 
     assert(windows_column and creation_column and source_player, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
 
+    self.rename_target      = nil
     source_player.state     = true
     windows_column.visible  = false
     creation_column.visible = true
@@ -358,6 +612,8 @@ function metatable:setVisible(visible)
 
     if visible then
         self:showWindowsList()
+    else
+        self.rename_target = nil
     end
 
     self:getFrame().visible = visible
@@ -387,6 +643,13 @@ local factory = {
         tree_inventory_toggle    = GUI_NAME.tree_inventory_toggle,
         tree_window_toggle       = GUI_NAME.tree_window_toggle,
         tree_label               = GUI_NAME.tree_label,
+        tree_name_field          = GUI_NAME.tree_name_field,
+        tree_edit_button         = GUI_NAME.tree_edit_button,
+        tree_confirm_button      = GUI_NAME.tree_confirm_button,
+        tree_cancel_button       = GUI_NAME.tree_cancel_button,
+        tree_visibility_button   = GUI_NAME.tree_visibility_button,
+        tree_lock_button         = GUI_NAME.tree_lock_button,
+        tree_delete_button       = GUI_NAME.tree_delete_button,
         inventory_id_tag_name    = INVENTORY_ID_TAG_NAME,
         window_id_tag_name       = WINDOW_ID_TAG_NAME,
         group_id_tag_name        = GROUP_ID_TAG_NAME,
@@ -406,7 +669,8 @@ function factory.create(player)
     local window = {                              ---@type MainWindow
         lua_player           = lua_player,
         expanded_inventories = { },
-        expanded_windows     = { }
+        expanded_windows     = { },
+        rename_target        = nil
     }
 
     setmetatable(window, metatable)
@@ -432,6 +696,7 @@ function factory.destroy(player)
     window.lua_player           = nil
     window.expanded_inventories = nil
     window.expanded_windows     = nil
+    window.rename_target        = nil
 
     storage.windows.main[player_index] = nil
 end

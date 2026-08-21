@@ -68,6 +68,38 @@ data:extend({
         scale        = 0.5
     },
     {
+        type     = "sprite",
+        name     = MOD_PREFIX .. "window-show",
+        filename = "__compact-inventory__/graphics/Show_Grey.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
+    },
+    {
+        type     = "sprite",
+        name     = MOD_PREFIX .. "window-show-hover",
+        filename = "__compact-inventory__/graphics/Show_Black.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
+    },
+    {
+        type     = "sprite",
+        name     = MOD_PREFIX .. "window-hide",
+        filename = "__compact-inventory__/graphics/Hide_Gray.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
+    },
+    {
+        type     = "sprite",
+        name     = MOD_PREFIX .. "window-hide-hover",
+        filename = "__compact-inventory__/graphics/Hide_Black.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
+    },
+    {
         type = "sprite",
         name = MOD_PREFIX .. "sort-standard",
         filename = "__compact-inventory__/graphics/sort-standard.png",

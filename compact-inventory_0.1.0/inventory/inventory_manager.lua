@@ -24,6 +24,7 @@ local changed_delta = { }
 --- @field private manager        InventoryManager                The InventoryManager that owns the inventory.
 --- @field private source         InventorySource                 The InventorySource monitored by the inventory.
 --- @field private id             integer                         The inventory identifier in its manager.
+--- @field private name           string                          The user-visible inventory name.
 --- @field private windows        table<integer, InventoryWindow> The inventory windows indexed by their stable ID.
 --- @field private next_window_id integer                         The next inventory window identifier to allocate.
 --- @field private content        table                           The current aggregated inventory content.
@@ -118,6 +119,20 @@ end
 function inventory_metatable:getID()
     assert(type(self.id) == "number" and self.id > 0, "Inventory ID must be a positive integer !")      -- [DEBUG-ONLY] . --
     return self.id
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:getName()
+    assert(type(self.name) == "string", "Inventory name must be a string !")      -- [DEBUG-ONLY] . --
+    return self.name
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:setName(name)
+    assert(type(name) == "string", "Inventory name must be a string !")      -- [DEBUG-ONLY] . --
+    self.name = name
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -440,6 +455,7 @@ function manager_metatable:monitorInventory(source)
 
     local inventory = {                                  ---@type Inventory
         id             = inventory_id,
+        name           = "Inventory " .. inventory_id,
         manager        = self,
         source         = source,
         windows        = { },
@@ -497,6 +513,7 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
 
     self.inventories[inventory.id] = nil
     inventory.source.inventory = nil
+    inventory.name    = nil
     inventory.windows = nil
     inventory.source  = nil
     inventory.manager = nil

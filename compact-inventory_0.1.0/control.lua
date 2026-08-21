@@ -352,6 +352,55 @@ script.on_event(defines.events.on_gui_click, function(event)
             WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(inventory_id)
         end
 
+    elseif event.element.name == main_gui_names.tree_edit_button then
+        WindowsManager.getMainWindow(event.player_index):startRename(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name],
+            event.element.tags[main_gui_names.group_id_tag_name]
+        )
+
+    elseif event.element.name == main_gui_names.tree_confirm_button then
+        local name_field = event.element.parent[main_gui_names.tree_name_field]
+
+        assert(name_field, "Main window rename field must exist here !")      -- [DEBUG-ONLY] . --
+
+        WindowsManager.getMainWindow(event.player_index):confirmRename(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name],
+            event.element.tags[main_gui_names.group_id_tag_name],
+            name_field.text
+        )
+
+    elseif event.element.name == main_gui_names.tree_cancel_button then
+        WindowsManager.getMainWindow(event.player_index):cancelRename()
+
+    elseif event.element.name == main_gui_names.tree_visibility_button then
+        WindowsManager.getMainWindow(event.player_index):toggleWindowVisibility(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name]
+        )
+
+    elseif event.element.name == main_gui_names.tree_lock_button then
+        ItemGroupMenuFactory.close(event.player_index)
+        WindowsManager.getMainWindow(event.player_index):toggleWindowLocked(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name]
+        )
+
+    elseif event.element.name == main_gui_names.tree_delete_button then
+        local inventory_id = event.element.tags[main_gui_names.inventory_id_tag_name]
+        local window_id    = event.element.tags[main_gui_names.window_id_tag_name]
+        local group_id     = event.element.tags[main_gui_names.group_id_tag_name]
+        local main_window  = WindowsManager.getMainWindow(event.player_index)
+
+        ItemGroupMenuFactory.close(event.player_index)
+
+        if group_id then
+            main_window:deleteItemGroup(inventory_id, window_id, group_id)
+        else
+            main_window:deleteWindow(inventory_id, window_id)
+        end
+
     elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
 
@@ -371,6 +420,7 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == gui_names.close_button and window then
         ItemGroupMenuFactory.close(event.player_index)
         window:setVisible(false)
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.add_button and window then
         window:createItemGroup()
@@ -379,9 +429,11 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == gui_names.lock_button and window then
         ItemGroupMenuFactory.close(event.player_index)
         window:setLocked(true)
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.group_unlock_button and window then
         window:setLocked(false)
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.group_rename_button and window then
         window:startRename(event.element.tags[gui_names.group_id_tag_name])
@@ -585,14 +637,11 @@ script.on_event(defines.events.on_gui_click, function(event)
         local group_id = event.element.tags[menu_names.group_id_tag_name]
 
         ItemGroupMenuFactory.close(event.player_index)
-
-        if #window:getItemGroups() == 1 then
-            window:getInventory():removeWindow(window)
-        else
-            window:removeItemGroup(group_id)
-        end
-
-        refreshMainWindow(event.player_index)
+        WindowsManager.getMainWindow(event.player_index):deleteItemGroup(
+            window:getInventory():getID(),
+            window:getID(),
+            group_id
+        )
 
     elseif event.element.tags[menu_names.sort_tag_name] and window then
         local sort_mode = event.element.tags[menu_names.sort_tag_name]
@@ -684,9 +733,18 @@ script.on_event(defines.events.on_gui_text_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_confirmed, function(event)
-    local gui_names = WindowsManager.exposed_gui_names.InventoryWindow
+    local main_gui_names = WindowsManager.exposed_gui_names.MainWindow
+    local gui_names      = WindowsManager.exposed_gui_names.InventoryWindow
 
-    if event.element.name == gui_names.group_name_field then
+    if event.element.name == main_gui_names.tree_name_field then
+        WindowsManager.getMainWindow(event.player_index):confirmRename(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name],
+            event.element.tags[main_gui_names.group_id_tag_name],
+            event.element.text
+        )
+
+    elseif event.element.name == gui_names.group_name_field then
         local window = resolveInventoryWindowFromElement(event.player_index, event.element)
 
         assert(window, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
