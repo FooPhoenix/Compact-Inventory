@@ -124,6 +124,10 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function inventory_metatable:getName()
+    if self.name == nil then
+        self.name = "Inventory " .. self:getID()
+    end
+
     assert(type(self.name) == "string", "Inventory name must be a string !")      -- [DEBUG-ONLY] . --
     return self.name
 end
