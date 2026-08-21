@@ -246,13 +246,17 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local gui_names  = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names = ItemGroupMenuFactory.exposed_gui_names
-    local window     = WindowsManager.hasWindowMainInventory(event.player_index)
+    local main_gui_names = WindowsManager.exposed_gui_names.MainWindow
+    local gui_names      = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names     = ItemGroupMenuFactory.exposed_gui_names
+    local window         = WindowsManager.hasWindowMainInventory(event.player_index)
         and WindowsManager.getWindowMainInventory(event.player_index)
         or nil
 
-    if event.element.name == gui_names.close_button then
+    if event.element.name == main_gui_names.close_button then
+        WindowsManager.getMainWindow(event.player_index):setVisible(false)
+
+    elseif event.element.name == gui_names.close_button then
         ItemGroupMenuFactory.close(event.player_index)
         window:setVisible(false)
 
@@ -598,18 +602,7 @@ script.on_event(defines.events.on_player_display_scale_changed, function(event)
 end)
 
 script.on_event(defines.events.on_lua_shortcut, function(event)
-    if event.prototype_name == WindowsManager.exposed_gui_names.InventoryWindow.shortcut_button then
-        ItemGroupMenuFactory.close(event.player_index)
-
-        if WindowsManager.hasWindowMainInventory(event.player_index) then
-            local window = WindowsManager.getWindowMainInventory(event.player_index)
-            window:toggleVisibility()
-
-            if window:isVisible() then
-                window:setLocked(window:isLocked())
-            end
-        else
-            WindowsManager.createWindowMainInventory(event.player_index)
-        end
+    if event.prototype_name == WindowsManager.exposed_gui_names.MainWindow.shortcut_button then
+        WindowsManager.getMainWindow(event.player_index):toggleVisibility()
     end
 end)
