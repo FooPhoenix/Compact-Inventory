@@ -6,14 +6,24 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
 
 local GUI_NAME = {
-    main_frame       = MOD_PREFIX .. "MW_frame",
-    title_bar        = MOD_PREFIX .. "MW_titlebar",
-    title            = MOD_PREFIX .. "MW_title",
-    dragger          = MOD_PREFIX .. "MW_dragger",
-    close_button     = MOD_PREFIX .. "MW_close",
-    windows_scroll   = MOD_PREFIX .. "MW_windows-scroll",
-    windows_table    = MOD_PREFIX .. "MW_windows-table",
-    shortcut_button  = MOD_PREFIX .. "main-window-toggle"
+    main_frame               = MOD_PREFIX .. "MW_frame",
+    title_bar                = MOD_PREFIX .. "MW_titlebar",
+    title                    = MOD_PREFIX .. "MW_title",
+    dragger                  = MOD_PREFIX .. "MW_dragger",
+    add_button               = MOD_PREFIX .. "MW_add",
+    close_button             = MOD_PREFIX .. "MW_close",
+    windows_column           = MOD_PREFIX .. "MW_windows-column",
+    windows_scroll           = MOD_PREFIX .. "MW_windows-scroll",
+    windows_table            = MOD_PREFIX .. "MW_windows-table",
+    creation_column          = MOD_PREFIX .. "MW_creation-column",
+    creation_title           = MOD_PREFIX .. "MW_creation-title",
+    source_player            = MOD_PREFIX .. "MW_source-player",
+    source_player_vehicle    = MOD_PREFIX .. "MW_source-player-vehicle",
+    source_selected_entities = MOD_PREFIX .. "MW_source-selected-entities",
+    creation_actions         = MOD_PREFIX .. "MW_creation-actions",
+    creation_cancel_button   = MOD_PREFIX .. "MW_creation-cancel",
+    creation_create_button   = MOD_PREFIX .. "MW_creation-create",
+    shortcut_button          = MOD_PREFIX .. "main-window-toggle"
 }
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -60,8 +70,9 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getWindowsTable()
-    local scroll = self:getFrame()[GUI_NAME.windows_scroll]
-    local windows_table = scroll and scroll[GUI_NAME.windows_table]
+    local windows_column = self:getFrame()[GUI_NAME.windows_column]
+    local scroll         = windows_column and windows_column[GUI_NAME.windows_scroll]
+    local windows_table  = scroll and scroll[GUI_NAME.windows_table]
 
     assert(windows_table, "Main window inventory list must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -119,11 +130,62 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:showWindowsList()
+    local frame           = self:getFrame()
+    local windows_column  = frame[GUI_NAME.windows_column]
+    local creation_column = frame[GUI_NAME.creation_column]
+
+    assert(windows_column and creation_column, "Main window columns must exist here !")      -- [DEBUG-ONLY] . --
+
+    self:refresh()
+    windows_column.visible  = true
+    creation_column.visible = false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:showCreationPanel()
+    local frame           = self:getFrame()
+    local windows_column  = frame[GUI_NAME.windows_column]
+    local creation_column = frame[GUI_NAME.creation_column]
+    local source_player   = creation_column and creation_column[GUI_NAME.source_player]
+
+    assert(windows_column and creation_column and source_player, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    source_player.state    = true
+    windows_column.visible = false
+    creation_column.visible = true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getCreationConfiguration()
+    local creation_column = self:getFrame()[GUI_NAME.creation_column]
+    local source_player   = creation_column and creation_column[GUI_NAME.source_player]
+
+    assert(source_player and source_player.state, "A supported inventory source must be selected !")      -- [DEBUG-ONLY] . --
+
+    return {
+        entities = {
+            {
+                entity = self:getPlayer(),
+                inventory_types = {
+                    defines.inventory.character_main
+                },
+                options = { }
+            }
+        },
+        options = { }
+    }
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:setVisible(visible)
     assert(type(visible) == "boolean", "Main window visibility must be a boolean !")      -- [DEBUG-ONLY] . --
 
     if visible then
-        self:refresh()
+        self:showWindowsList()
     end
 
     self:getFrame().visible = visible
@@ -148,8 +210,11 @@ end
 
 local factory = {
     exposed_gui_names = {
-        close_button    = GUI_NAME.close_button,
-        shortcut_button = GUI_NAME.shortcut_button
+        add_button             = GUI_NAME.add_button,
+        close_button           = GUI_NAME.close_button,
+        creation_cancel_button = GUI_NAME.creation_cancel_button,
+        creation_create_button = GUI_NAME.creation_create_button,
+        shortcut_button        = GUI_NAME.shortcut_button
     }
 }
 
@@ -231,6 +296,18 @@ function factory.createGUI(window)                                              
     dragger.style.height = 16
     dragger.drag_target  = frame
 
+    local add = title_bar.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.add_button,
+        sprite  = "utility/add_white",
+        style   = "frame_action_button",
+        tooltip = "Create new window"
+    })
+
+    add.style.width   = 16
+    add.style.height  = 16
+    add.style.padding = 0
+
     local close = title_bar.add({
         type           = "sprite-button",
         name           = GUI_NAME.close_button,
@@ -245,7 +322,15 @@ function factory.createGUI(window)                                              
     close.style.height  = 16
     close.style.padding = 0
 
-    local scroll = frame.add({
+    local windows_column = frame.add({
+        type      = "flow",
+        name      = GUI_NAME.windows_column,
+        direction = "vertical"
+    })
+
+    windows_column.style.horizontally_stretchable = true
+
+    local scroll = windows_column.add({
         type                     = "scroll-pane",
         name                     = GUI_NAME.windows_scroll,
         direction                = "vertical",
@@ -253,7 +338,7 @@ function factory.createGUI(window)                                              
         horizontal_scroll_policy = "never"
     })
 
-    scroll.style.maximal_height          = WINDOW_LIST_MAX_HEIGHT
+    scroll.style.maximal_height           = WINDOW_LIST_MAX_HEIGHT
     scroll.style.horizontally_stretchable = true
 
     local windows_table = scroll.add({
@@ -263,7 +348,82 @@ function factory.createGUI(window)                                              
     })
 
     windows_table.style.horizontally_stretchable = true
-    windows_table.style.vertical_spacing = 2
+    windows_table.style.vertical_spacing         = 2
+
+    local creation_column = frame.add({
+        type      = "flow",
+        name      = GUI_NAME.creation_column,
+        direction = "vertical",
+        visible   = false
+    })
+
+    creation_column.style.horizontally_stretchable = true
+    creation_column.style.vertical_spacing         = 4
+
+    creation_column.add({
+        type    = "label",
+        name    = GUI_NAME.creation_title,
+        caption = "Create new window"
+    })
+
+    creation_column.add({
+        type    = "radiobutton",
+        name    = GUI_NAME.source_player,
+        caption = "Player",
+        state   = true
+    })
+
+    local player_vehicle = creation_column.add({
+        type    = "radiobutton",
+        name    = GUI_NAME.source_player_vehicle,
+        caption = "Player vehicle",
+        state   = false
+    })
+
+    player_vehicle.enabled = false
+
+    local selected_entities = creation_column.add({
+        type    = "radiobutton",
+        name    = GUI_NAME.source_selected_entities,
+        caption = "Selected entities",
+        state   = false
+    })
+
+    selected_entities.enabled = false
+
+    local filler = creation_column.add({
+        type = "empty-widget"
+    })
+
+    filler.style.vertically_stretchable = true
+
+    local actions = creation_column.add({
+        type      = "flow",
+        name      = GUI_NAME.creation_actions,
+        direction = "horizontal"
+    })
+
+    actions.style.horizontally_stretchable = true
+    actions.style.horizontal_spacing       = 4
+
+    local spacer = actions.add({
+        type = "empty-widget"
+    })
+
+    spacer.style.horizontally_stretchable = true
+
+    actions.add({
+        type    = "button",
+        name    = GUI_NAME.creation_cancel_button,
+        caption = "Cancel"
+    })
+
+    actions.add({
+        type    = "button",
+        name    = GUI_NAME.creation_create_button,
+        caption = "Create",
+        style   = "green_button"
+    })
 
     frame.auto_center = true
     window:refresh()
