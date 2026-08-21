@@ -43,6 +43,8 @@ local SORT_SPRITE = {
 local SORT_TAG_NAME     = MOD_PREFIX .. "SortID"
 local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
 
+local factory = { }
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventoryWindowMetatable.                                                                                      ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -50,16 +52,15 @@ local GROUP_ID_TAG_NAME = MOD_PREFIX .. "ItemGroupID"
 ---
 --- @class InventoryWindowMetatable
 ---
---- ### This class groups all functions used to create and manage an inventory window.
+--- @field private id            integer
+--- @field private inventory     Inventory
+--- @field private lua_player    LuaPlayer
+--- @field private item_groups   ItemGroup[]
+--- @field private next_group_id integer
+--- @field private locked        boolean
+--- @field         valid         boolean
+--- @field         object_name   string
 ---
---- @field private lua_player     LuaPlayer       The player that owns the window.
---- @field private item_groups    ItemGroup[]     The ordered item groups displayed by the window.
---- @field private next_group_id  integer         The next stable ItemGroup identifier.
---- @field private locked         boolean         Whether the window is displayed in locked mode.
---- @field         valid          boolean         Whether the window is valid or not.
---- @field         object_name    string          The object name of the window.
----
---
 local metatable = { }
 
 metatable.object_name = "InventoryWindow"
@@ -75,9 +76,39 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:getID()
+    assert(type(self.id) == "number" and self.id > 0, "InventoryWindow ID must be a positive integer !")      -- [DEBUG-ONLY] . --
+    return self.id
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getInventory()
+    assert(self.inventory and self.inventory.object_name == "Inventory", "InventoryWindow must have a valid Inventory !")      -- [DEBUG-ONLY] . --
+    return self.inventory
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getPlayer()
     assert(self.lua_player and self.lua_player.valid and self.lua_player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
     return self.lua_player
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getFrameName()
+    return GUI_NAME.main_frame .. "-" .. self:getInventory():getID() .. "-" .. self:getID()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getFrame()
+    local frame = self:getPlayer().gui.screen[self:getFrameName()]
+
+    assert(frame, "InventoryWindow GUI frame does not exist !")      -- [DEBUG-ONLY] . --
+
+    return frame
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -109,17 +140,6 @@ function metatable:getItemGroupByID(group_id)
     end
 
     return nil
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function metatable:getFrame()
-    local lua_player = self:getPlayer()
-    local frame = lua_player.gui.screen[GUI_NAME.main_frame]
-
-    assert(frame, "GUI frame does not exist !")      -- [DEBUG-ONLY] . --
-
-    return frame
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -180,11 +200,13 @@ end
 function metatable:isValid()                                                    ---@private
     local lua_player = self.lua_player
 
-    if not lua_player or not lua_player.valid then
+    if not lua_player or not lua_player.valid or lua_player.object_name ~= "LuaPlayer" then
         return false
     end
 
-    assert(lua_player.object_name == "LuaPlayer", "Player must be a LuaPlayer here !")      -- [DEBUG-ONLY] . --
+    if not self.inventory or self.inventory.object_name ~= "Inventory" then
+        return false
+    end
 
     if not self.item_groups or #self.item_groups == 0 then
         return false
@@ -196,7 +218,7 @@ function metatable:isValid()                                                    
         end
     end
 
-    return lua_player.gui.screen[GUI_NAME.main_frame] ~= nil
+    return lua_player.gui.screen[self:getFrameName()] ~= nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -253,12 +275,9 @@ end
 
 function metatable:refreshSortIcon(group_id)
     local item_group = self:getItemGroupByID(group_id)
+    local icon       = item_group and getGroupHeader(self, item_group)[GUI_NAME.group_sort_icon]
 
-    assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
-
-    local icon = getGroupHeader(self, item_group)[GUI_NAME.group_sort_icon]
-
-    assert(icon, "ItemGroup sort icon must exist here !")      -- [DEBUG-ONLY] . --
+    assert(item_group and icon, "ItemGroup sort icon must exist here !")      -- [DEBUG-ONLY] . --
 
     icon.sprite = SORT_SPRITE[item_group:getSortMode()]
 end
@@ -358,8 +377,7 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:createItemGroup()
-    local inventory  = self:getDefaultItemGroup():getView():getInventory()
-    local item_group = ItemGroupFactory.new(inventory, self.next_group_id)
+    local item_group = ItemGroupFactory.new(self:getInventory(), self.next_group_id)
 
     self.next_group_id = self.next_group_id + 1
     self.item_groups[#self.item_groups + 1] = item_group
@@ -456,13 +474,14 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:setVisible(visible)
+    assert(type(visible) == "boolean", "InventoryWindow visibility must be a boolean !")      -- [DEBUG-ONLY] . --
+
     if visible then
         self:updateMaxHeight()
         self:refresh()
     end
 
     self:getFrame().visible = visible
-    self:getPlayer().set_shortcut_toggled(GUI_NAME.shortcut_button, visible)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -481,31 +500,32 @@ end
 -- ║ InventoryWindowFactory.                                                                                        ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
-factory = {
-    exposed_gui_names = {
-        close_button         = GUI_NAME.close_button,
-        add_button           = GUI_NAME.add_button,
-        lock_button          = GUI_NAME.lock_button,
-        group_rename_button  = GUI_NAME.group_rename_button,
-        group_name_field     = GUI_NAME.group_name_field,
-        group_confirm_button = GUI_NAME.group_confirm_button,
-        group_cancel_button  = GUI_NAME.group_cancel_button,
-        group_menu_button    = GUI_NAME.group_menu_button,
-        group_unlock_button  = GUI_NAME.group_unlock_button,
-        shortcut_button      = GUI_NAME.shortcut_button,
-        sort_tag_name        = SORT_TAG_NAME,
-        group_id_tag_name    = GROUP_ID_TAG_NAME
-    }
+factory.exposed_gui_names = {
+    close_button         = GUI_NAME.close_button,
+    add_button           = GUI_NAME.add_button,
+    lock_button          = GUI_NAME.lock_button,
+    group_rename_button  = GUI_NAME.group_rename_button,
+    group_name_field     = GUI_NAME.group_name_field,
+    group_confirm_button = GUI_NAME.group_confirm_button,
+    group_cancel_button  = GUI_NAME.group_cancel_button,
+    group_menu_button    = GUI_NAME.group_menu_button,
+    group_unlock_button  = GUI_NAME.group_unlock_button,
+    shortcut_button      = GUI_NAME.shortcut_button,
+    sort_tag_name        = SORT_TAG_NAME,
+    group_id_tag_name    = GROUP_ID_TAG_NAME
 }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.create(player, inventory)
-    local player_index, lua_player = resolve_player(player)
+function factory.create(player, inventory, window_id)
+    local _, lua_player = resolve_player(player)
 
     assert(inventory and inventory.object_name == "Inventory", "You need to provide a valid Inventory !")      -- [DEBUG-ONLY] . --
+    assert(type(window_id) == "number" and window_id > 0 and window_id % 1 == 0, "InventoryWindow ID must be valid !")      -- [DEBUG-ONLY] . --
 
     local window = {                                        ---@type InventoryWindow
+        id            = window_id,
+        inventory     = inventory,
         lua_player    = lua_player,
         item_groups   = {
             ItemGroupFactory.new(inventory, 1)
@@ -517,31 +537,24 @@ function factory.create(player, inventory)
     setmetatable(window, metatable)
     factory.createGUI(window)
 
-    assert(storage.windows.main_inventory[player_index] == nil, "Inventory window already exists !")      -- [DEBUG-ONLY] . --
-
-    storage.windows.main_inventory[player_index] = window
-
     return window
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function factory.destroy(player)
-    local player_index, lua_player = resolve_player(player)
-    local window = storage.windows.main_inventory[player_index]                 ---@type InventoryWindow
-
+function factory.destroy(window)
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                                  -- [DEBUG-ONLY] . --
     assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.lua_player == lua_player, "Player must be the same as the window one !")                                                -- [DEBUG-ONLY] . --
 
-    window:setVisible(false)
-    window:getFrame().destroy()
-    window.lua_player     = nil
-    window.item_groups    = nil
-    window.next_group_id  = nil
-    window.locked         = nil
+    if window:getFrame() then
+        window:getFrame().destroy()
+    end
 
-    storage.windows.main_inventory[player_index] = nil
+    window.inventory     = nil
+    window.lua_player    = nil
+    window.item_groups   = nil
+    window.next_group_id = nil
+    window.locked        = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -699,11 +712,11 @@ end
 function factory.createGUI(window)                                              ---@private
     assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")                                  -- [DEBUG-ONLY] . --
     assert(window.lua_player and window.lua_player.valid and window.lua_player.object_name == "LuaPlayer", "Player must exist here !")  -- [DEBUG-ONLY] . --
-    assert(window.lua_player.gui.screen[GUI_NAME.main_frame] == nil, "GUI frame already exists !")                                       -- [DEBUG-ONLY] . --
+    assert(window.lua_player.gui.screen[window:getFrameName()] == nil, "InventoryWindow GUI frame already exists !")                     -- [DEBUG-ONLY] . --
 
     local frame = window.lua_player.gui.screen.add({
         type      = "frame",
-        name      = GUI_NAME.main_frame,
+        name      = window:getFrameName(),
         direction = "vertical"
     })
 
