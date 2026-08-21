@@ -4,7 +4,6 @@
 
 local MainWindowFactory       = require("gui.main_window")
 local InventoryWindowFactory  = require("gui.inventory_window")
-local InventorySourceFactory  = require("inventory.inventory_source")
 local InventoryManagerFactory = require("inventory.inventory_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -76,14 +75,21 @@ end
 
 function manager.initializePlayer(player)
     local _, lua_player = resolve_player(player)
-    local lua_inventory = lua_player.get_main_inventory()
+    local inventory = InventoryManagerFactory.get(lua_player):monitorConfiguration({
+        entities = {
+            {
+                entity = lua_player,
+                inventory_types = {
+                    defines.inventory.character_main
+                },
+                options = { }
+            }
+        },
+        options = { }
+    })
 
-    assert(lua_inventory and lua_inventory.valid, "Player must have a valid main LuaInventory !")      -- [DEBUG-ONLY] . --
+    assert(inventory, "Player inventory configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
 
-    local source    = InventorySourceFactory.new(lua_inventory)
-    local inventory = InventoryManagerFactory.get(lua_player):monitorInventory(source)
-
-    inventory:update()
     inventory:createWindow()
     MainWindowFactory.create(lua_player)
 end
