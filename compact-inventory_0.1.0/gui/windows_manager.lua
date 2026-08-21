@@ -9,12 +9,6 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
----
---- @class WindowsManager
----
---- ### This class groups all functions used to create and manage GUI windows.
----
---
 local manager = {
     exposed_gui_names = {
         MainWindow      = MainWindowFactory.exposed_gui_names,
@@ -24,11 +18,46 @@ local manager = {
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function manager.initialize()
+local function getMainInventory(player)
+    local _, lua_player = resolve_player(player)
+    local lua_inventory = lua_player.get_main_inventory()
+    local inventory
 
+    assert(lua_inventory and lua_inventory.valid, "Player must have a valid main LuaInventory !")      -- [DEBUG-ONLY] . --
+
+    for _, monitored_inventory in pairs(InventoryManagerFactory.get(lua_player):getInventories()) do
+        if monitored_inventory:getSource():containsInventory(lua_inventory) then
+            assert(inventory == nil, "Several monitored Inventory contain the player's main LuaInventory !")      -- [DEBUG-ONLY] . --
+            inventory = monitored_inventory
+        end
+    end
+
+    return inventory
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getFirstWindow(inventory)
+    if not inventory then
+        return nil
+    end
+
+    local first_id
+
+    for window_id, window in pairs(inventory:getWindows()) do
+        if window.valid and (not first_id or window_id < first_id) then
+            first_id = window_id
+        end
+    end
+
+    return first_id and inventory:getWindow(first_id) or nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager.initialize()
     storage.windows = { }
     storage.windows.main = { }
-    storage.windows.main_inventory = { }
 
     for _, lua_player in pairs(game.players) do
         manager.initializePlayer(lua_player)
@@ -38,7 +67,6 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.initializePlayer(player)
-
     local _, lua_player = resolve_player(player)
     local lua_inventory = lua_player.get_main_inventory()
 
@@ -48,14 +76,13 @@ function manager.initializePlayer(player)
     local inventory = InventoryManagerFactory.get(lua_player):monitorInventory(source)
 
     inventory:update()
-    InventoryWindowFactory.create(lua_player, inventory)
+    inventory:createWindow()
     MainWindowFactory.create(lua_player)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.hasMainWindow(player)
-
     local player_index = resolve_player(player)
     local window = storage.windows.main[player_index]
 
@@ -65,73 +92,51 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.getMainWindow(player)
-
     local player_index = resolve_player(player)
+    local window = storage.windows.main[player_index]
 
-    assert(storage.windows.main[player_index], "Player does not have a main window !")                            -- [DEBUG-ONLY] . --
-    assert(storage.windows.main[player_index].valid, "Player does not have a valid main window !")               -- [DEBUG-ONLY] . --
-    assert(storage.windows.main[player_index].object_name == "MainWindow", "Player does not have a valid main window !")  -- [DEBUG-ONLY] . --
+    assert(window and window.valid and window.object_name == "MainWindow", "Player does not have a valid main window !")      -- [DEBUG-ONLY] . --
 
-    return storage.windows.main[player_index]
+    return window
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+-- [TRANSITION] Compatibility helpers for control.lua while only one InventoryWindow can be created from the UI. --
+
 function manager.hasWindowMainInventory(player)
-
-    local player_index = resolve_player(player)
-    local window = storage.windows.main_inventory[player_index]
-
-    return window ~= nil and window.valid
+    return getFirstWindow(getMainInventory(player)) ~= nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.createWindowMainInventory(player)
-
-    local player_index, lua_player = resolve_player(player)
-
-    assert(not manager.hasWindowMainInventory(lua_player), "Player already has a main inventory window !")      -- [DEBUG-ONLY] . --
-
-    if storage.windows.main_inventory[player_index] then
-        storage.windows.main_inventory[player_index] = nil
-    end
-
-    local lua_inventory = lua_player.get_main_inventory()
-
-    assert(lua_inventory and lua_inventory.valid, "Player must have a valid main LuaInventory !")      -- [DEBUG-ONLY] . --
-
-    local inventory
-
-    for _, monitored_inventory in pairs(InventoryManagerFactory.get(lua_player):getInventories()) do
-        if monitored_inventory:getSource():containsInventory(lua_inventory) then
-            assert(inventory == nil, "Several monitored Inventory contain the player's main LuaInventory !")      -- [DEBUG-ONLY] . --
-            inventory = monitored_inventory
-        end
-    end
+    local inventory = getMainInventory(player)
 
     assert(inventory, "No monitored Inventory contains the player's main LuaInventory !")      -- [DEBUG-ONLY] . --
 
-    return InventoryWindowFactory.create(lua_player, inventory)
+    return inventory:createWindow()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.destroyWindowMainInventory(player)
-    InventoryWindowFactory.destroy(player)
+    local inventory = getMainInventory(player)
+    local window    = getFirstWindow(inventory)
+
+    assert(window, "Player does not have a main inventory window !")      -- [DEBUG-ONLY] . --
+
+    inventory:removeWindow(window)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.getWindowMainInventory(player)
+    local window = getFirstWindow(getMainInventory(player))
 
-    local player_index = resolve_player(player)
+    assert(window and window.valid and window.object_name == "InventoryWindow", "Player does not have a valid inventory window !")      -- [DEBUG-ONLY] . --
 
-    assert(storage.windows.main_inventory[player_index], "Player does not have a main inventory window !")                                    -- [DEBUG-ONLY] . --
-    assert(storage.windows.main_inventory[player_index].valid, "Player does not have a main inventory window !")                              -- [DEBUG-ONLY] . --
-    assert(storage.windows.main_inventory[player_index].object_name == "InventoryWindow", "Player does not have a valid inventory window !") -- [DEBUG-ONLY] . --
-
-    return storage.windows.main_inventory[player_index]
+    return window
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
