@@ -331,6 +331,17 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == main_gui_names.add_button then
         WindowsManager.getMainWindow(event.player_index):showCreationPanel()
 
+    elseif event.element.name == main_gui_names.tree_inventory_toggle then
+        WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(
+            event.element.tags[main_gui_names.inventory_id_tag_name]
+        )
+
+    elseif event.element.name == main_gui_names.tree_window_toggle then
+        WindowsManager.getMainWindow(event.player_index):toggleWindowExpanded(
+            event.element.tags[main_gui_names.inventory_id_tag_name],
+            event.element.tags[main_gui_names.window_id_tag_name]
+        )
+
     elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
 
