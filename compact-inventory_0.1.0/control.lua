@@ -342,6 +342,16 @@ script.on_event(defines.events.on_gui_click, function(event)
             event.element.tags[main_gui_names.window_id_tag_name]
         )
 
+    elseif event.element.name == main_gui_names.tree_label then
+        local inventory_id = event.element.tags[main_gui_names.inventory_id_tag_name]
+        local window_id    = event.element.tags[main_gui_names.window_id_tag_name]
+
+        if window_id then
+            WindowsManager.getMainWindow(event.player_index):toggleWindowExpanded(inventory_id, window_id)
+        else
+            WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(inventory_id)
+        end
+
     elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
 
@@ -364,6 +374,7 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == gui_names.add_button and window then
         window:createItemGroup()
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.lock_button and window then
         ItemGroupMenuFactory.close(event.player_index)
@@ -377,6 +388,7 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == gui_names.group_confirm_button and window then
         window:confirmRename(event.element.tags[gui_names.group_id_tag_name])
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.group_cancel_button and window then
         window:cancelRename(event.element.tags[gui_names.group_id_tag_name])
@@ -398,6 +410,7 @@ script.on_event(defines.events.on_gui_click, function(event)
 
         assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
         ItemGroupMenuFactory.moveItemGroup(window, item_group, offset)
+        refreshMainWindow(event.player_index)
 
     elseif event.element.name == menu_names.sort_toggle_button then
         ItemGroupMenuFactory.toggleSortColumn(event.player_index)
@@ -575,10 +588,11 @@ script.on_event(defines.events.on_gui_click, function(event)
 
         if #window:getItemGroups() == 1 then
             window:getInventory():removeWindow(window)
-            refreshMainWindow(event.player_index)
         else
             window:removeItemGroup(group_id)
         end
+
+        refreshMainWindow(event.player_index)
 
     elseif event.element.tags[menu_names.sort_tag_name] and window then
         local sort_mode = event.element.tags[menu_names.sort_tag_name]
@@ -678,6 +692,7 @@ script.on_event(defines.events.on_gui_confirmed, function(event)
         assert(window, "InventoryWindow must exist here !")      -- [DEBUG-ONLY] . --
 
         window:confirmRename(event.element.tags[gui_names.group_id_tag_name])
+        refreshMainWindow(event.player_index)
     end
 end)
 
