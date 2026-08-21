@@ -5,6 +5,7 @@ local InventoryManagerFactory = require("inventory.inventory_manager")
 
 local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
 local TREE_INDENT             = 16
+local TREE_TOGGLE_SIZE        = 8
 local TREE_ACTION_WIDTH       = 44      -- Reserved for the future delete and show/hide actions.
 
 local GUI_NAME = {
@@ -102,12 +103,12 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags)
             tags    = tags
         })
 
-        toggle.style.width   = TREE_INDENT
-        toggle.style.height  = TREE_INDENT
+        toggle.style.width   = TREE_TOGGLE_SIZE
+        toggle.style.height  = TREE_TOGGLE_SIZE
         toggle.style.padding = 0
     else
         local toggle_space = row.add({ type = "empty-widget" })
-        toggle_space.style.width = TREE_INDENT
+        toggle_space.style.width = TREE_TOGGLE_SIZE
     end
 
     if toggle_name then
