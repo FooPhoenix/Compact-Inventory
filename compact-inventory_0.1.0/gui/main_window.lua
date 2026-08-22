@@ -126,7 +126,7 @@ local function addActionButton(row, name, sprite, tooltip, tags, hovered_sprite,
         type    = "sprite-button",
         name    = name,
         sprite  = sprite,
-        style   = style or "frame_action_button",
+        style   = style or MOD_PREFIX .. "tree-toggle-button",
         tooltip = tooltip,
         tags    = tags
     }
@@ -232,7 +232,7 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, o
     end
 
     if options.edit then
-        addActionButton(row, GUI_NAME.tree_edit_button, "utility/rename_icon", "Rename", tags, nil, nil, "button")
+        addActionButton(row, GUI_NAME.tree_edit_button, "utility/rename_icon", "Rename", tags)
     else
         addActionSpace(row)
     end
