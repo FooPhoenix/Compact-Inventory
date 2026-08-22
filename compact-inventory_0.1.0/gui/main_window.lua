@@ -126,7 +126,7 @@ local function addActionButton(row, name, sprite, tooltip, tags, hovered_sprite,
         type    = "sprite-button",
         name    = name,
         sprite  = sprite,
-        style   = style or MOD_PREFIX .. "tree-toggle-button",
+        style   = style or MOD_PREFIX .. "tree-action-button",
         tooltip = tooltip,
         tags    = tags
     }
@@ -232,7 +232,7 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, o
     end
 
     if options.edit then
-        addActionButton(row, GUI_NAME.tree_edit_button, "utility/rename_icon", "Rename", tags)
+        addActionButton(row, GUI_NAME.tree_edit_button, MOD_PREFIX .. "rename-white", "Rename", tags)
     else
         addActionSpace(row)
     end
@@ -244,9 +244,7 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, o
                 GUI_NAME.tree_visibility_button,
                 MOD_PREFIX .. "window-hide",
                 "Hide window",
-                tags,
-                MOD_PREFIX .. "window-hide-hover",
-                MOD_PREFIX .. "window-hide-hover"
+                tags
             )
         else
             addActionButton(
@@ -254,9 +252,7 @@ local function addTreeRow(parent, level, toggle_name, expanded, caption, tags, o
                 GUI_NAME.tree_visibility_button,
                 MOD_PREFIX .. "window-show",
                 "Show window",
-                tags,
-                MOD_PREFIX .. "window-show-hover",
-                MOD_PREFIX .. "window-show-hover"
+                tags
             )
         end
     else
