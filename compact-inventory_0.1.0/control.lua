@@ -21,6 +21,7 @@ local custom_sort_selections = { }
 local preset_contexts        = { }
 local filter_preset_manager
 local custom_sort_preset_manager
+local window_preset_manager
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -114,6 +115,7 @@ local function initializePresetStorage()
     storage.presets = storage.presets or { }
     storage.presets.filters = storage.presets.filters or { }
     storage.presets.custom_sort = storage.presets.custom_sort or { }
+    storage.presets.windows = storage.presets.windows or { }
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -136,6 +138,17 @@ local function getCustomSortPresetManager()
     end
 
     return custom_sort_preset_manager
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getWindowPresetManager()
+    if not window_preset_manager then
+        initializePresetStorage()
+        window_preset_manager = PresetManagerFactory.new(storage.presets.windows)
+    end
+
+    return window_preset_manager
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -329,7 +342,7 @@ script.on_event(defines.events.on_gui_click, function(event)
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
 
     elseif event.element.name == main_gui_names.add_button then
-        WindowsManager.getMainWindow(event.player_index):showCreationPanel()
+        WindowsManager.getMainWindow(event.player_index):showCreationPanel(getWindowPresetManager():list())
 
     elseif event.element.name == main_gui_names.tree_inventory_toggle then
         WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(
@@ -400,6 +413,24 @@ script.on_event(defines.events.on_gui_click, function(event)
         else
             main_window:deleteWindow(inventory_id, window_id)
         end
+
+    elseif event.element.tags[main_gui_names.creation_preset_delete_tag_name] then
+        local preset_name = event.element.tags[main_gui_names.creation_preset_delete_tag_name]
+        local manager     = getWindowPresetManager()
+        local main_window = WindowsManager.getMainWindow(event.player_index)
+
+        if manager:delete(preset_name) then
+            if main_window:getSelectedWindowPresetName() == preset_name then
+                main_window:toggleCreationPresetSelection(preset_name)
+            end
+
+            main_window:refreshCreationPresetList(manager:list())
+        end
+
+    elseif event.element.tags[main_gui_names.creation_preset_name_tag_name] then
+        WindowsManager.getMainWindow(event.player_index):toggleCreationPresetSelection(
+            event.element.tags[main_gui_names.creation_preset_name_tag_name]
+        )
 
     elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
