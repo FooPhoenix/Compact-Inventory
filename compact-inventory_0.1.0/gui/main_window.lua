@@ -19,6 +19,8 @@ local GUI_NAME = {
     windows_column           = MOD_PREFIX .. "MW_windows-column",
     windows_scroll           = MOD_PREFIX .. "MW_windows-scroll",
     windows_table            = MOD_PREFIX .. "MW_windows-table",
+    visibility_flow          = MOD_PREFIX .. "MW_visibility-flow",
+    visibility_switch        = MOD_PREFIX .. "MW_visibility-switch",
     tree_inventory_toggle    = MOD_PREFIX .. "MW_tree-inventory-toggle",
     tree_window_toggle       = MOD_PREFIX .. "MW_tree-window-toggle",
     tree_label               = MOD_PREFIX .. "MW_tree-label",
@@ -311,6 +313,72 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:getVisibilitySwitch()
+    local windows_column    = self:getFrame()[GUI_NAME.windows_column]
+    local visibility_flow   = windows_column and windows_column[GUI_NAME.visibility_flow]
+    local visibility_switch = visibility_flow and visibility_flow[GUI_NAME.visibility_switch]
+
+    assert(visibility_switch, "Main window visibility switch must exist here !")      -- [DEBUG-ONLY] . --
+
+    return visibility_switch
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getWindowVisibilityState()
+    local manager       = InventoryManagerFactory.get(self:getPlayer())
+    local visible_count = 0
+    local window_count  = 0
+
+    for _, inventory in pairs(manager:getInventories()) do
+        for _, window in pairs(inventory:getWindows()) do
+            if window.valid then
+                window_count = window_count + 1
+
+                if window:isVisible() then
+                    visible_count = visible_count + 1
+                end
+            end
+        end
+    end
+
+    if window_count == 0 then
+        return "none"
+    elseif visible_count == window_count then
+        return "left"
+    elseif visible_count == 0 then
+        return "right"
+    end
+
+    return "none"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:refreshVisibilitySwitch()
+    self:getVisibilitySwitch().switch_state = self:getWindowVisibilityState()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:setAllWindowsVisible(visible)
+    assert(type(visible) == "boolean", "Global window visibility must be a boolean !")      -- [DEBUG-ONLY] . --
+
+    local manager = InventoryManagerFactory.get(self:getPlayer())
+
+    for _, inventory in pairs(manager:getInventories()) do
+        for _, window in pairs(inventory:getWindows()) do
+            if window.valid and window:isVisible() ~= visible then
+                window:setVisible(visible)
+            end
+        end
+    end
+
+    self:refresh()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:isValid()                                                    ---@private
     local lua_player = self.lua_player
 
@@ -416,6 +484,8 @@ function metatable:refresh()
             end
         end
     end
+
+    self:refreshVisibilitySwitch()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -636,6 +706,7 @@ local factory = {
     exposed_gui_names = {
         add_button               = GUI_NAME.add_button,
         close_button             = GUI_NAME.close_button,
+        visibility_switch        = GUI_NAME.visibility_switch,
         tree_inventory_toggle    = GUI_NAME.tree_inventory_toggle,
         tree_window_toggle       = GUI_NAME.tree_window_toggle,
         tree_label               = GUI_NAME.tree_label,
@@ -792,6 +863,39 @@ function factory.createGUI(window)                                              
 
     windows_table.style.horizontally_stretchable = true
     windows_table.style.vertical_spacing         = 2
+
+    local visibility_flow = windows_column.add({
+        type      = "flow",
+        name      = GUI_NAME.visibility_flow,
+        direction = "horizontal"
+    })
+
+    visibility_flow.style.horizontal_spacing       = 4
+    visibility_flow.style.horizontally_stretchable = true
+    visibility_flow.style.vertical_align           = "center"
+
+    local visibility_spacer = visibility_flow.add({ type = "empty-widget" })
+    visibility_spacer.style.horizontally_stretchable = true
+
+    visibility_flow.add({
+        type    = "label",
+        caption = "Show all"
+    })
+
+    visibility_flow.add({
+        type             = "switch",
+        name             = GUI_NAME.visibility_switch,
+        switch_state     = "none",
+        allow_none_state = true
+    })
+
+    visibility_flow.add({
+        type    = "label",
+        caption = "Hide all"
+    })
+
+    local visibility_spacer_right = visibility_flow.add({ type = "empty-widget" })
+    visibility_spacer_right.style.horizontally_stretchable = true
 
     local creation_column = frame.add({
         type      = "flow",
