@@ -679,6 +679,22 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_switch_state_changed, function(event)
+    local main_gui_names = WindowsManager.exposed_gui_names.MainWindow
+
+    if event.element.name == main_gui_names.visibility_switch then
+        local main_window = WindowsManager.getMainWindow(event.player_index)
+
+        if event.element.switch_state == "left" then
+            main_window:setAllWindowsVisible(true)
+        elseif event.element.switch_state == "right" then
+            main_window:setAllWindowsVisible(false)
+        else
+            main_window:refreshVisibilitySwitch()
+        end
+
+        return
+    end
+
     local menu_names = ItemGroupMenuFactory.exposed_gui_names
 
     if event.element.name ~= menu_names.filter_switch then
