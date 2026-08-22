@@ -40,6 +40,15 @@ gui_style[MOD_PREFIX .. "tree-toggle-button"] = {
     minimal_height = 0
 }
 
+gui_style[MOD_PREFIX .. "tree-action-button"] = {
+    type                  = "button_style",
+    parent                = "frame_action_button",
+    default_graphical_set = { },
+    padding               = 0,
+    minimal_width         = 0,
+    minimal_height        = 0
+}
+
 data:extend({
     {
         type = "sprite",
@@ -66,6 +75,14 @@ data:extend({
         mipmap_count = 2,
         flags        = { "gui-icon" },
         scale        = 0.5
+    },
+    {
+        type     = "sprite",
+        name     = MOD_PREFIX .. "rename-white",
+        filename = "__compact-inventory__/graphics/rename-icon-white.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
     },
     {
         type     = "sprite",
