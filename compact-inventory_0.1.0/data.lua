@@ -82,7 +82,7 @@ data:extend({
         filename = "__compact-inventory__/graphics/rename-icon-white.png",
         size     = 32,
         flags    = { "gui-icon" },
-        scale    = 0.4375
+        scale    = 0.5
     },
     {
         type     = "sprite",
