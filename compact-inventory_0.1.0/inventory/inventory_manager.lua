@@ -632,4 +632,27 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function factory.destroy(player)
+    local player_index = resolve_player(player)
+    local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
+
+    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
+
+    local inventory_ids = { }
+
+    for inventory_id in pairs(manager.inventories) do
+        inventory_ids[#inventory_ids + 1] = inventory_id
+    end
+
+    for _, inventory_id in ipairs(inventory_ids) do
+        manager:unmonitorInventory(manager.inventories[inventory_id])
+    end
+
+    manager.inventories = { }
+    manager.lua_player = nil
+    storage.inventory_managers[player_index] = nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 return factory
