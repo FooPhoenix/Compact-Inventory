@@ -7,6 +7,7 @@ local InventoryManagerFactory   = require("inventory.inventory_manager")
 local WindowsManager            = require("gui.windows_manager")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
 local WindowPresetMenuFactory   = require("gui.window_preset_menu")
+local WindowPresetFactory       = require("gui.window_preset")
 
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
@@ -17,6 +18,11 @@ local PRESET_CONTEXT_CUSTOM_SORT = "Custom sort"
 local INVENTORY_WINDOW_FRAME_PREFIX = MOD_PREFIX .. "IW_frame-"
 local MENU_INVENTORY_ID_TAG_NAME    = MOD_PREFIX .. "MenuInventoryID"
 local MENU_WINDOW_ID_TAG_NAME       = MOD_PREFIX .. "MenuWindowID"
+local CREATION_SOURCE_GUI_NAMES     = {
+    [MOD_PREFIX .. "MW_source-player"]            = true,
+    [MOD_PREFIX .. "MW_source-player-vehicle"]    = true,
+    [MOD_PREFIX .. "MW_source-selected-entities"] = true
+}
 
 local custom_sort_selections = { }
 local preset_contexts        = { }
@@ -205,6 +211,42 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function applyWindowPresetSourceToCreationUI(main_window, configuration)
+    assert(main_window and main_window.object_name == "MainWindow", "Main window must exist here !")      -- [DEBUG-ONLY] . --
+    assert(type(configuration) == "table", "Window preset source configuration must be a table !")         -- [DEBUG-ONLY] . --
+
+    local entities         = configuration.entities
+    local entity_config    = type(entities) == "table" and entities[1] or nil
+    local inventory_types  = entity_config and entity_config.inventory_types or nil
+    local is_player_source = type(entities) == "table"
+        and #entities == 1
+        and entity_config.entity == main_window:getPlayer()
+        and type(inventory_types) == "table"
+        and #inventory_types == 1
+        and inventory_types[1] == defines.inventory.character_main
+
+    assert(is_player_source, "Window preset contains an unsupported source configuration !")      -- [DEBUG-ONLY] . --
+
+    if not is_player_source then
+        return false
+    end
+
+    local frame             = main_window:getFrame()
+    local source_player     = findGuiElement(frame, MOD_PREFIX .. "MW_source-player")
+    local source_vehicle    = findGuiElement(frame, MOD_PREFIX .. "MW_source-player-vehicle")
+    local source_entities   = findGuiElement(frame, MOD_PREFIX .. "MW_source-selected-entities")
+
+    assert(source_player and source_vehicle and source_entities, "Main window source controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    source_player.state   = true
+    source_vehicle.state  = false
+    source_entities.state = false
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function refreshCustomSortEditor(window, item_group)
     local menu = window:getPlayer().gui.screen[ItemGroupMenuFactory.exposed_gui_names.menu]
 
@@ -334,11 +376,11 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local main_gui_names   = WindowsManager.exposed_gui_names.MainWindow
-    local gui_names        = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names       = ItemGroupMenuFactory.exposed_gui_names
+    local main_gui_names    = WindowsManager.exposed_gui_names.MainWindow
+    local gui_names         = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names        = ItemGroupMenuFactory.exposed_gui_names
     local preset_menu_names = WindowPresetMenuFactory.exposed_gui_names
-    local window           = resolveInventoryWindowFromElement(event.player_index, event.element)
+    local window            = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
@@ -432,22 +474,39 @@ script.on_event(defines.events.on_gui_click, function(event)
         end
 
     elseif event.element.tags[main_gui_names.creation_preset_name_tag_name] then
-        WindowsManager.getMainWindow(event.player_index):toggleCreationPresetSelection(
-            event.element.tags[main_gui_names.creation_preset_name_tag_name]
-        )
+        local preset_name = event.element.tags[main_gui_names.creation_preset_name_tag_name]
+        local main_window = WindowsManager.getMainWindow(event.player_index)
+
+        main_window:toggleCreationPresetSelection(preset_name)
+
+        if main_window:getSelectedWindowPresetName() == preset_name then
+            local data = getWindowPresetManager():load(preset_name)
+
+            assert(data, "Selected window preset must exist here !")      -- [DEBUG-ONLY] . --
+
+            if data and data.source then
+                applyWindowPresetSourceToCreationUI(main_window, data.source)
+            end
+        end
 
     elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
 
     elseif event.element.name == main_gui_names.creation_create_button then
         local main_window   = WindowsManager.getMainWindow(event.player_index)
+        local preset_name   = main_window:getSelectedWindowPresetName()
+        local preset_data   = preset_name and getWindowPresetManager():load(preset_name) or nil
         local configuration = main_window:getCreationConfiguration()
         local inventory     = InventoryManagerFactory.get(event.player_index):monitorConfiguration(configuration)
 
         assert(inventory, "Inventory creation configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
 
         if inventory then
-            inventory:createWindow()
+            local created_window = inventory:createWindow()
+
+            if preset_data then
+                WindowPresetFactory.apply(created_window, preset_data)
+            end
         end
 
         main_window:showWindowsList()
@@ -732,6 +791,25 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
     window:refreshGroup(item_group)
     ItemGroupMenuFactory.refreshFilterTable(window, item_group)
     ItemGroupMenuFactory.clearPresetSelection(event.player_index)
+end)
+
+script.on_event(defines.events.on_gui_checked_state_changed, function(event)
+    if not CREATION_SOURCE_GUI_NAMES[event.element.name] or not event.element.state then
+        return
+    end
+
+    local main_window = WindowsManager.getMainWindow(event.player_index)
+    local preset_name = main_window:getSelectedWindowPresetName()
+
+    if not preset_name then
+        return
+    end
+
+    local data = getWindowPresetManager():load(preset_name)
+
+    if data and data.source then
+        main_window:toggleCreationPresetSelection(preset_name)
+    end
 end)
 
 script.on_event(defines.events.on_gui_switch_state_changed, function(event)
