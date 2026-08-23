@@ -244,7 +244,7 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.onLeave(event)
-    if not isMenuElement(event.element) then
+    if event.element.name ~= GUI_NAME.menu then
         return
     end
 
