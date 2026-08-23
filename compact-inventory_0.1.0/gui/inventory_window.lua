@@ -10,6 +10,7 @@ local GUI_NAME = {
     main_frame           = MOD_PREFIX .. "IW_frame",
     title_bar            = MOD_PREFIX .. "IW_titlebar",
     dragger              = MOD_PREFIX .. "IW_dragger",
+    save_button          = MOD_PREFIX .. "IW_save-button",
     add_button           = MOD_PREFIX .. "IW_add-button",
     lock_button          = MOD_PREFIX .. "IW_lock-button",
     close_button         = MOD_PREFIX .. "IW_close",
@@ -142,6 +143,40 @@ function metatable:getItemGroupByID(group_id)
     end
 
     return nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getPresetData(include_source, selected_groups)
+    assert(type(include_source) == "boolean", "Preset source selection must be a boolean !")                  -- [DEBUG-ONLY] . --
+    assert(type(selected_groups) == "table", "Preset group selection must be a table !")                      -- [DEBUG-ONLY] . --
+
+    local data = {
+        groups = { }
+    }
+
+    if include_source then
+        local configuration = self:getInventory():getConfiguration()
+
+        assert(configuration, "Inventory source configuration must exist when saving it in a preset !")      -- [DEBUG-ONLY] . --
+        data.source = configuration
+    end
+
+    for _, item_group in ipairs(self:getItemGroups()) do
+        if selected_groups[item_group:getID()] then
+            data.groups[#data.groups + 1] = {
+                name         = item_group:getName(),
+                sort_mode    = item_group:getSortMode(),
+                custom_order = item_group:getCustomOrder(),
+                filter       = {
+                    mode    = item_group:getFilterMode(),
+                    filters = item_group:getFilters()
+                }
+            }
+        end
+    end
+
+    return data
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -519,6 +554,7 @@ end
 
 factory.exposed_gui_names = {
     close_button         = GUI_NAME.close_button,
+    save_button          = GUI_NAME.save_button,
     add_button           = GUI_NAME.add_button,
     lock_button          = GUI_NAME.lock_button,
     group_rename_button  = GUI_NAME.group_rename_button,
@@ -764,6 +800,18 @@ function factory.createGUI(window)                                              
     dragger.style.horizontally_stretchable = true
     dragger.style.height = 16
     dragger.drag_target  = frame
+
+    local save_button = title_bar.add({
+        type    = "sprite-button",
+        name    = GUI_NAME.save_button,
+        sprite  = MOD_PREFIX .. "save",
+        style   = "frame_action_button",
+        tooltip = "Save window preset"
+    })
+
+    save_button.style.width   = 16
+    save_button.style.height  = 16
+    save_button.style.padding = 0
 
     local add_button = title_bar.add({
         type    = "sprite-button",
