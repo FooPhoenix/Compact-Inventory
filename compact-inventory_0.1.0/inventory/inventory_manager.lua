@@ -23,6 +23,7 @@ local changed_delta = { }
 ---
 --- @field private manager        InventoryManager                The InventoryManager that owns the inventory.
 --- @field private source         InventorySource                 The InventorySource monitored by the inventory.
+--- @field private configuration  table?                          The declarative configuration used to resolve the source.
 --- @field private id             integer                         The inventory identifier in its manager.
 --- @field private name           string                          The user-visible inventory name.
 --- @field private windows        table<integer, InventoryWindow> The inventory windows indexed by their stable ID.
@@ -143,6 +144,12 @@ end
 
 function inventory_metatable:getSource()
     return self.source
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:getConfiguration()
+    return self.configuration
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -431,6 +438,10 @@ function manager_metatable:monitorConfiguration(configuration)
 
     for _, inventory in pairs(self.inventories) do
         if sourcesMatch(inventory:getSource(), lua_inventories) then
+            if inventory.configuration == nil then
+                inventory.configuration = configuration
+            end
+
             return inventory
         end
     end
@@ -438,6 +449,7 @@ function manager_metatable:monitorConfiguration(configuration)
     local source = InventorySourceFactory.new(table.unpack(lua_inventories))
     local inventory = self:monitorInventory(source)
 
+    inventory.configuration = configuration
     inventory:update()
 
     return inventory
@@ -462,6 +474,7 @@ function manager_metatable:monitorInventory(source)
         name           = "Inventory " .. inventory_id,
         manager        = self,
         source         = source,
+        configuration  = nil,
         windows        = { },
         next_window_id = 1,
         content        = { },
@@ -517,10 +530,11 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
 
     self.inventories[inventory.id] = nil
     inventory.source.inventory = nil
-    inventory.name    = nil
-    inventory.windows = nil
-    inventory.source  = nil
-    inventory.manager = nil
+    inventory.name          = nil
+    inventory.windows       = nil
+    inventory.configuration = nil
+    inventory.source        = nil
+    inventory.manager       = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -614,29 +628,6 @@ function factory.get(player)
     assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
 
     return manager
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function factory.destroy(player)
-    local player_index = resolve_player(player)
-    local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
-
-    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
-
-    local inventory_ids = { }
-
-    for inventory_id in pairs(manager.inventories) do
-        inventory_ids[#inventory_ids + 1] = inventory_id
-    end
-
-    for _, inventory_id in ipairs(inventory_ids) do
-        manager:unmonitorInventory(manager.inventories[inventory_id])
-    end
-
-    manager.inventories = { }
-    manager.lua_player = nil
-    storage.inventory_managers[player_index] = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
