@@ -68,8 +68,6 @@ function factory.open(window, location)
         y = location.y - 4
     }
 
-    menu.style.vertical_spacing = 4
-
     local title_flow = menu.add({
         type               = "flow",
         name               = GUI_NAME.title_flow,
