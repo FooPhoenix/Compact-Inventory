@@ -6,6 +6,7 @@ local InventoryViewFactory      = require("inventory.inventory_view")
 local InventoryManagerFactory   = require("inventory.inventory_manager")
 local WindowsManager            = require("gui.windows_manager")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
+local WindowPresetMenuFactory   = require("gui.window_preset_menu")
 
 local SortMode   = InventoryViewFactory.sort_modes
 local FilterMode = InventoryViewFactory.filter_modes
@@ -333,10 +334,11 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local main_gui_names = WindowsManager.exposed_gui_names.MainWindow
-    local gui_names      = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names     = ItemGroupMenuFactory.exposed_gui_names
-    local window         = resolveInventoryWindowFromElement(event.player_index, event.element)
+    local main_gui_names   = WindowsManager.exposed_gui_names.MainWindow
+    local gui_names        = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names       = ItemGroupMenuFactory.exposed_gui_names
+    local preset_menu_names = WindowPresetMenuFactory.exposed_gui_names
+    local window           = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
@@ -395,6 +397,7 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == main_gui_names.tree_lock_button then
         ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.close(event.player_index)
         WindowsManager.getMainWindow(event.player_index):toggleWindowLocked(
             event.element.tags[main_gui_names.inventory_id_tag_name],
             event.element.tags[main_gui_names.window_id_tag_name]
@@ -407,6 +410,7 @@ script.on_event(defines.events.on_gui_click, function(event)
         local main_window  = WindowsManager.getMainWindow(event.player_index)
 
         ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.close(event.player_index)
 
         if group_id then
             main_window:deleteItemGroup(inventory_id, window_id, group_id)
@@ -450,15 +454,22 @@ script.on_event(defines.events.on_gui_click, function(event)
 
     elseif event.element.name == gui_names.close_button and window then
         ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.close(event.player_index)
         window:setVisible(false)
         refreshMainWindow(event.player_index)
 
+    elseif event.element.name == gui_names.save_button and window then
+        ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.open(window, event.cursor_display_location)
+
     elseif event.element.name == gui_names.add_button and window then
+        WindowPresetMenuFactory.close(event.player_index)
         window:createItemGroup()
         refreshMainWindow(event.player_index)
 
     elseif event.element.name == gui_names.lock_button and window then
         ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.close(event.player_index)
         window:setLocked(true)
         refreshMainWindow(event.player_index)
 
@@ -481,8 +492,22 @@ script.on_event(defines.events.on_gui_click, function(event)
         local item_group = window:getItemGroupByID(group_id)
 
         assert(item_group, "ItemGroup must exist here !")      -- [DEBUG-ONLY] . --
+        WindowPresetMenuFactory.close(event.player_index)
         ItemGroupMenuFactory.open(window, item_group, event.cursor_display_location)
         tagItemGroupMenu(window)
+
+    elseif event.element.name == preset_menu_names.cancel_button then
+        WindowPresetMenuFactory.close(event.player_index)
+
+    elseif event.element.name == preset_menu_names.save_button and window then
+        local name, include_source, selected_groups = WindowPresetMenuFactory.getSelection(window)
+
+        if name ~= "" then
+            local data = window:getPresetData(include_source, selected_groups)
+
+            getWindowPresetManager():save(name, data)
+            WindowPresetMenuFactory.close(event.player_index)
+        end
 
     elseif (event.element.name == menu_names.move_up_button
         or event.element.name == menu_names.move_down_button) and window then
@@ -803,14 +828,17 @@ end)
 
 script.on_event(defines.events.on_gui_hover, function(event)
     ItemGroupMenuFactory.onHover(event)
+    WindowPresetMenuFactory.onHover(event)
 end)
 
 script.on_event(defines.events.on_gui_leave, function(event)
     ItemGroupMenuFactory.onLeave(event)
+    WindowPresetMenuFactory.onLeave(event)
 end)
 
 script.on_event(defines.events.on_tick, function(event)
     ItemGroupMenuFactory.onTick(event)
+    WindowPresetMenuFactory.onTick(event)
 end)
 
 local function updateWindowMaxHeight(player_index)
