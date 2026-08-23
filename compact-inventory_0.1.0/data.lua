@@ -86,6 +86,14 @@ data:extend({
     },
     {
         type     = "sprite",
+        name     = MOD_PREFIX .. "save",
+        filename = "__compact-inventory__/graphics/save.png",
+        size     = 32,
+        flags    = { "gui-icon" },
+        scale    = 0.5
+    },
+    {
+        type     = "sprite",
         name     = MOD_PREFIX .. "window-show",
         filename = "__compact-inventory__/graphics/Show_Grey.png",
         size     = 32,
