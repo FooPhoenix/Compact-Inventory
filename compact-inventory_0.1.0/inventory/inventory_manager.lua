@@ -1,5 +1,7 @@
 
-local ItemOrder = require("util.item_order")
+local ItemOrder              = require("util.item_order")
+local InventoryWindowFactory = require("gui.inventory_window")
+local InventorySourceFactory = require("inventory.inventory_source")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -19,16 +21,20 @@ local changed_delta = { }
 ---
 --- ### This class groups all functions used to monitor an InventorySource.
 ---
---- @field private manager     InventoryManager      The InventoryManager that owns the inventory.
---- @field private source      InventorySource       The InventorySource monitored by the inventory.
---- @field private id          integer               The inventory identifier in its manager.
---- @field private content     table                 The current aggregated inventory content.
---- @field private counts      table<integer, integer> The current item counts indexed by item identifier.
---- @field private previous    table<integer, integer> Previous item links used by last-change ordering.
---- @field private next        table<integer, integer> Next item links used by last-change ordering.
---- @field private first       integer?              The first item identifier in last-change ordering.
---- @field private last        integer?              The last item identifier in last-change ordering.
---- @field private initialized boolean               Whether a non-empty baseline has been initialized.
+--- @field private manager        InventoryManager                The InventoryManager that owns the inventory.
+--- @field private source         InventorySource                 The InventorySource monitored by the inventory.
+--- @field private configuration  table?                          The declarative configuration used to resolve the source.
+--- @field private id             integer                         The inventory identifier in its manager.
+--- @field private name           string                          The user-visible inventory name.
+--- @field private windows        table<integer, InventoryWindow> The inventory windows indexed by their stable ID.
+--- @field private next_window_id integer                         The next inventory window identifier to allocate.
+--- @field private content        table                           The current aggregated inventory content.
+--- @field private counts         table<integer, integer>         The current item counts indexed by item identifier.
+--- @field private previous       table<integer, integer>         Previous item links used by last-change ordering.
+--- @field private next           table<integer, integer>         Next item links used by last-change ordering.
+--- @field private first          integer?                        The first item identifier in last-change ordering.
+--- @field private last           integer?                        The last item identifier in last-change ordering.
+--- @field private initialized    boolean                         Whether a non-empty baseline has been initialized.
 ---
 --
 local inventory_metatable = { }
@@ -44,14 +50,7 @@ inventory_metatable.__index = inventory_metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Detach an item from the last-change linked list.
---
---- -----
---- @param inventory Inventory      The inventory whose linked list must be modified.
---- @param item_id integer          The item identifier to detach.
---
 local function inventory_detachItem(inventory, item_id)
-
     local previous_id = inventory.previous[item_id]
     local next_id     = inventory.next[item_id]
 
@@ -75,14 +74,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Prepend an item to the last-change linked list.
---
---- -----
---- @param inventory Inventory      The inventory whose linked list must be modified.
---- @param item_id integer          The item identifier to prepend.
---
 local function inventory_prependItem(inventory, item_id)
-
     local first_id = inventory.first
 
     inventory.previous[item_id] = nil
@@ -99,14 +91,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Initialize the inventory state from a non-empty content baseline without recording changes.
---
---- -----
---- @param inventory Inventory      The inventory to initialize.
---- @param content table            The current inventory content in standard order.
---
 local function inventory_initializeState(inventory, content)
-
     assert(#content > 0, "Inventory baseline cannot be initialized from empty content !")      -- [DEBUG-ONLY] . --
 
     local previous_id
@@ -132,35 +117,90 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the InventorySource monitored by the inventory.
---
---- -----
---- @return InventorySource      @ The monitored InventorySource.
---
+function inventory_metatable:getID()
+    assert(type(self.id) == "number" and self.id > 0, "Inventory ID must be a positive integer !")      -- [DEBUG-ONLY] . --
+    return self.id
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:getName()
+    if self.name == nil then
+        self.name = "Inventory " .. self:getID()
+    end
+
+    assert(type(self.name) == "string", "Inventory name must be a string !")      -- [DEBUG-ONLY] . --
+    return self.name
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:setName(name)
+    assert(type(name) == "string", "Inventory name must be a string !")      -- [DEBUG-ONLY] . --
+    self.name = name
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function inventory_metatable:getSource()
     return self.source
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the current aggregated inventory content.
---
---- -----
---- @return table      @ The current inventory content in Factorio standard item order.
---
+function inventory_metatable:getConfiguration()
+    return self.configuration
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:getWindows()
+    assert(type(self.windows) == "table", "Inventory windows must be a table !")      -- [DEBUG-ONLY] . --
+    return self.windows
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:getWindow(window_id)
+    assert(type(window_id) == "number" and window_id > 0 and window_id % 1 == 0, "Inventory window ID must be valid !")      -- [DEBUG-ONLY] . --
+    return self:getWindows()[window_id]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:createWindow()
+    local window_id = self.next_window_id
+
+    self.next_window_id = window_id + 1
+
+    local window = InventoryWindowFactory.create(self.manager.lua_player, self, window_id)
+    self.windows[window_id] = window
+
+    return window
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function inventory_metatable:removeWindow(window_or_id)
+    local window_id = type(window_or_id) == "number" and window_or_id or window_or_id and window_or_id:getID()
+    local window    = window_id and self.windows[window_id] or nil
+
+    assert(window and window.object_name == "InventoryWindow", "Inventory window does not exist !")      -- [DEBUG-ONLY] . --
+    assert(window:getInventory() == self, "Inventory window belongs to another Inventory !")              -- [DEBUG-ONLY] . --
+
+    InventoryWindowFactory.destroy(window)
+    self.windows[window_id] = nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function inventory_metatable:getContent()
     return self.content
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Update the logical inventory state from every LuaInventory in its source.
---
---- The source content is aggregated before changes are detected, so one item spread over several LuaInventory is
---- tracked as one logical item quantity.
---
 function inventory_metatable:update()
-
     assert(self.source and self.source.object_name == "InventorySource", "Inventory must have a valid InventorySource !")      -- [DEBUG-ONLY] . --
     assert(#changed_items == 0 and next(changed_delta) == nil, "Inventory working buffers must be empty !")                     -- [DEBUG-ONLY] . --
 
@@ -250,15 +290,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Sort an item list using this inventory's maintained last-change order.
---
---- -----
---- @param items table      The item list to order.
---
---- @return table           @ The ordered item list.
---
 function inventory_metatable:sortByLastChange(items)
-
     if not self.initialized and #items > 0 then
         inventory_initializeState(self, items)
     end
@@ -326,17 +358,106 @@ manager_metatable.__index = manager_metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Start monitoring an InventorySource.
----
---- Returns the existing Inventory if this source is already monitored by this manager.
---
---- -----
---- @param source InventorySource      The InventorySource to monitor.
---
---- @return Inventory                 @ The Inventory monitoring the source.
---
-function manager_metatable:monitorInventory(source)
+local function sourcesMatch(source, lua_inventories)
+    local source_inventories = source:getInventories()
 
+    if #source_inventories ~= #lua_inventories then
+        return false
+    end
+
+    for _, lua_inventory in ipairs(lua_inventories) do
+        local found = false
+
+        for _, source_lua_inventory in ipairs(source_inventories) do
+            if source_lua_inventory == lua_inventory then
+                found = true
+                break
+            end
+        end
+
+        if not found then
+            return false
+        end
+    end
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function resolveConfiguration(configuration)
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
+    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+    assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
+
+    local lua_inventories = { }
+
+    for _, entity_configuration in ipairs(configuration.entities) do
+        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")                      -- [DEBUG-ONLY] . --
+        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")           -- [DEBUG-ONLY] . --
+        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")                      -- [DEBUG-ONLY] . --
+        assert(entity_configuration.options == nil or type(entity_configuration.options) == "table", "Inventory entity options must be a table !") -- [DEBUG-ONLY] . --
+
+        local entity = entity_configuration.entity
+
+        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+            assert(type(inventory_type) == "number", "Inventory type must be a defines.inventory value !")      -- [DEBUG-ONLY] . --
+
+            local lua_inventory = entity.get_inventory(inventory_type)
+
+            if lua_inventory and lua_inventory.valid then
+                local duplicate = false
+
+                for _, existing_inventory in ipairs(lua_inventories) do
+                    if existing_inventory == lua_inventory then
+                        duplicate = true
+                        break
+                    end
+                end
+
+                if not duplicate then
+                    lua_inventories[#lua_inventories + 1] = lua_inventory
+                end
+            end
+        end
+    end
+
+    return lua_inventories
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager_metatable:monitorConfiguration(configuration)
+    local lua_inventories = resolveConfiguration(configuration)
+
+    assert(#lua_inventories > 0, "Inventory configuration did not resolve any LuaInventory !")      -- [DEBUG-ONLY] . --
+
+    if #lua_inventories == 0 then
+        return nil
+    end
+
+    for _, inventory in pairs(self.inventories) do
+        if sourcesMatch(inventory:getSource(), lua_inventories) then
+            if inventory.configuration == nil then
+                inventory.configuration = configuration
+            end
+
+            return inventory
+        end
+    end
+
+    local source = InventorySourceFactory.new(table.unpack(lua_inventories))
+    local inventory = self:monitorInventory(source)
+
+    inventory.configuration = configuration
+    inventory:update()
+
+    return inventory
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager_metatable:monitorInventory(source)
     assert(source and source.object_name == "InventorySource", "Source must be a valid InventorySource !")                    -- [DEBUG-ONLY] . --
 
     if source.inventory then
@@ -349,16 +470,20 @@ function manager_metatable:monitorInventory(source)
     local inventory_id = self.next_inventory_id
 
     local inventory = {                                  ---@type Inventory
-        id          = inventory_id,
-        manager     = self,
-        source      = source,
-        content     = { },
-        counts      = { },
-        previous    = { },
-        next        = { },
-        first       = nil,
-        last        = nil,
-        initialized = false
+        id             = inventory_id,
+        name           = "Inventory " .. inventory_id,
+        manager        = self,
+        source         = source,
+        configuration  = nil,
+        windows        = { },
+        next_window_id = 1,
+        content        = { },
+        counts         = { },
+        previous       = { },
+        next           = { },
+        first          = nil,
+        last           = nil,
+        initialized    = false
     }
 
     setmetatable(inventory, inventory_metatable)
@@ -372,13 +497,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Stop monitoring an InventorySource or Inventory.
---
---- -----
---- @param source_or_inventory InventorySource|Inventory      The InventorySource or Inventory to stop monitoring.
---
 function manager_metatable:unmonitorInventory(source_or_inventory)
-
     assert(source_or_inventory ~= nil, "InventorySource or Inventory cannot be nil !")                                -- [DEBUG-ONLY] . --
 
     local inventory
@@ -399,45 +518,40 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     assert(self.inventories[inventory.id] == inventory, "InventoryManager does not contain this Inventory !")           -- [DEBUG-ONLY] . --
     assert(inventory.source and inventory.source.inventory == inventory, "InventorySource relationship is invalid !")  -- [DEBUG-ONLY] . --
 
+    local window_ids = { }
+
+    for window_id in pairs(inventory:getWindows()) do
+        window_ids[#window_ids + 1] = window_id
+    end
+
+    for _, window_id in ipairs(window_ids) do
+        inventory:removeWindow(window_id)
+    end
+
     self.inventories[inventory.id] = nil
     inventory.source.inventory = nil
-    inventory.source  = nil
-    inventory.manager = nil
+    inventory.name          = nil
+    inventory.windows       = nil
+    inventory.configuration = nil
+    inventory.source        = nil
+    inventory.manager       = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get all Inventory monitored by this manager.
---
---- -----
---- @return table<integer, Inventory>      @ The monitored Inventory indexed by their internal ID.
---
 function manager_metatable:getInventories()
     return self.inventories
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Update every monitored InventorySource containing one LuaInventory.
---
---- -----
---- @param lua_inventory LuaInventory      The LuaInventory whose content changed.
---
 function manager_metatable:updateInventory(lua_inventory)
     self:updateInventories({ lua_inventory })
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Update every monitored InventorySource containing at least one of the provided LuaInventory.
---
---- Each logical Inventory is updated at most once, even if several of its physical LuaInventory are provided.
---
---- -----
---- @param lua_inventories LuaInventory[]      The LuaInventory whose content changed.
---
 function manager_metatable:updateInventories(lua_inventories)
-
     local inventories_to_update = { }
 
     for _, lua_inventory in ipairs(lua_inventories) do
@@ -479,7 +593,6 @@ local factory = { }
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function factory.initialize()
-
     storage.inventory_managers = { }
 
     for _, lua_player in pairs(game.players) do
@@ -489,15 +602,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Initialize the InventoryManager for one player.
---
---- -----
---- @param player integer|LuaPlayer      The player that will own the manager.
---
---- @return InventoryManager             @ The created InventoryManager.
---
 function factory.initializePlayer(player)
-
     local player_index, lua_player = resolve_player(player)
 
     assert(storage.inventory_managers[player_index] == nil, "Player already has an InventoryManager !")              -- [DEBUG-ONLY] . --
@@ -516,15 +621,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the InventoryManager for one player.
---
---- -----
---- @param player integer|LuaPlayer      The player whose manager is requested.
---
---- @return InventoryManager             @ The player's InventoryManager.
---
 function factory.get(player)
-
     local player_index = resolve_player(player)
     local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
 
@@ -535,22 +632,20 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Destroy the InventoryManager for one player.
---
---- -----
---- @param player integer|LuaPlayer      The player whose manager must be destroyed.
---
 function factory.destroy(player)
-
     local player_index = resolve_player(player)
     local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
 
     assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
 
-    for _, inventory in pairs(manager.inventories) do
-        inventory.source.inventory = nil
-        inventory.source  = nil
-        inventory.manager = nil
+    local inventory_ids = { }
+
+    for inventory_id in pairs(manager.inventories) do
+        inventory_ids[#inventory_ids + 1] = inventory_id
+    end
+
+    for _, inventory_id in ipairs(inventory_ids) do
+        manager:unmonitorInventory(manager.inventories[inventory_id])
     end
 
     manager.inventories = { }
