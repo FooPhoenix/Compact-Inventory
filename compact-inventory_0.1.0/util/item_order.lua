@@ -193,14 +193,19 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the item prototype name associated with a base item order identifier.
+--- ### Get the item prototype name associated with a base item order identifier or an already resolved item name.
 --
 --- -----
---- @param item_id integer      The base item order identifier without quality offset.
+--- @param item_id integer|string      The base item order identifier or item prototype name.
 --
---- @return string              @ The item prototype name.
+--- @return string                     @ The item prototype name.
 --
 function ItemOrder.getName(item_id)
+    if type(item_id) == "string" then
+        assert(prototypes.item[item_id], "Item prototype does not exist: " .. item_id)      -- [DEBUG-ONLY] . --
+        return item_id
+    end
+
     ensureItemLists()
     assert(storage.item_order_names[item_id], "Base item order identifier does not exist: " .. item_id)      -- [DEBUG-ONLY] . --
     return storage.item_order_names[item_id]
