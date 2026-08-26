@@ -31,7 +31,7 @@ local function createDefaultCustomOrder()
     local custom_order = { }
 
     for index = 1, ItemOrder.getItemCount() do
-        custom_order[index] = ItemOrder.getItemID(index)
+        custom_order[index] = ItemOrder.getName(ItemOrder.getItemID(index))
     end
 
     return custom_order
@@ -67,13 +67,13 @@ function metatable:setCustomOrder(custom_order)
     local new_order = { }
     local seen      = { }
 
-    for index, item_id in ipairs(custom_order) do
-        assert(type(item_id) == "number", "Custom sort item ID must be a number !")      -- [DEBUG-ONLY] . --
-        assert(ItemOrder.getName(item_id), "Custom sort item ID must exist !")            -- [DEBUG-ONLY] . --
-        assert(not seen[item_id], "Custom sort item ID must be unique !")                  -- [DEBUG-ONLY] . --
+    for index, item_name in ipairs(custom_order) do
+        assert(type(item_name) == "string", "Custom sort item name must be a string !")      -- [DEBUG-ONLY] . --
+        assert(prototypes.item[item_name], "Custom sort item must exist: " .. tostring(item_name))      -- [DEBUG-ONLY] . --
+        assert(not seen[item_name], "Custom sort item name must be unique !")                -- [DEBUG-ONLY] . --
 
-        seen[item_id] = true
-        new_order[index] = item_id
+        seen[item_name] = true
+        new_order[index] = item_name
     end
 
     self.custom_order = new_order
@@ -89,13 +89,13 @@ function metatable:moveCustomItem(source_index, target_index)
         return
     end
 
-    local item_id = table.remove(custom_order, source_index)
+    local item_name = table.remove(custom_order, source_index)
 
     if source_index < target_index then
         target_index = target_index - 1
     end
 
-    table.insert(custom_order, target_index, item_id)
+    table.insert(custom_order, target_index, item_name)
 end
 
 function metatable:getFilterMode()
@@ -215,23 +215,22 @@ function metatable:getContent()
         sorted_items = inventory:sortByLastChange(items)
 
     elseif self.sort_mode == SortMode.custom then
-        local items_by_base_id = { }
-        sorted_items           = { }
+        local items_by_name = { }
+        sorted_items        = { }
 
         for _, item in ipairs(items) do
-            local base_id  = ItemOrder.get(item.name)
-            local variants = items_by_base_id[base_id]
+            local variants = items_by_name[item.name]
 
             if not variants then
                 variants = { }
-                items_by_base_id[base_id] = variants
+                items_by_name[item.name] = variants
             end
 
             variants[#variants + 1] = item
         end
 
-        for _, base_id in ipairs(self:getCustomOrder()) do
-            local variants = items_by_base_id[base_id]
+        for _, item_name in ipairs(self:getCustomOrder()) do
+            local variants = items_by_name[item_name]
 
             if variants then
                 for _, item in ipairs(variants) do
