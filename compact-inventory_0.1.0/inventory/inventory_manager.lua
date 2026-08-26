@@ -1,4 +1,5 @@
 
+local ItemKey                = require("util.item_key")
 local ItemOrder              = require("util.item_order")
 local InventoryWindowFactory = require("gui.inventory_window")
 local InventorySourceFactory = require("inventory.inventory_source")
@@ -29,11 +30,11 @@ local changed_delta = { }
 --- @field private windows        table<integer, InventoryWindow> The inventory windows indexed by their stable ID.
 --- @field private next_window_id integer                         The next inventory window identifier to allocate.
 --- @field private content        table                           The current aggregated inventory content.
---- @field private counts         table<integer, integer>         The current item counts indexed by item identifier.
---- @field private previous       table<integer, integer>         Previous item links used by last-change ordering.
---- @field private next           table<integer, integer>         Next item links used by last-change ordering.
---- @field private first          integer?                        The first item identifier in last-change ordering.
---- @field private last           integer?                        The last item identifier in last-change ordering.
+--- @field private counts         table<string, integer>          The current item counts indexed by stable item key.
+--- @field private previous       table<string, string>           Previous item links used by last-change ordering.
+--- @field private next           table<string, string>           Next item links used by last-change ordering.
+--- @field private first          string?                         The first item key in last-change ordering.
+--- @field private last           string?                         The last item key in last-change ordering.
 --- @field private initialized    boolean                         Whether a non-empty baseline has been initialized.
 ---
 --
@@ -50,43 +51,43 @@ inventory_metatable.__index = inventory_metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function inventory_detachItem(inventory, item_id)
-    local previous_id = inventory.previous[item_id]
-    local next_id     = inventory.next[item_id]
+local function inventory_detachItem(inventory, item_key)
+    local previous_key = inventory.previous[item_key]
+    local next_key     = inventory.next[item_key]
 
-    if previous_id then
-        inventory.next[previous_id] = next_id
-    elseif inventory.first == item_id then
-        inventory.first = next_id
+    if previous_key then
+        inventory.next[previous_key] = next_key
+    elseif inventory.first == item_key then
+        inventory.first = next_key
     else
         return
     end
 
-    if next_id then
-        inventory.previous[next_id] = previous_id
+    if next_key then
+        inventory.previous[next_key] = previous_key
     else
-        inventory.last = previous_id
+        inventory.last = previous_key
     end
 
-    inventory.previous[item_id] = nil
-    inventory.next[item_id]     = nil
+    inventory.previous[item_key] = nil
+    inventory.next[item_key]     = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function inventory_prependItem(inventory, item_id)
-    local first_id = inventory.first
+local function inventory_prependItem(inventory, item_key)
+    local first_key = inventory.first
 
-    inventory.previous[item_id] = nil
-    inventory.next[item_id]     = first_id
+    inventory.previous[item_key] = nil
+    inventory.next[item_key]     = first_key
 
-    if first_id then
-        inventory.previous[first_id] = item_id
+    if first_key then
+        inventory.previous[first_key] = item_key
     else
-        inventory.last = item_id
+        inventory.last = item_key
     end
 
-    inventory.first = item_id
+    inventory.first = item_key
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -94,24 +95,24 @@ end
 local function inventory_initializeState(inventory, content)
     assert(#content > 0, "Inventory baseline cannot be initialized from empty content !")      -- [DEBUG-ONLY] . --
 
-    local previous_id
+    local previous_key
 
     for _, item in ipairs(content) do
-        local item_id = ItemOrder.get(item.name, item.quality)
+        local item_key = ItemKey.create(item.name, item.quality)
 
-        inventory.counts[item_id]   = item.count
-        inventory.previous[item_id] = previous_id
+        inventory.counts[item_key]   = item.count
+        inventory.previous[item_key] = previous_key
 
-        if previous_id then
-            inventory.next[previous_id] = item_id
+        if previous_key then
+            inventory.next[previous_key] = item_key
         else
-            inventory.first = item_id
+            inventory.first = item_key
         end
 
-        previous_id = item_id
+        previous_key = item_key
     end
 
-    inventory.last        = previous_id
+    inventory.last        = previous_key
     inventory.initialized = true
 end
 
@@ -204,18 +205,18 @@ function inventory_metatable:update()
     assert(self.source and self.source.object_name == "InventorySource", "Inventory must have a valid InventorySource !")      -- [DEBUG-ONLY] . --
     assert(#changed_items == 0 and next(changed_delta) == nil, "Inventory working buffers must be empty !")                     -- [DEBUG-ONLY] . --
 
-    local content_by_id = { }
+    local content_by_key = { }
 
     for _, lua_inventory in ipairs(self.source:getInventories()) do
         if lua_inventory.valid then
             for _, item in ipairs(lua_inventory.get_contents()) do
-                local item_id = ItemOrder.get(item.name, item.quality)
-                local content_item = content_by_id[item_id]
+                local item_key     = ItemKey.create(item.name, item.quality)
+                local content_item = content_by_key[item_key]
 
                 if content_item then
                     content_item.count = content_item.count + item.count
                 else
-                    content_by_id[item_id] = {
+                    content_by_key[item_key] = {
                         name    = item.name,
                         quality = item.quality,
                         count   = item.count
@@ -227,7 +228,7 @@ function inventory_metatable:update()
 
     local content = { }
 
-    for _, item in pairs(content_by_id) do
+    for _, item in pairs(content_by_key) do
         content[#content + 1] = item
     end
 
@@ -248,24 +249,24 @@ function inventory_metatable:update()
     local seen = { }
 
     for _, item in ipairs(content) do
-        local item_id   = ItemOrder.get(item.name, item.quality)
-        local old_count = self.counts[item_id]
+        local item_key  = ItemKey.create(item.name, item.quality)
+        local old_count = self.counts[item_key]
 
-        seen[item_id] = true
+        seen[item_key] = true
 
         if old_count ~= item.count then
-            changed_items[#changed_items + 1] = item_id
-            changed_delta[item_id] = math.abs(item.count - (old_count or 0))
-            self.counts[item_id] = item.count
+            changed_items[#changed_items + 1] = item_key
+            changed_delta[item_key] = math.abs(item.count - (old_count or 0))
+            self.counts[item_key] = item.count
         end
     end
 
-    for item_id in pairs(self.counts) do
-        if not seen[item_id] then
-            inventory_detachItem(self, item_id)
-            self.counts[item_id]   = nil
-            self.previous[item_id] = nil
-            self.next[item_id]     = nil
+    for item_key in pairs(self.counts) do
+        if not seen[item_key] then
+            inventory_detachItem(self, item_key)
+            self.counts[item_key]   = nil
+            self.previous[item_key] = nil
+            self.next[item_key]     = nil
         end
     end
 
@@ -278,13 +279,13 @@ function inventory_metatable:update()
     end)
 
     for index = #changed_items, 1, -1 do
-        local item_id = changed_items[index]
+        local item_key = changed_items[index]
 
-        inventory_detachItem(self, item_id)
-        inventory_prependItem(self, item_id)
+        inventory_detachItem(self, item_key)
+        inventory_prependItem(self, item_key)
 
-        changed_delta[item_id] = nil
-        changed_items[index]   = nil
+        changed_delta[item_key] = nil
+        changed_items[index]    = nil
     end
 end
 
@@ -295,17 +296,17 @@ function inventory_metatable:sortByLastChange(items)
         inventory_initializeState(self, items)
     end
 
-    local items_by_id  = { }
+    local items_by_key = { }
     local sorted_items = { }
 
     for _, item in ipairs(items) do
-        items_by_id[ItemOrder.get(item.name, item.quality)] = item
+        items_by_key[ItemKey.create(item.name, item.quality)] = item
     end
 
-    local item_id = self.first
+    local item_key = self.first
 
-    while item_id do
-        local item = items_by_id[item_id]
+    while item_key do
+        local item = items_by_key[item_key]
 
         assert(item, "Last change order contains an item that is not in the current inventory !")      -- [DEBUG-ONLY] . --
 
@@ -313,7 +314,7 @@ function inventory_metatable:sortByLastChange(items)
             sorted_items[#sorted_items + 1] = item
         end
 
-        item_id = self.next[item_id]
+        item_key = self.next[item_key]
     end
 
     assert(#sorted_items == #items, "Last change sorting did not resolve every item !")      -- [DEBUG-ONLY] . --
