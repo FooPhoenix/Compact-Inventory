@@ -1,3 +1,4 @@
+require("debug.character_switch_test")
 
 local ItemKey   = require("util.item_key")
 local ItemOrder = require("util.item_order")
