@@ -3,6 +3,8 @@ local factory = { }
 local SHORTCUT_NAME = MOD_PREFIX .. "debug-switch-character"
 local LOG_PREFIX    = "[Compact Inventory / Character switch test] "
 
+local watched_characters = { }
+
 local function emit(message)
     local text = LOG_PREFIX .. message
 
@@ -135,6 +137,26 @@ script.on_event(defines.events.on_player_controller_changed, function(event)
     logPlayerState("on_player_controller_changed", event)
 end)
 
+script.on_nth_tick(5, function(event)
+    for _, lua_player in pairs(game.players) do
+        local previous = watched_characters[lua_player.index]
+        local current  = lua_player.character
+
+        if previous ~= current then
+            emit(
+                "player.character changed"
+                .. " | tick=" .. tostring(event.tick)
+                .. " | player=" .. tostring(lua_player.index)
+                .. " | controller=" .. tostring(lua_player.controller_type)
+                .. " | from=" .. describeCharacter(previous)
+                .. " | to=" .. describeCharacter(current)
+            )
+
+            watched_characters[lua_player.index] = current
+        end
+    end
+end)
+
 script.on_nth_tick(1, function()
     local inventory_handler = script.get_event_handler(defines.events.on_player_main_inventory_changed)
     local shortcut_handler  = script.get_event_handler(defines.events.on_lua_shortcut)
@@ -155,6 +177,18 @@ script.on_nth_tick(1, function()
 
         shortcut_handler(event)
     end)
+
+    for _, lua_player in pairs(game.players) do
+        watched_characters[lua_player.index] = lua_player.character
+
+        emit(
+            "Watching player.character"
+            .. " | tick=" .. tostring(game.tick)
+            .. " | player=" .. tostring(lua_player.index)
+            .. " | controller=" .. tostring(lua_player.controller_type)
+            .. " | character=" .. describeCharacter(lua_player.character)
+        )
+    end
 
     script.on_nth_tick(1, nil)
     emit("Debug event wrappers installed.")
