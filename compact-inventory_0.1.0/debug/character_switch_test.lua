@@ -3,6 +3,13 @@ local factory = { }
 local SHORTCUT_NAME = MOD_PREFIX .. "debug-switch-character"
 local LOG_PREFIX    = "[Compact Inventory / Character switch test] "
 
+local function emit(message)
+    local text = LOG_PREFIX .. message
+
+    game.print(text)
+    log(text)
+end
+
 local function describeCharacter(lua_character)
     if not lua_character then
         return "nil"
@@ -22,9 +29,8 @@ local function logPlayerState(label, event)
         return
     end
 
-    log(
-        LOG_PREFIX
-        .. label
+    emit(
+        label
         .. " | tick=" .. tostring(event.tick)
         .. " | player=" .. tostring(event.player_index)
         .. " | controller=" .. tostring(lua_player.controller_type)
@@ -65,9 +71,9 @@ local function getOrCreateCharacters(lua_player)
     end
 
     local character_b = character_a.surface.create_entity({
-        name     = character_a.name,
-        position = position,
-        force    = character_a.force,
+        name      = character_a.name,
+        position  = position,
+        force     = character_a.force,
         direction = character_a.direction
     })
 
@@ -80,9 +86,8 @@ local function getOrCreateCharacters(lua_player)
 
     storage.debug_character_switch_test[lua_player.index] = state
 
-    log(
-        LOG_PREFIX
-        .. "Initialized characters"
+    emit(
+        "Initialized characters"
         .. " | player=" .. tostring(lua_player.index)
         .. " | A=" .. describeCharacter(character_a)
         .. " | B=" .. describeCharacter(character_b)
@@ -108,9 +113,8 @@ function factory.switch(player)
         target = state.character_a
     end
 
-    log(
-        LOG_PREFIX
-        .. "Switch requested"
+    emit(
+        "Switch requested"
         .. " | tick=" .. tostring(game.tick)
         .. " | player=" .. tostring(lua_player.index)
         .. " | from=" .. describeCharacter(current)
@@ -119,9 +123,8 @@ function factory.switch(player)
 
     lua_player.character = target
 
-    log(
-        LOG_PREFIX
-        .. "Switch completed"
+    emit(
+        "Switch completed"
         .. " | tick=" .. tostring(game.tick)
         .. " | player=" .. tostring(lua_player.index)
         .. " | character=" .. describeCharacter(lua_player.character)
@@ -154,7 +157,7 @@ script.on_nth_tick(1, function()
     end)
 
     script.on_nth_tick(1, nil)
-    log(LOG_PREFIX .. "Debug event wrappers installed.")
+    emit("Debug event wrappers installed.")
 end)
 
 return factory
