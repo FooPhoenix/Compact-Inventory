@@ -1,6 +1,7 @@
 MOD_PREFIX = "FooPhoenix_CI_"
 
 local ItemOrder                 = require("util.item_order")
+local Migration                 = require("util.migration")
 local PresetManagerFactory      = require("util.preset_manager")
 local InventoryViewFactory      = require("inventory.inventory_view")
 local InventoryManagerFactory   = require("inventory.inventory_manager")
@@ -261,9 +262,7 @@ local function refreshCustomSortEditor(window, item_group)
 
     custom_sort_table.clear()
 
-    for _, item_id in ipairs(item_group:getCustomOrder()) do
-        local item_name = ItemOrder.getName(item_id)
-
+    for _, item_name in ipairs(item_group:getCustomOrder()) do
         custom_sort_table.add({
             type               = "sprite-button",
             sprite             = "item/" .. item_name,
@@ -334,17 +333,34 @@ script.on_init(function()
 end)
 
 script.on_configuration_changed(function()
-    for _, lua_player in pairs(game.players) do
-        local screen = lua_player.gui.screen
-        for _, frame in pairs(screen.children) do
-            frame.destroy()     -- Very dangerous, but it is only for testing purposes.
-        end
+    initializePresetStorage()
+    Migration.prepareItemIdentityMigration()
+    ItemOrder.initialize()
+    Migration.reconcileItemData()
+
+    if not storage.inventory_managers then
+        InventoryManagerFactory.initialize()
     end
 
-    ItemOrder.initialize()
-    initializePresetStorage()
-    InventoryManagerFactory.initialize()
-    WindowsManager.initialize()
+    if not storage.windows or not storage.windows.main then
+        WindowsManager.initialize()
+    end
+
+    for _, lua_player in pairs(game.players) do
+        local manager = InventoryManagerFactory.get(lua_player)
+
+        for _, inventory in pairs(manager:getInventories()) do
+            inventory:update()
+
+            for _, window in pairs(inventory:getWindows()) do
+                if window.valid then
+                    window:refresh()
+                end
+            end
+        end
+
+        refreshMainWindow(lua_player)
+    end
 end)
 
 script.on_event(defines.events.on_player_created, function(event)
@@ -942,5 +958,9 @@ end)
 script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == WindowsManager.exposed_gui_names.MainWindow.shortcut_button then
         WindowsManager.getMainWindow(event.player_index):toggleVisibility()
+    elseif event.prototype_name == MOD_PREFIX .. "debug-rebuild-gui" then
+        ItemGroupMenuFactory.close(event.player_index)
+        WindowPresetMenuFactory.close(event.player_index)
+        WindowsManager.rebuildGUI(event.player_index)
     end
 end)

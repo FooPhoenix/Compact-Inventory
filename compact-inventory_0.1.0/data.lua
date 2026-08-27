@@ -203,5 +203,24 @@ data:extend({
                 icon_size = 64
             }
         }
+    },
+    {
+        type           = "shortcut",
+        name           = MOD_PREFIX .. "debug-rebuild-gui",
+        action         = "lua",
+        toggleable     = false,
+        localised_name = "[DEBUG] Rebuild Compact Inventory GUI",
+        icons = {
+            {
+                icon      = "__base__/graphics/icons/signal/signal_D.png",
+                icon_size = 64
+            }
+        },
+        small_icons = {
+            {
+                icon      = "__base__/graphics/icons/signal/signal_D.png",
+                icon_size = 64
+            }
+        }
     }
 })

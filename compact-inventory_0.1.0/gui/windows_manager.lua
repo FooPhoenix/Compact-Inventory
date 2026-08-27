@@ -116,6 +116,66 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function manager.rebuildGUI(player)
+    local player_index, lua_player = resolve_player(player)
+    local main_window = storage.windows and storage.windows.main and storage.windows.main[player_index] or nil
+    local main_visible
+    local main_location
+
+    if main_window and main_window.object_name == "MainWindow" then
+        local frame = lua_player.gui.screen[MOD_PREFIX .. "MW_frame"]
+
+        if frame then
+            main_visible  = frame.visible
+            main_location = frame.location
+            frame.destroy()
+        end
+    end
+
+    local inventory_manager = InventoryManagerFactory.get(lua_player)
+
+    for _, inventory in pairs(inventory_manager:getInventories()) do
+        for _, window in pairs(inventory:getWindows()) do
+            local frame       = lua_player.gui.screen[window:getFrameName()]
+            local was_visible = frame and frame.visible or true
+            local location    = frame and frame.location or nil
+            local was_locked  = window:isLocked()
+
+            if frame then
+                frame.destroy()
+            end
+
+            if was_locked then
+                window.locked = false
+            end
+
+            InventoryWindowFactory.createGUI(window)
+
+            if location then
+                window:getFrame().location = location
+            end
+
+            if was_locked then
+                window:setLocked(true)
+            end
+
+            window:setVisible(was_visible)
+        end
+    end
+
+    if main_window and main_window.object_name == "MainWindow" then
+        MainWindowFactory.createGUI(main_window)
+
+        if main_location then
+            main_window:getFrame().location = main_location
+        end
+
+        main_window:setVisible(main_visible == true)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 -- [TRANSITION] Compatibility helpers for control.lua while only one InventoryWindow can be created from the UI. --
 
 function manager.hasWindowMainInventory(player)
