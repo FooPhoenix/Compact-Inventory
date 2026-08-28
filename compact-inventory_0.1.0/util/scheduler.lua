@@ -10,8 +10,8 @@
 ---
 --- ### This class groups all functions used to manage a scheduler bucket.
 ---
---- @field private tick integer      The tick associated with the bucket.
---- @field private jobs table[]      The jobs scheduled for the tick.
+--- @field private tick integer          The tick associated with the bucket.
+--- @field private jobs SchedulerJob[]   The jobs scheduled for the tick.
 ---
 --
 local bucket_metatable = { }
@@ -34,8 +34,21 @@ bucket_metatable.__index = bucket_metatable
 ---
 --- ### This class represents all jobs scheduled for a specific tick.
 ---
---- @field private tick integer      The tick associated with the bucket.
---- @field private jobs table[]      The jobs scheduled for the tick.
+--- @field private tick integer          The tick associated with the bucket.
+--- @field private jobs SchedulerJob[]   The jobs scheduled for the tick.
+---
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
+-- ║ SchedulerJob.                                                                                                 ║ --
+-- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+
+---
+--- @class SchedulerJob
+---
+--- ### This class describes the scheduling data shared by all scheduler jobs.
+---
+--- @field         next_tick      integer?           The next tick requested by the job owner, or nil to unregister it.
+--- @field private current_bucket SchedulerBucket?   The bucket currently containing the job. Managed only by Scheduler.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -95,22 +108,77 @@ metatable.__index = metatable
 --- ### Get the scheduler bucket associated with a tick, creating it if necessary.
 --
 --- -----
---- @param tick integer      The tick associated with the bucket.
+--- @param scheduler Scheduler      The scheduler owning the bucket.
+--- @param tick      integer        The tick associated with the bucket.
 ---
---- @return SchedulerBucket  @ Returns the scheduler bucket associated with the tick.
+--- @return SchedulerBucket         @ Returns the scheduler bucket associated with the tick.
 --
-function metatable:getBucket(tick)
+local function getBucket(scheduler, tick)
 
     assert(type(tick) == "number" and tick >= 0 and tick % 1 == 0, "Scheduler bucket tick must be a positive integer !")  -- [DEBUG-ONLY] . --
 
-    local bucket = self.scheduled_jobs[tick]
+    local bucket = scheduler.scheduled_jobs[tick]
 
     if not bucket then
         bucket = bucket_factory.new(tick)
-        self.scheduled_jobs[tick] = bucket
+        scheduler.scheduled_jobs[tick] = bucket
     end
 
     return bucket
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Register a job according to its requested next tick.
+---
+--- The job owner only manages `next_tick`. The scheduler exclusively manages `current_bucket` and moves the job
+--- between buckets when required. Setting `next_tick` to nil unregisters the job.
+--
+--- -----
+--- @param job SchedulerJob      The job to register, move or unregister.
+--
+function metatable:register(job)
+
+    assert(type(job) == "table", "Scheduler job must be a table !")                                                                                      -- [DEBUG-ONLY] . --
+    assert(job.next_tick == nil or (type(job.next_tick) == "number" and job.next_tick >= 0 and job.next_tick % 1 == 0), "Scheduler job next tick must be nil or a positive integer !")  -- [DEBUG-ONLY] . --
+
+    local current_bucket = job.current_bucket
+    local next_tick      = job.next_tick
+
+    if current_bucket and current_bucket.tick == next_tick then
+        return
+    end
+
+    if current_bucket then
+        assert(self.scheduled_jobs[current_bucket.tick] == current_bucket, "Scheduler job current bucket must belong to this Scheduler !")      -- [DEBUG-ONLY] . --
+
+        local removed = false
+
+        for index, scheduled_job in ipairs(current_bucket.jobs) do
+            if scheduled_job == job then
+                table.remove(current_bucket.jobs, index)
+                removed = true
+                break
+            end
+        end
+
+        assert(removed, "Scheduler job must exist in its current bucket !")      -- [DEBUG-ONLY] . --
+
+        job.current_bucket = nil
+
+        if #current_bucket.jobs == 0 then
+            self.scheduled_jobs[current_bucket.tick] = nil
+        end
+    end
+
+    if next_tick == nil then
+        return
+    end
+
+    local bucket = getBucket(self, next_tick)
+
+    bucket.jobs[#bucket.jobs + 1] = job
+    job.current_bucket = bucket
 end
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
