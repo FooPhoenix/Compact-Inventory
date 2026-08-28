@@ -186,8 +186,8 @@ end
 
 --- ### Execute all jobs scheduled for a tick.
 ---
---- The current bucket is detached before any job executes. This allows jobs to request their next tick without
---- mutating the bucket being iterated. Each job is re-registered after execution according to its new `next_tick`.
+--- Jobs are consumed from the current bucket through `register()`, which remains the single path responsible for
+--- moving and unregistering jobs. The first job is repeatedly executed and re-registered until the bucket is empty.
 --
 --- -----
 --- @param tick integer      The tick to execute.
@@ -201,18 +201,12 @@ function metatable:execute(tick)
         return
     end
 
-    self.scheduled_jobs[tick] = nil
+    while bucket.jobs[1] do
+        local job = bucket.jobs[1]
 
-    local jobs = bucket.jobs
-    bucket.jobs = { }
-
-    for _, job in ipairs(jobs) do
         assert(job.current_bucket == bucket, "Scheduled job must belong to the executed bucket !")      -- [DEBUG-ONLY] . --
         assert(type(job.execute) == "function", "Scheduled job must provide an execute method !")       -- [DEBUG-ONLY] . --
-        job.current_bucket = nil
-    end
 
-    for _, job in ipairs(jobs) do
         job:execute(tick)
         self:register(job)
     end
