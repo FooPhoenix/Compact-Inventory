@@ -40,6 +40,30 @@ function metatable:getWindow()
     return self.window
 end
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Execute the scheduled window refresh.
+--
+--- -----
+--- @param tick integer      The tick being executed by the Scheduler.
+--
+function metatable:execute(tick)
+    assert(type(tick) == "number" and tick >= 0 and tick % 1 == 0, "WindowRefreshJob execution tick must be a positive integer !")      -- [DEBUG-ONLY] . --
+
+    local window = self:getWindow()
+
+    if not window.valid then
+        self.next_tick = nil
+        return
+    end
+
+    if window:isVisible() then
+        window:refresh()
+    end
+
+    self.next_tick = tick + window:getRefreshRate()
+end
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ WindowRefreshJob.                                                                                             ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --

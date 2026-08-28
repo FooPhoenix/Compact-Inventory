@@ -32,6 +32,37 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Ensure that an InventoryWindow owns a registered refresh job.
+--
+--- This is also used by the debug GUI rebuild path to upgrade persisted windows created before refresh jobs existed.
+--
+--- -----
+--- @param window InventoryWindow      The InventoryWindow to initialize or repair.
+--
+function integration.ensure(window)
+    assert(window and window.object_name == "InventoryWindow", "Window does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+
+    installWindowMethods(window)
+
+    if window.refresh_rate == nil then
+        window.refresh_rate = DEFAULT_REFRESH_RATE
+    end
+
+    assert(type(window.refresh_rate) == "number" and window.refresh_rate > 0 and window.refresh_rate % 1 == 0, "InventoryWindow refresh rate must be a positive integer !")      -- [DEBUG-ONLY] . --
+
+    if not storage.scheduler then
+        SchedulerFactory.initialize()
+    end
+
+    if not window.refresh_job then
+        window.refresh_job = WindowRefreshJobFactory.new(window)
+    end
+
+    SchedulerFactory.get():register(window.refresh_job)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function integration.install(inventory_window_factory)
     assert(type(inventory_window_factory) == "table", "InventoryWindowFactory must be a table !")      -- [DEBUG-ONLY] . --
 
@@ -43,16 +74,7 @@ function integration.install(inventory_window_factory)
     inventory_window_factory.create = function(...)
         local window = create(...)
 
-        installWindowMethods(window)
-
-        window.refresh_rate = DEFAULT_REFRESH_RATE
-        window.refresh_job  = WindowRefreshJobFactory.new(window)
-
-        if not storage.scheduler then
-            SchedulerFactory.initialize()
-        end
-
-        SchedulerFactory.get():register(window.refresh_job)
+        integration.ensure(window)
 
         return window
     end

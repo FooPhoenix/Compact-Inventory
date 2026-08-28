@@ -49,6 +49,7 @@ bucket_metatable.__index = bucket_metatable
 ---
 --- @field         next_tick      integer?           The next tick requested by the job owner, or nil to unregister it.
 --- @field private current_bucket SchedulerBucket?   The bucket currently containing the job. Managed only by Scheduler.
+--- @field         execute        fun(self: SchedulerJob, tick: integer)      Executes the job and updates its next requested tick.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -179,6 +180,42 @@ function metatable:register(job)
 
     bucket.jobs[#bucket.jobs + 1] = job
     job.current_bucket = bucket
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Execute all jobs scheduled for a tick.
+---
+--- The current bucket is detached before any job executes. This allows jobs to request their next tick without
+--- mutating the bucket being iterated. Each job is re-registered after execution according to its new `next_tick`.
+--
+--- -----
+--- @param tick integer      The tick to execute.
+--
+function metatable:execute(tick)
+    assert(type(tick) == "number" and tick >= 0 and tick % 1 == 0, "Scheduler execution tick must be a positive integer !")      -- [DEBUG-ONLY] . --
+
+    local bucket = self.scheduled_jobs[tick]
+
+    if not bucket then
+        return
+    end
+
+    self.scheduled_jobs[tick] = nil
+
+    local jobs = bucket.jobs
+    bucket.jobs = { }
+
+    for _, job in ipairs(jobs) do
+        assert(job.current_bucket == bucket, "Scheduled job must belong to the executed bucket !")      -- [DEBUG-ONLY] . --
+        assert(type(job.execute) == "function", "Scheduled job must provide an execute method !")       -- [DEBUG-ONLY] . --
+        job.current_bucket = nil
+    end
+
+    for _, job in ipairs(jobs) do
+        job:execute(tick)
+        self:register(job)
+    end
 end
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
