@@ -10,8 +10,9 @@
 ---
 --- ### This class groups all functions used to manage a scheduled InventoryWindow refresh.
 ---
---- @field private window InventoryWindow      The InventoryWindow associated with the job.
---- @field private bucket SchedulerBucket?     The SchedulerBucket currently containing the job.
+--- @field private window         InventoryWindow      The InventoryWindow associated with the job.
+--- @field         next_tick      integer?             The next tick requested by the InventoryWindow.
+--- @field private current_bucket SchedulerBucket?     The SchedulerBucket currently containing the job. Managed only by Scheduler.
 ---
 --
 local metatable = { }
@@ -48,8 +49,9 @@ end
 ---
 --- ### This class represents a scheduled InventoryWindow refresh job.
 ---
---- @field private window InventoryWindow      The InventoryWindow associated with the job.
---- @field private bucket SchedulerBucket?     The SchedulerBucket currently containing the job.
+--- @field private window         InventoryWindow      The InventoryWindow associated with the job.
+--- @field         next_tick      integer?             The next tick requested by the InventoryWindow.
+--- @field private current_bucket SchedulerBucket?     The SchedulerBucket currently containing the job. Managed only by Scheduler.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -77,8 +79,9 @@ function factory.new(window)
     assert(window and window.object_name == "InventoryWindow", "WindowRefreshJob requires a valid InventoryWindow !")      -- [DEBUG-ONLY] . --
 
     local job = {      ---@type WindowRefreshJob
-        window = window,
-        bucket = nil
+        window         = window,
+        next_tick      = nil,
+        current_bucket = nil
     }
 
     setmetatable(job, metatable)
