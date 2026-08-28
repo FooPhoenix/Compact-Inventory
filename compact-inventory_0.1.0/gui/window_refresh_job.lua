@@ -80,7 +80,7 @@ function factory.new(window)
 
     local job = {      ---@type WindowRefreshJob
         window         = window,
-        next_tick      = nil,
+        next_tick      = game.tick + window:getRefreshRate(),
         current_bucket = nil
     }
 

@@ -2,9 +2,13 @@
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local MainWindowFactory       = require("gui.main_window")
-local InventoryWindowFactory  = require("gui.inventory_window")
-local InventoryManagerFactory = require("inventory.inventory_manager")
+local MainWindowFactory              = require("gui.main_window")
+local InventoryWindowFactory         = require("gui.inventory_window")
+local InventoryWindowScheduler       = require("gui.inventory_window_scheduler")
+local InventoryManagerFactory        = require("inventory.inventory_manager")
+local SchedulerFactory               = require("util.scheduler")
+
+InventoryWindowScheduler.install(InventoryWindowFactory)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -63,6 +67,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.initialize()
+    SchedulerFactory.initialize()
+
     storage.windows = { }
     storage.windows.main = { }
 
