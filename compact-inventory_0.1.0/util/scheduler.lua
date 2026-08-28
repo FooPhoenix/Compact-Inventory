@@ -224,4 +224,24 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Initialize the persistent scheduler.
+--
+function factory.initialize()
+    storage.scheduler = factory.new()
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the persistent scheduler.
+--
+--- -----
+--- @return Scheduler      @ Returns the persistent scheduler.
+--
+function factory.get()
+    assert(storage.scheduler and storage.scheduler.object_name == "Scheduler", "Scheduler must be initialized !")      -- [DEBUG-ONLY] . --
+    return storage.scheduler
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 return factory
