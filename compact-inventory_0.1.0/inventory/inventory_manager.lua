@@ -519,6 +519,7 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     assert(self.inventories[inventory.id] == inventory, "InventoryManager does not contain this Inventory !")           -- [DEBUG-ONLY] . --
     assert(inventory.source and inventory.source.inventory == inventory, "InventorySource relationship is invalid !")  -- [DEBUG-ONLY] . --
 
+    local source     = inventory.source
     local window_ids = { }
 
     for window_id in pairs(inventory:getWindows()) do
@@ -530,7 +531,9 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     end
 
     self.inventories[inventory.id] = nil
-    inventory.source.inventory = nil
+    source.inventory = nil
+    InventorySourceFactory.destroy(source)
+
     inventory.name          = nil
     inventory.windows       = nil
     inventory.configuration = nil
