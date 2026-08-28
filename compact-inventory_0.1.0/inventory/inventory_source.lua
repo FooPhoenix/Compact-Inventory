@@ -4,6 +4,13 @@ local LuaInventoryRegistry = require("inventory.lua_inventory_registry")
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
+-- ║ Local Working Cache.                                                                                          ║ --
+-- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+
+local inventory_content_cache      = { }
+local inventory_content_cache_tick = nil
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventorySourceMetatable.                                                                                     ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
@@ -50,6 +57,50 @@ end
 --
 function metatable:getInventoryIDs()
     return self.lua_inventory_ids
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the content of one LuaInventory contained in the source.
+--
+--- The LuaInventory is read at most once per game tick. Other InventorySource referencing the same registry ID reuse
+--- the same cached content for the rest of the tick.
+--
+--- -----
+--- @param index integer      The source LuaInventory index.
+--
+--- @return table             @ The LuaInventory content for the current game tick.
+--
+function metatable:getInventoryContent(index)
+    assert(type(index) == "number" and index > 0 and index % 1 == 0, "InventorySource index must be a positive integer !")      -- [DEBUG-ONLY] . --
+    assert(self.lua_inventories[index] ~= nil, "InventorySource LuaInventory does not exist !")                                  -- [DEBUG-ONLY] . --
+    assert(self.lua_inventory_ids[index] ~= nil, "InventorySource LuaInventory ID does not exist !")                             -- [DEBUG-ONLY] . --
+
+    local tick = game.tick
+
+    if inventory_content_cache_tick ~= tick then
+        inventory_content_cache      = { }
+        inventory_content_cache_tick = tick
+    end
+
+    local lua_inventory_id = self.lua_inventory_ids[index]
+    local content          = inventory_content_cache[lua_inventory_id]
+
+    if content then
+        return content
+    end
+
+    local lua_inventory = self.lua_inventories[index]
+
+    if lua_inventory.valid then
+        content = lua_inventory.get_contents()
+    else
+        content = { }
+    end
+
+    inventory_content_cache[lua_inventory_id] = content
+
+    return content
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
