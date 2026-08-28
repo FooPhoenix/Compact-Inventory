@@ -58,6 +58,7 @@ function metatable:execute(tick)
     end
 
     if window:isVisible() then
+        window:getInventory():update()
         window:refresh()
     end
 
@@ -95,7 +96,7 @@ local factory = { }
 --
 --- -----
 --- @param window InventoryWindow      The InventoryWindow associated with the job.
----
+--
 --- @return WindowRefreshJob           @ Returns the created window refresh job.
 --
 function factory.new(window)
