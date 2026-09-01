@@ -368,29 +368,6 @@ script.on_event(defines.events.on_player_created, function(event)
     WindowsManager.initializePlayer(event.player_index)
 end)
 
-script.on_event(defines.events.on_player_main_inventory_changed, function(event)
-    local _, lua_player = resolve_player(event.player_index)
-    local lua_inventory = lua_player.get_main_inventory()
-
-    if not lua_inventory then
-        return
-    end
-
-    local manager = InventoryManagerFactory.get(lua_player)
-
-    manager:updateInventory(lua_inventory)
-
-    for _, inventory in pairs(manager:getInventories()) do
-        if inventory:getSource():containsInventory(lua_inventory) then
-            for _, window in pairs(inventory:getWindows()) do
-                if window.valid and window:isVisible() then
-                    window:refresh()
-                end
-            end
-        end
-    end
-end)
-
 script.on_event(defines.events.on_gui_click, function(event)
     local main_gui_names    = WindowsManager.exposed_gui_names.MainWindow
     local gui_names         = WindowsManager.exposed_gui_names.InventoryWindow

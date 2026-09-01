@@ -206,22 +206,21 @@ function inventory_metatable:update()
     assert(#changed_items == 0 and next(changed_delta) == nil, "Inventory working buffers must be empty !")                     -- [DEBUG-ONLY] . --
 
     local content_by_key = { }
+    local source         = self.source
 
-    for _, lua_inventory in ipairs(self.source:getInventories()) do
-        if lua_inventory.valid then
-            for _, item in ipairs(lua_inventory.get_contents()) do
-                local item_key     = ItemKey.create(item.name, item.quality)
-                local content_item = content_by_key[item_key]
+    for index in ipairs(source:getInventories()) do
+        for _, item in ipairs(source:getInventoryContent(index)) do
+            local item_key     = ItemKey.create(item.name, item.quality)
+            local content_item = content_by_key[item_key]
 
-                if content_item then
-                    content_item.count = content_item.count + item.count
-                else
-                    content_by_key[item_key] = {
-                        name    = item.name,
-                        quality = item.quality,
-                        count   = item.count
-                    }
-                end
+            if content_item then
+                content_item.count = content_item.count + item.count
+            else
+                content_by_key[item_key] = {
+                    name    = item.name,
+                    quality = item.quality,
+                    count   = item.count
+                }
             end
         end
     end
@@ -519,6 +518,7 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     assert(self.inventories[inventory.id] == inventory, "InventoryManager does not contain this Inventory !")           -- [DEBUG-ONLY] . --
     assert(inventory.source and inventory.source.inventory == inventory, "InventorySource relationship is invalid !")  -- [DEBUG-ONLY] . --
 
+    local source     = inventory.source
     local window_ids = { }
 
     for window_id in pairs(inventory:getWindows()) do
@@ -530,7 +530,9 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     end
 
     self.inventories[inventory.id] = nil
-    inventory.source.inventory = nil
+    source.inventory = nil
+    InventorySourceFactory.destroy(source)
+
     inventory.name          = nil
     inventory.windows       = nil
     inventory.configuration = nil

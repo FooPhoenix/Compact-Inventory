@@ -2,9 +2,13 @@
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local MainWindowFactory       = require("gui.main_window")
-local InventoryWindowFactory  = require("gui.inventory_window")
-local InventoryManagerFactory = require("inventory.inventory_manager")
+local MainWindowFactory              = require("gui.main_window")
+local InventoryWindowFactory         = require("gui.inventory_window")
+local InventoryWindowScheduler       = require("gui.inventory_window_scheduler")
+local InventoryManagerFactory        = require("inventory.inventory_manager")
+local SchedulerFactory               = require("util.scheduler")
+
+InventoryWindowScheduler.install(InventoryWindowFactory)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -14,6 +18,38 @@ local manager = {
         InventoryWindow = InventoryWindowFactory.exposed_gui_names
     }
 }
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local scheduler_tick_handler
+
+local function installSchedulerTickHandler()
+    local current_handler = script.get_event_handler(defines.events.on_tick)
+
+    if current_handler == scheduler_tick_handler then
+        return
+    end
+
+    local previous_handler = current_handler
+
+    scheduler_tick_handler = function(event)
+        if storage.scheduler then
+            SchedulerFactory.get():execute(event.tick)
+        end
+
+        if previous_handler then
+            previous_handler(event)
+        end
+    end
+
+    script.on_event(defines.events.on_tick, scheduler_tick_handler)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_load(function()
+    installSchedulerTickHandler()
+end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -63,6 +99,9 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.initialize()
+    SchedulerFactory.initialize()
+    installSchedulerTickHandler()
+
     storage.windows = { }
     storage.windows.main = { }
 
@@ -136,6 +175,8 @@ function manager.rebuildGUI(player)
 
     for _, inventory in pairs(inventory_manager:getInventories()) do
         for _, window in pairs(inventory:getWindows()) do
+            InventoryWindowScheduler.ensure(window)
+
             local frame       = lua_player.gui.screen[window:getFrameName()]
             local was_visible = frame and frame.visible or true
             local location    = frame and frame.location or nil

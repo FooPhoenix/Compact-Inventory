@@ -1,5 +1,14 @@
 
+local LuaInventoryRegistry = require("inventory.lua_inventory_registry")
+
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
+-- ║ Local Working Cache.                                                                                          ║ --
+-- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+
+local inventory_content_cache      = { }
+local inventory_content_cache_tick = nil
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventorySourceMetatable.                                                                                     ║ --
@@ -10,8 +19,9 @@
 ---
 --- ### This class groups all functions used to manage an inventory source.
 ---
---- @field private lua_inventories LuaInventory[]       The LuaInventory contained in the source.
---- @field private inventory       Inventory?            The Inventory currently monitoring the source.
+--- @field private lua_inventories    LuaInventory[]      The LuaInventory contained in the source.
+--- @field private lua_inventory_ids  integer[]           The internal registry IDs matching `lua_inventories`.
+--- @field private inventory          Inventory?           The Inventory currently monitoring the source.
 ---
 --
 local metatable = { }
@@ -34,6 +44,63 @@ metatable.__index = metatable
 --
 function metatable:getInventories()
     return self.lua_inventories
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the internal registry IDs associated with the source LuaInventory.
+--
+--- IDs use the same indexes as `getInventories()`.
+--
+--- -----
+--- @return integer[]      @ The internal LuaInventory IDs contained in the source.
+--
+function metatable:getInventoryIDs()
+    return self.lua_inventory_ids
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Get the content of one LuaInventory contained in the source.
+--
+--- The LuaInventory is read at most once per game tick. Other InventorySource referencing the same registry ID reuse
+--- the same cached content for the rest of the tick.
+--
+--- -----
+--- @param index integer      The source LuaInventory index.
+--
+--- @return table             @ The LuaInventory content for the current game tick.
+--
+function metatable:getInventoryContent(index)
+    assert(type(index) == "number" and index > 0 and index % 1 == 0, "InventorySource index must be a positive integer !")      -- [DEBUG-ONLY] . --
+    assert(self.lua_inventories[index] ~= nil, "InventorySource LuaInventory does not exist !")                                  -- [DEBUG-ONLY] . --
+    assert(self.lua_inventory_ids[index] ~= nil, "InventorySource LuaInventory ID does not exist !")                             -- [DEBUG-ONLY] . --
+
+    local tick = game.tick
+
+    if inventory_content_cache_tick ~= tick then
+        inventory_content_cache      = { }
+        inventory_content_cache_tick = tick
+    end
+
+    local lua_inventory_id = self.lua_inventory_ids[index]
+    local content          = inventory_content_cache[lua_inventory_id]
+
+    if content then
+        return content
+    end
+
+    local lua_inventory = self.lua_inventories[index]
+
+    if lua_inventory.valid then
+        content = lua_inventory.get_contents()
+    else
+        content = { }
+    end
+
+    inventory_content_cache[lua_inventory_id] = content
+
+    return content
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -70,8 +137,9 @@ end
 ---
 --- ### This class represents a logical inventory source containing zero or more LuaInventory.
 ---
---- @field private lua_inventories LuaInventory[]      The LuaInventory contained in the source.
---- @field private inventory       Inventory?          The Inventory currently monitoring the source.
+--- @field private lua_inventories   LuaInventory[]      The LuaInventory contained in the source.
+--- @field private lua_inventory_ids integer[]           The internal registry IDs matching `lua_inventories`.
+--- @field private inventory         Inventory?          The Inventory currently monitoring the source.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -89,6 +157,9 @@ local factory = { }
 
 --- ### Create a new inventory source.
 --
+--- Each LuaInventory is registered once during source creation so hot-path updates can use its pre-resolved internal
+--- ID without repeating the registry lookup.
+--
 --- -----
 --- @param ... LuaInventory      The LuaInventory to include in the source.
 --
@@ -100,7 +171,8 @@ function factory.new(...)
     local lua_inventories     = { ... }
 
     local source = {                                     ---@type InventorySource
-        lua_inventories = { }
+        lua_inventories   = { },
+        lua_inventory_ids = { }
     }
 
     for index = 1, lua_inventory_count do
@@ -110,13 +182,34 @@ function factory.new(...)
         assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "InventorySource can only contain LuaObject !")  -- [DEBUG-ONLY] . --
         assert(lua_inventory.valid, "InventorySource can only contain valid LuaInventory !")                                         -- [DEBUG-ONLY] . --
         assert(lua_inventory.object_name == "LuaInventory", "InventorySource can only contain LuaInventory !")                       -- [DEBUG-ONLY] . --
-    
-        source.lua_inventories[index] = lua_inventory
+
+        source.lua_inventories[index]   = lua_inventory
+        source.lua_inventory_ids[index] = LuaInventoryRegistry.register(lua_inventory)
     end
 
     setmetatable(source, metatable)
 
     return source
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Destroy an inventory source and release all LuaInventory registry references it owns.
+--
+--- -----
+--- @param source InventorySource      The InventorySource to destroy.
+--
+function factory.destroy(source)
+    assert(source and source.object_name == "InventorySource", "InventorySource does not exist or is invalid !")      -- [DEBUG-ONLY] . --
+    assert(source.inventory == nil, "Monitored InventorySource cannot be destroyed !")                                 -- [DEBUG-ONLY] . --
+    assert(type(source.lua_inventory_ids) == "table", "InventorySource LuaInventory IDs must exist !")                -- [DEBUG-ONLY] . --
+
+    for _, lua_inventory_id in ipairs(source.lua_inventory_ids) do
+        LuaInventoryRegistry.unregister(lua_inventory_id)
+    end
+
+    source.lua_inventories   = nil
+    source.lua_inventory_ids = nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
