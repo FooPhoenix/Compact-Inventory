@@ -1,8 +1,8 @@
-
-local ItemKey                = require("util.item_key")
-local ItemOrder              = require("util.item_order")
-local InventoryWindowFactory = require("gui.inventory_window")
-local InventorySourceFactory = require("inventory.inventory_source")
+local ItemKey                     = require("util.item_key")
+local ItemOrder                   = require("util.item_order")
+local InventoryWindowFactory      = require("gui.inventory_window")
+local InventorySourceFactory      = require("inventory.inventory_source")
+local CharacterTrackingJobFactory = require("inventory.character_tracking_job")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -40,12 +40,7 @@ local changed_delta = { }
 --
 local inventory_metatable = { }
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 inventory_metatable.object_name = "Inventory"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.register_metatable(MOD_PREFIX .. "InventoryMetatable", inventory_metatable)
 inventory_metatable.__index = inventory_metatable
 
@@ -263,9 +258,9 @@ function inventory_metatable:update()
     for item_key in pairs(self.counts) do
         if not seen[item_key] then
             inventory_detachItem(self, item_key)
-            self.counts[item_key]   = nil
-            self.previous[item_key] = nil
-            self.next[item_key]     = nil
+            inventory.counts[item_key]   = nil
+            inventory.previous[item_key] = nil
+            inventory.next[item_key]     = nil
         end
     end
 
@@ -340,42 +335,57 @@ end
 ---
 --- ### This class groups all functions used to monitor inventories for one player.
 ---
---- @field private lua_player        LuaPlayer                 The player that owns the manager.
---- @field private inventories       table<integer, Inventory> The monitored inventories indexed by their internal ID.
---- @field private next_inventory_id integer                   The next inventory identifier to allocate.
+--- @field private lua_player             LuaPlayer                 The player that owns the manager.
+--- @field private inventories            table<integer, Inventory> The monitored inventories indexed by their internal ID.
+--- @field private next_inventory_id      integer                   The next inventory identifier to allocate.
+--- @field private character_tracking_job CharacterTrackingJob?     The physical-context tracker owned by this manager.
 ---
 --
 local manager_metatable = { }
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 manager_metatable.object_name = "InventoryManager"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.register_metatable(MOD_PREFIX .. "InventoryManagerMetatable", manager_metatable)
 manager_metatable.__index = manager_metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function sourcesMatch(source, lua_inventories)
-    local source_inventories = source:getInventories()
+local function sourceMatchesConfiguration(source, configuration)
+    local entries = source:getEntries()
 
-    if #source_inventories ~= #lua_inventories then
+    if #entries ~= #configuration.entities then
         return false
     end
 
-    for _, lua_inventory in ipairs(lua_inventories) do
-        local found = false
+    for _, entity_configuration in ipairs(configuration.entities) do
+        local matched_entry
 
-        for _, source_lua_inventory in ipairs(source_inventories) do
-            if source_lua_inventory == lua_inventory then
-                found = true
+        for _, entry in ipairs(entries) do
+            if entry.owner == entity_configuration.entity then
+                matched_entry = entry
                 break
             end
         end
 
-        if not found then
+        if not matched_entry then
+            return false
+        end
+
+        local requested_count = 0
+        local resolved_count  = 0
+
+        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+            requested_count = requested_count + 1
+
+            if not matched_entry.inventories[inventory_type] then
+                return false
+            end
+        end
+
+        for _ in pairs(matched_entry.inventories) do
+            resolved_count = resolved_count + 1
+        end
+
+        if requested_count ~= resolved_count then
             return false
         end
     end
@@ -385,59 +395,37 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function resolveConfiguration(configuration)
-    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
-    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
-    assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
+local function registerSourceTracking(source)
+    for _, lua_player in ipairs(source:getTrackedPlayers()) do
+        local job = CharacterTrackingJobFactory.get(lua_player)
 
-    local lua_inventories = { }
-
-    for _, entity_configuration in ipairs(configuration.entities) do
-        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")                      -- [DEBUG-ONLY] . --
-        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")           -- [DEBUG-ONLY] . --
-        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")                      -- [DEBUG-ONLY] . --
-        assert(entity_configuration.options == nil or type(entity_configuration.options) == "table", "Inventory entity options must be a table !") -- [DEBUG-ONLY] . --
-
-        local entity = entity_configuration.entity
-
-        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
-            assert(type(inventory_type) == "number", "Inventory type must be a defines.inventory value !")      -- [DEBUG-ONLY] . --
-
-            local lua_inventory = entity.get_inventory(inventory_type)
-
-            if lua_inventory and lua_inventory.valid then
-                local duplicate = false
-
-                for _, existing_inventory in ipairs(lua_inventories) do
-                    if existing_inventory == lua_inventory then
-                        duplicate = true
-                        break
-                    end
-                end
-
-                if not duplicate then
-                    lua_inventories[#lua_inventories + 1] = lua_inventory
-                end
-            end
+        if job then
+            job:registerSource(source)
         end
     end
+end
 
-    return lua_inventories
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function unregisterSourceTracking(source)
+    for _, lua_player in ipairs(source:getTrackedPlayers()) do
+        local job = CharacterTrackingJobFactory.get(lua_player)
+
+        if job then
+            job:unregisterSource(source)
+        end
+    end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager_metatable:monitorConfiguration(configuration)
-    local lua_inventories = resolveConfiguration(configuration)
-
-    assert(#lua_inventories > 0, "Inventory configuration did not resolve any LuaInventory !")      -- [DEBUG-ONLY] . --
-
-    if #lua_inventories == 0 then
-        return nil
-    end
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
+    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+    assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
 
     for _, inventory in pairs(self.inventories) do
-        if sourcesMatch(inventory:getSource(), lua_inventories) then
+        if sourceMatchesConfiguration(inventory:getSource(), configuration) then
             if inventory.configuration == nil then
                 inventory.configuration = configuration
             end
@@ -446,10 +434,11 @@ function manager_metatable:monitorConfiguration(configuration)
         end
     end
 
-    local source = InventorySourceFactory.new(table.unpack(lua_inventories))
+    local source    = InventorySourceFactory.new(configuration)
     local inventory = self:monitorInventory(source)
 
     inventory.configuration = configuration
+    registerSourceTracking(source)
     inventory:update()
 
     return inventory
@@ -458,18 +447,18 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager_metatable:monitorInventory(source)
-    assert(source and source.object_name == "InventorySource", "Source must be a valid InventorySource !")                    -- [DEBUG-ONLY] . --
+    assert(source and source.object_name == "InventorySource", "Source must be a valid InventorySource !")      -- [DEBUG-ONLY] . --
 
     if source.inventory then
-        assert(source.inventory.object_name == "Inventory", "InventorySource contains an invalid Inventory reference !")     -- [DEBUG-ONLY] . --
-        assert(source.inventory.manager == self, "InventorySource is already monitored by another InventoryManager !")       -- [DEBUG-ONLY] . --
+        assert(source.inventory.object_name == "Inventory", "InventorySource contains an invalid Inventory reference !")      -- [DEBUG-ONLY] . --
+        assert(source.inventory.manager == self, "InventorySource is already monitored by another InventoryManager !")        -- [DEBUG-ONLY] . --
 
         return source.inventory
     end
 
     local inventory_id = self.next_inventory_id
 
-    local inventory = {                                  ---@type Inventory
+    local inventory = {      ---@type Inventory
         id             = inventory_id,
         name           = "Inventory " .. inventory_id,
         manager        = self,
@@ -498,19 +487,19 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager_metatable:unmonitorInventory(source_or_inventory)
-    assert(source_or_inventory ~= nil, "InventorySource or Inventory cannot be nil !")                                -- [DEBUG-ONLY] . --
+    assert(source_or_inventory ~= nil, "InventorySource or Inventory cannot be nil !")      -- [DEBUG-ONLY] . --
 
     local inventory
 
     if source_or_inventory.object_name == "InventorySource" then
         inventory = source_or_inventory.inventory
-        assert(inventory, "InventorySource is not monitored !")                                                        -- [DEBUG-ONLY] . --
+        assert(inventory, "InventorySource is not monitored !")      -- [DEBUG-ONLY] . --
 
     elseif source_or_inventory.object_name == "Inventory" then
         inventory = source_or_inventory
 
     else
-        assert(false, "You need to provide an InventorySource or Inventory !")                                         -- [DEBUG-ONLY] . --
+        assert(false, "You need to provide an InventorySource or Inventory !")      -- [DEBUG-ONLY] . --
         return
     end
 
@@ -528,6 +517,8 @@ function manager_metatable:unmonitorInventory(source_or_inventory)
     for _, window_id in ipairs(window_ids) do
         inventory:removeWindow(window_id)
     end
+
+    unregisterSourceTracking(source)
 
     self.inventories[inventory.id] = nil
     source.inventory = nil
@@ -548,6 +539,26 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function manager_metatable:ensureCharacterTracking()
+    local job = CharacterTrackingJobFactory.ensure(self.lua_player)
+
+    self.character_tracking_job = job
+
+    for _, inventory_manager in pairs(storage.inventory_managers) do
+        for _, inventory in pairs(inventory_manager:getInventories()) do
+            local source = inventory:getSource()
+
+            if source:usesPlayer(self.lua_player) then
+                job:registerSource(source)
+            end
+        end
+    end
+
+    return job
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function manager_metatable:updateInventory(lua_inventory)
     self:updateInventories({ lua_inventory })
 end
@@ -558,7 +569,7 @@ function manager_metatable:updateInventories(lua_inventories)
     local inventories_to_update = { }
 
     for _, lua_inventory in ipairs(lua_inventories) do
-        assert(lua_inventory and lua_inventory.valid and lua_inventory.object_name == "LuaInventory", "You need to provide valid LuaInventory !")  -- [DEBUG-ONLY] . --
+        assert(lua_inventory and lua_inventory.valid and lua_inventory.object_name == "LuaInventory", "You need to provide valid LuaInventory !")      -- [DEBUG-ONLY] . --
 
         for _, inventory in pairs(self.inventories) do
             if inventory.source:containsInventory(lua_inventory) then
@@ -586,11 +597,6 @@ end
 -- ║ InventoryManagerFactory.                                                                                      ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
----
---- @class InventoryManagerFactory
----
---- ### This class groups all functions used to create and retrieve InventoryManager instances.
----
 local factory = { }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -608,12 +614,13 @@ end
 function factory.initializePlayer(player)
     local player_index, lua_player = resolve_player(player)
 
-    assert(storage.inventory_managers[player_index] == nil, "Player already has an InventoryManager !")              -- [DEBUG-ONLY] . --
+    assert(storage.inventory_managers[player_index] == nil, "Player already has an InventoryManager !")      -- [DEBUG-ONLY] . --
 
-    local manager = {                                    ---@type InventoryManager
-        lua_player        = lua_player,
-        inventories       = { },
-        next_inventory_id = 1
+    local manager = {      ---@type InventoryManager
+        lua_player             = lua_player,
+        inventories            = { },
+        next_inventory_id      = 1,
+        character_tracking_job = nil
     }
 
     setmetatable(manager, manager_metatable)
@@ -628,7 +635,7 @@ function factory.get(player)
     local player_index = resolve_player(player)
     local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
 
-    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
+    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")      -- [DEBUG-ONLY] . --
 
     return manager
 end
@@ -639,7 +646,7 @@ function factory.destroy(player)
     local player_index = resolve_player(player)
     local manager = storage.inventory_managers[player_index]     ---@type InventoryManager
 
-    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")  -- [DEBUG-ONLY] . --
+    assert(manager and manager.object_name == "InventoryManager", "Player does not have a valid InventoryManager !")      -- [DEBUG-ONLY] . --
 
     local inventory_ids = { }
 
@@ -651,8 +658,9 @@ function factory.destroy(player)
         manager:unmonitorInventory(manager.inventories[inventory_id])
     end
 
-    manager.inventories = { }
-    manager.lua_player = nil
+    manager.inventories            = { }
+    manager.character_tracking_job = nil
+    manager.lua_player             = nil
     storage.inventory_managers[player_index] = nil
 end
 
