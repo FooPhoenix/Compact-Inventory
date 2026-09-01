@@ -8,6 +8,7 @@ local InventoryWindowScheduler        = require("gui.inventory_window_scheduler"
 local InventoryManagerFactory         = require("inventory.inventory_manager")
 local CharacterTrackingJobFactory     = require("inventory.character_tracking_job")
 local SchedulerFactory                = require("util.scheduler")
+local CharacterSwitchTest             = require("debug.character_switch_test")
 
 InventoryWindowScheduler.install(InventoryWindowFactory)
 
