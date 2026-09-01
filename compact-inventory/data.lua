@@ -222,5 +222,24 @@ data:extend({
                 icon_size = 64
             }
         }
+    },
+    {
+        type           = "shortcut",
+        name           = MOD_PREFIX .. "debug-switch-character",
+        action         = "lua",
+        toggleable     = false,
+        localised_name = "[DEBUG] Switch player character",
+        icons = {
+            {
+                icon      = "__base__/graphics/icons/signal/signal_C.png",
+                icon_size = 64
+            }
+        },
+        small_icons = {
+            {
+                icon      = "__base__/graphics/icons/signal/signal_C.png",
+                icon_size = 64
+            }
+        }
     }
 })
