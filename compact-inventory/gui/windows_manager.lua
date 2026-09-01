@@ -2,12 +2,12 @@
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local MainWindowFactory               = require("gui.main_window")
-local InventoryWindowFactory          = require("gui.inventory_window")
-local InventoryWindowScheduler        = require("gui.inventory_window_scheduler")
-local InventoryManagerFactory         = require("inventory.inventory_manager")
-local CharacterTrackingJobFactory     = require("inventory.character_tracking_job")
-local SchedulerFactory                = require("util.scheduler")
+local MainWindowFactory        = require("gui.main_window")
+local InventoryWindowFactory   = require("gui.inventory_window")
+local InventoryWindowScheduler = require("gui.inventory_window_scheduler")
+local InventoryManagerFactory  = require("inventory.inventory_manager")
+local InventoryType            = require("inventory.inventory_type")
+local SchedulerFactory         = require("util.scheduler")
 
 InventoryWindowScheduler.install(InventoryWindowFactory)
 
@@ -115,12 +115,13 @@ end
 
 function manager.initializePlayer(player)
     local _, lua_player = resolve_player(player)
-    local inventory = InventoryManagerFactory.get(lua_player):monitorConfiguration({
+    local inventory_manager = InventoryManagerFactory.get(lua_player)
+    local inventory = inventory_manager:monitorConfiguration({
         entities = {
             {
                 entity = lua_player,
                 inventory_types = {
-                    defines.inventory.character_main
+                    InventoryType.character_main
                 },
                 options = { }
             }
@@ -130,7 +131,7 @@ function manager.initializePlayer(player)
 
     assert(inventory, "Player inventory configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
 
-    CharacterTrackingJobFactory.ensure(lua_player)
+    inventory_manager:ensureCharacterTracking()
     inventory:createWindow()
     MainWindowFactory.create(lua_player)
 end
@@ -138,7 +139,7 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager.ensureCharacterTracking(player)
-    return CharacterTrackingJobFactory.ensure(player)
+    return InventoryManagerFactory.get(player):ensureCharacterTracking()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
