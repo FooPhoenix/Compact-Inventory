@@ -174,6 +174,56 @@ local function unregisterResolvedInventories(inventory_data)
     end
 end
 
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function buildEntries(configuration)
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
+    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+
+    local entries = { }
+
+    for _, entity_configuration in ipairs(configuration.entities) do
+        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")             -- [DEBUG-ONLY] . --
+        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")  -- [DEBUG-ONLY] . --
+        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")             -- [DEBUG-ONLY] . --
+
+        local owner = entity_configuration.entity
+        local entry
+
+        for _, existing_entry in ipairs(entries) do
+            if existing_entry.owner == owner then
+                entry = existing_entry
+                break
+            end
+        end
+
+        if not entry then
+            entry = {
+                owner       = owner,
+                inventories = { }
+            }
+
+            entries[#entries + 1] = entry
+        end
+
+        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+            assert(VALID_INVENTORY_TYPES[inventory_type], "Inventory configuration contains an invalid InventoryType !")      -- [DEBUG-ONLY] . --
+            assert(entry.inventories[inventory_type] == nil, "InventorySource cannot request the same InventoryType twice for one owner !")      -- [DEBUG-ONLY] . --
+
+            local lua_inventory = resolveInventory(owner, inventory_type)
+            local lua_inventories = lua_inventory and { lua_inventory } or { }
+            local registered_inventories, registered_ids = registerResolvedInventories(lua_inventories)
+
+            entry.inventories[inventory_type] = {
+                lua_inventories   = registered_inventories,
+                lua_inventory_ids = registered_ids
+            }
+        end
+    end
+
+    return entries
+end
+
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventorySourceMetatable.                                                                                     ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
@@ -261,7 +311,38 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+function metatable:migrateConfiguration(configuration)
+    if self.entries then
+        return false
+    end
+
+    local old_lua_inventory_ids = self.lua_inventory_ids or { }
+
+    self.entries = buildEntries(configuration)
+    rebuildFlattenedInventories(self)
+
+    for _, lua_inventory_id in ipairs(old_lua_inventory_ids) do
+        LuaInventoryRegistry.unregister(lua_inventory_id)
+    end
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function ensureEntries(source)
+    if source.entries then
+        return
+    end
+
+    assert(source.inventory and source.inventory.configuration, "Legacy InventorySource requires its configuration to migrate !")      -- [DEBUG-ONLY] . --
+    source:migrateConfiguration(source.inventory.configuration)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getEntries()
+    ensureEntries(self)
     return self.entries
 end
 
@@ -280,6 +361,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getTrackedPlayers()
+    ensureEntries(self)
+
     local players = { }
 
     for _, entry in ipairs(self.entries) do
@@ -332,6 +415,8 @@ end
 function metatable:updatePlayerContext(player, lua_character, lua_vehicle, character_changed, vehicle_changed)
     local _, lua_player = resolve_player(player)
     local changed = false
+
+    ensureEntries(self)
 
     for _, entry in ipairs(self.entries) do
         if entry.owner == lua_player then
@@ -430,46 +515,15 @@ local factory = { }
 
 --- ### Create an InventorySource from a descriptive inventory configuration.
 --
---- One runtime entry is created per configured owner. Requested InventoryType are kept as map keys even when they
---- currently resolve no LuaInventory, allowing dynamic player sources to become available later.
+--- One runtime entry is created per owner. Requested InventoryType are kept as map keys even when they currently
+--- resolve no LuaInventory, allowing dynamic player sources to become available later.
 --
 function factory.new(configuration)
-    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
-    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
-
     local source = {      ---@type InventorySource
-        entries           = { },
+        entries           = buildEntries(configuration),
         lua_inventories   = { },
         lua_inventory_ids = { }
     }
-
-    for _, entity_configuration in ipairs(configuration.entities) do
-        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")             -- [DEBUG-ONLY] . --
-        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")  -- [DEBUG-ONLY] . --
-        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")             -- [DEBUG-ONLY] . --
-
-        local owner = entity_configuration.entity
-        local entry = {
-            owner       = owner,
-            inventories = { }
-        }
-
-        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
-            assert(VALID_INVENTORY_TYPES[inventory_type], "Inventory configuration contains an invalid InventoryType !")      -- [DEBUG-ONLY] . --
-            assert(entry.inventories[inventory_type] == nil, "InventorySource cannot request the same InventoryType twice for one owner !")      -- [DEBUG-ONLY] . --
-
-            local lua_inventory = resolveInventory(owner, inventory_type)
-            local lua_inventories = lua_inventory and { lua_inventory } or { }
-            local registered_inventories, registered_ids = registerResolvedInventories(lua_inventories)
-
-            entry.inventories[inventory_type] = {
-                lua_inventories   = registered_inventories,
-                lua_inventory_ids = registered_ids
-            }
-        end
-
-        source.entries[#source.entries + 1] = entry
-    end
 
     setmetatable(source, metatable)
     rebuildFlattenedInventories(source)
@@ -483,9 +537,15 @@ function factory.destroy(source)
     assert(source and source.object_name == "InventorySource", "InventorySource does not exist or is invalid !")      -- [DEBUG-ONLY] . --
     assert(source.inventory == nil, "Monitored InventorySource cannot be destroyed !")                                 -- [DEBUG-ONLY] . --
 
-    for _, entry in ipairs(source.entries) do
-        for _, inventory_data in pairs(entry.inventories) do
-            unregisterResolvedInventories(inventory_data)
+    if source.entries then
+        for _, entry in ipairs(source.entries) do
+            for _, inventory_data in pairs(entry.inventories) do
+                unregisterResolvedInventories(inventory_data)
+            end
+        end
+    else
+        for _, lua_inventory_id in ipairs(source.lua_inventory_ids or { }) do
+            LuaInventoryRegistry.unregister(lua_inventory_id)
         end
     end
 
