@@ -61,6 +61,59 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+--- ### Replace all LuaInventory contained in the source.
+--
+--- Registry references are acquired for the new inventories before the old references are released. If the resolved
+--- inventories are unchanged, the source is left untouched.
+--
+--- -----
+--- @param lua_inventories LuaInventory[]      The new LuaInventory to monitor.
+--
+--- @return boolean                              @ Whether the source changed.
+--
+function metatable:replaceInventories(lua_inventories)
+    assert(type(lua_inventories) == "table", "InventorySource replacement inventories must be a table !")      -- [DEBUG-ONLY] . --
+
+    if #lua_inventories == #self.lua_inventories then
+        local identical = true
+
+        for index, lua_inventory in ipairs(lua_inventories) do
+            if self.lua_inventories[index] ~= lua_inventory then
+                identical = false
+                break
+            end
+        end
+
+        if identical then
+            return false
+        end
+    end
+
+    local new_lua_inventories   = { }
+    local new_lua_inventory_ids = { }
+
+    for index, lua_inventory in ipairs(lua_inventories) do
+        assert(lua_inventory ~= nil, "InventorySource cannot contain nil LuaInventory !")                                            -- [DEBUG-ONLY] . --
+        assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "InventorySource can only contain LuaObject !")  -- [DEBUG-ONLY] . --
+        assert(lua_inventory.valid, "InventorySource can only contain valid LuaInventory !")                                         -- [DEBUG-ONLY] . --
+        assert(lua_inventory.object_name == "LuaInventory", "InventorySource can only contain LuaInventory !")                       -- [DEBUG-ONLY] . --
+
+        new_lua_inventories[index]   = lua_inventory
+        new_lua_inventory_ids[index] = LuaInventoryRegistry.register(lua_inventory)
+    end
+
+    for _, lua_inventory_id in ipairs(self.lua_inventory_ids) do
+        LuaInventoryRegistry.unregister(lua_inventory_id)
+    end
+
+    self.lua_inventories   = new_lua_inventories
+    self.lua_inventory_ids = new_lua_inventory_ids
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Get the content of one LuaInventory contained in the source.
 --
 --- The LuaInventory is read at most once per game tick. Other InventorySource referencing the same registry ID reuse
