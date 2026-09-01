@@ -6,6 +6,7 @@ local MainWindowFactory              = require("gui.main_window")
 local InventoryWindowFactory         = require("gui.inventory_window")
 local InventoryWindowScheduler       = require("gui.inventory_window_scheduler")
 local InventoryManagerFactory        = require("inventory.inventory_manager")
+local CharacterTracker               = require("inventory.character_tracker")
 local SchedulerFactory               = require("util.scheduler")
 
 InventoryWindowScheduler.install(InventoryWindowFactory)
@@ -49,6 +50,12 @@ end
 
 script.on_load(function()
     installSchedulerTickHandler()
+end)
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_player_controller_changed, function(event)
+    CharacterTracker.resynchronize(event.player_index)
 end)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
