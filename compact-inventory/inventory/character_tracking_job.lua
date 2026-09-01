@@ -50,6 +50,8 @@ end
 function metatable:registerSource(source)
     assert(source and source.object_name == "InventorySource", "CharacterTrackingJob can only register InventorySource !")      -- [DEBUG-ONLY] . --
 
+    self.sources = self.sources or { }
+
     for _, registered_source in ipairs(self.sources) do
         if registered_source == source then
             return false
@@ -66,6 +68,8 @@ end
 function metatable:unregisterSource(source)
     assert(source and source.object_name == "InventorySource", "CharacterTrackingJob can only unregister InventorySource !")      -- [DEBUG-ONLY] . --
 
+    self.sources = self.sources or { }
+
     for index, registered_source in ipairs(self.sources) do
         if registered_source == source then
             table.remove(self.sources, index)
@@ -74,6 +78,26 @@ function metatable:unregisterSource(source)
     end
 
     return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function migrateSources(job, lua_player)
+    if job.sources then
+        return
+    end
+
+    job.sources = { }
+
+    for _, manager in pairs(storage.inventory_managers or { }) do
+        for _, inventory in pairs(manager:getInventories()) do
+            local source = inventory:getSource()
+
+            if source:usesPlayer(lua_player) then
+                job:registerSource(source)
+            end
+        end
+    end
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -95,6 +119,8 @@ function metatable:execute(tick)
         self.next_tick = nil
         return
     end
+
+    migrateSources(self, lua_player)
 
     local lua_character = getCharacter(lua_player)
     local lua_vehicle   = lua_player.physical_vehicle
@@ -190,8 +216,7 @@ function factory.ensure(player)
         setmetatable(job, metatable)
         storage.character_tracking_jobs[player_index] = job
     else
-        job.sources = job.sources or { }
-        job.previous_vehicle = job.previous_vehicle or nil
+        migrateSources(job, lua_player)
     end
 
     assert(job.object_name == "CharacterTrackingJob", "Player character tracking job must be valid !")      -- [DEBUG-ONLY] . --
