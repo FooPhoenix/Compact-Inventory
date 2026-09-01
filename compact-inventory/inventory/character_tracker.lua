@@ -18,7 +18,17 @@ local tracker = { }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getPlayerCharacter(lua_player)
+--- ### Resolve the physical character currently associated with a player.
+--
+--- During cutscenes, `cutscene_character` keeps pointing to the character that will be restored afterwards.
+--
+--- -----
+--- @param player integer|LuaPlayer      The player whose physical character must be resolved.
+--
+--- @return LuaEntity?                   @ The physical character, or nil when no character can currently be resolved.
+--
+function tracker.getCharacter(player)
+    local _, lua_player = resolve_player(player)
     local lua_character = lua_player.character
 
     if lua_character and lua_character.valid then
@@ -52,7 +62,7 @@ local function resolveConfiguration(configuration)
             local inventory_owner = entity
 
             if entity.object_name == "LuaPlayer" and CHARACTER_INVENTORY_TYPES[inventory_type] then
-                inventory_owner = getPlayerCharacter(entity)
+                inventory_owner = tracker.getCharacter(entity)
 
                 if not inventory_owner then
                     return nil
