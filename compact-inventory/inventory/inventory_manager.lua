@@ -258,9 +258,9 @@ function inventory_metatable:update()
     for item_key in pairs(self.counts) do
         if not seen[item_key] then
             inventory_detachItem(self, item_key)
-            inventory.counts[item_key]   = nil
-            inventory.previous[item_key] = nil
-            inventory.next[item_key]     = nil
+            self.counts[item_key]   = nil
+            self.previous[item_key] = nil
+            self.next[item_key]     = nil
         end
     end
 
