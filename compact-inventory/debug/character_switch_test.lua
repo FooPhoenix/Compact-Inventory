@@ -1,5 +1,7 @@
 local factory = { }
 
+local SHORTCUT_NAME = MOD_PREFIX .. "debug-switch-character"
+
 local function getOrCreateCharacters(lua_player)
     storage.debug_character_switch_test = storage.debug_character_switch_test or { }
 
@@ -65,5 +67,22 @@ function factory.switch(player)
         lua_player.character = state.character_a
     end
 end
+
+script.on_nth_tick(1, function()
+    local shortcut_handler = script.get_event_handler(defines.events.on_lua_shortcut)
+
+    assert(shortcut_handler, "Lua shortcut event handler must exist before installing the debug wrapper !")      -- [DEBUG-ONLY] . --
+
+    script.on_event(defines.events.on_lua_shortcut, function(event)
+        if event.prototype_name == SHORTCUT_NAME then
+            factory.switch(event.player_index)
+            return
+        end
+
+        shortcut_handler(event)
+    end)
+
+    script.on_nth_tick(1, nil)
+end)
 
 return factory
