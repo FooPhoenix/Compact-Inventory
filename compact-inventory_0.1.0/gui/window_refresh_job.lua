@@ -57,8 +57,9 @@ function metatable:execute(tick)
         return
     end
 
+    window:getInventory():update()
+
     if window:isVisible() then
-        window:getInventory():update()
         window:refresh()
     end
 
