@@ -1,3 +1,6 @@
+-- Static types reuse Factorio inventory IDs when the semantic meaning is identical. Dynamic types use mod-owned IDs
+-- because their concrete LuaInventory depends on the source owner and current physical context.
+-- Character/vehicle types always refer to the selected LuaPlayer or LuaEntity, not necessarily the local player.
 local InventoryType = {
     character_main  = defines.inventory.character_main,
     character_ammo  = defines.inventory.character_ammo,
