@@ -1,4 +1,5 @@
 local InventoryType        = require("inventory.inventory_type")
+local SourceType           = require("inventory.source_type")
 local LuaInventoryRegistry = require("inventory.lua_inventory_registry")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
@@ -177,21 +178,23 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function buildEntries(configuration)
-    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
-    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                  -- [DEBUG-ONLY] . --
+    assert(type(configuration.sources) == "table", "Inventory configuration sources must be a table !") -- [DEBUG-ONLY] . --
 
     local entries = { }
 
-    for _, entity_configuration in ipairs(configuration.entities) do
-        assert(type(entity_configuration) == "table", "Inventory entity configuration must be a table !")             -- [DEBUG-ONLY] . --
-        assert(entity_configuration.entity and entity_configuration.entity.valid, "Inventory entity must be valid !")  -- [DEBUG-ONLY] . --
-        assert(type(entity_configuration.inventory_types) == "table", "Inventory types must be a table !")             -- [DEBUG-ONLY] . --
+    for _, source_configuration in ipairs(configuration.sources) do
+        assert(type(source_configuration) == "table", "Inventory source configuration must be a table !")        -- [DEBUG-ONLY] . --
+        assert(source_configuration.type == SourceType.player, "Inventory source type is not implemented yet !")  -- [DEBUG-ONLY] . --
+        assert(source_configuration.player and source_configuration.player.valid, "Inventory player source must be valid !")  -- [DEBUG-ONLY] . --
+        assert(source_configuration.player.object_name == "LuaPlayer", "Player source must contain a LuaPlayer !")            -- [DEBUG-ONLY] . --
+        assert(type(source_configuration.inventory_types) == "table", "Inventory types must be a table !")                    -- [DEBUG-ONLY] . --
 
-        local owner = entity_configuration.entity
+        local owner = source_configuration.player
         local entry
 
         for _, existing_entry in ipairs(entries) do
-            if existing_entry.owner == owner then
+            if existing_entry.source_type == source_configuration.type and existing_entry.owner == owner then
                 entry = existing_entry
                 break
             end
@@ -199,6 +202,7 @@ local function buildEntries(configuration)
 
         if not entry then
             entry = {
+                source_type = source_configuration.type,
                 owner       = owner,
                 inventories = { }
             }
@@ -206,9 +210,9 @@ local function buildEntries(configuration)
             entries[#entries + 1] = entry
         end
 
-        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+        for _, inventory_type in ipairs(source_configuration.inventory_types) do
             assert(VALID_INVENTORY_TYPES[inventory_type], "Inventory configuration contains an invalid InventoryType !")      -- [DEBUG-ONLY] . --
-            assert(entry.inventories[inventory_type] == nil, "InventorySource cannot request the same InventoryType twice for one owner !")      -- [DEBUG-ONLY] . --
+            assert(entry.inventories[inventory_type] == nil, "InventorySource cannot request the same InventoryType twice for one source !")      -- [DEBUG-ONLY] . --
 
             local lua_inventory = resolveInventory(owner, inventory_type)
             local lua_inventories = lua_inventory and { lua_inventory } or { }
@@ -233,7 +237,7 @@ end
 ---
 --- ### This class groups all functions used to manage an inventory source.
 ---
---- @field private entries            table[]             The descriptive source entries grouped by owner.
+--- @field private entries            table[]             Runtime source entries resolved from descriptive SourceType configurations.
 --- @field private lua_inventories    LuaInventory[]      The flattened resolved LuaInventory contained in the source.
 --- @field private lua_inventory_ids  integer[]           The flattened registry IDs matching `lua_inventories`.
 --- @field private inventory          Inventory?          The Inventory currently monitoring the source.
@@ -366,7 +370,7 @@ function metatable:getTrackedPlayers()
     local players = { }
 
     for _, entry in ipairs(self.entries) do
-        if entry.owner.object_name == "LuaPlayer" then
+        if entry.source_type == SourceType.player and entry.owner.object_name == "LuaPlayer" then
             for inventory_type in pairs(entry.inventories) do
                 if CHARACTER_INVENTORY_TYPES[inventory_type] or VEHICLE_INVENTORY_TYPES[inventory_type] then
                     local duplicate = false
@@ -407,7 +411,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Re-resolve only source entries that depend on one player's physical character or vehicle.
+--- ### Re-resolve only player source entries that depend on one player's physical character or vehicle.
 --
 --- Character and vehicle are passed as one physical-context snapshot so a character replacement cannot leave vehicle
 --- inventories synchronized against the previous character.
@@ -419,7 +423,7 @@ function metatable:updatePlayerContext(player, lua_character, lua_vehicle, chara
     ensureEntries(self)
 
     for _, entry in ipairs(self.entries) do
-        if entry.owner == lua_player then
+        if entry.source_type == SourceType.player and entry.owner == lua_player then
             for inventory_type in pairs(entry.inventories) do
                 local should_resolve = CHARACTER_INVENTORY_TYPES[inventory_type] and character_changed
                     or VEHICLE_INVENTORY_TYPES[inventory_type] and vehicle_changed
@@ -497,9 +501,9 @@ end
 ---
 --- @class InventorySource: InventorySourceMetatable
 ---
---- ### This class represents a logical inventory source resolved from descriptive owner/type entries.
+--- ### This class represents a logical inventory source resolved from descriptive SourceType configurations.
 ---
---- @field private entries            table[]             The descriptive source entries grouped by owner.
+--- @field private entries            table[]             Runtime source entries used by the currently implemented resolvers.
 --- @field private lua_inventories    LuaInventory[]      The flattened resolved LuaInventory contained in the source.
 --- @field private lua_inventory_ids  integer[]           The flattened registry IDs matching `lua_inventories`.
 --- @field private inventory          Inventory?          The Inventory currently monitoring the source.
@@ -515,8 +519,9 @@ local factory = { }
 
 --- ### Create an InventorySource from a descriptive inventory configuration.
 --
---- One runtime entry is created per owner. Requested InventoryType are kept as map keys even when they currently
---- resolve no LuaInventory, allowing dynamic player sources to become available later.
+--- The public configuration is SourceType based. Runtime entries remain resolver-specific implementation details.
+--- Requested InventoryType are kept as map keys even when they currently resolve no LuaInventory, allowing dynamic
+--- player sources to become available later.
 --
 function factory.new(configuration)
     local source = {      ---@type InventorySource
