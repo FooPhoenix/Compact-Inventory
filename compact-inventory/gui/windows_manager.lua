@@ -7,6 +7,7 @@ local InventoryWindowFactory   = require("gui.inventory_window")
 local InventoryWindowScheduler = require("gui.inventory_window_scheduler")
 local InventoryManagerFactory  = require("inventory.inventory_manager")
 local InventoryType            = require("inventory.inventory_type")
+local SourceType               = require("inventory.source_type")
 local SchedulerFactory         = require("util.scheduler")
 
 InventoryWindowScheduler.install(InventoryWindowFactory)
@@ -117,9 +118,10 @@ function manager.initializePlayer(player)
     local _, lua_player = resolve_player(player)
     local inventory_manager = InventoryManagerFactory.get(lua_player)
     local inventory = inventory_manager:monitorConfiguration({
-        entities = {
+        sources = {
             {
-                entity = lua_player,
+                type   = SourceType.player,
+                player = lua_player,
                 inventory_types = {
                     InventoryType.character_main
                 },
