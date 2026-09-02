@@ -217,7 +217,28 @@ local function reconcileLastChangeState(inventory)
     inventory.last     = new_last
 end
 
+local function resetDevelopmentState()
+    -- [TEMPORARY] Development-only nuclear reset while persisted scheduler/window migration is unresolved (#6). --
+    for _, lua_player in pairs(game.players) do
+        for _, lua_element in ipairs(lua_player.gui.screen.children) do
+            if lua_element.name:sub(1, #MOD_PREFIX) == MOD_PREFIX then
+                lua_element.destroy()
+            end
+        end
+    end
+
+    for key in pairs(storage) do
+        storage[key] = nil
+    end
+end
+
 function Migration.prepareItemIdentityMigration()
+    resetDevelopmentState()
+    return
+
+    -- [TEMPORARY] Unreachable while the development reset above is enabled. --
+    -- luacheck: ignore 511
+    --[[
     if not storage.item_order_names then
         return
     end
@@ -229,6 +250,7 @@ function Migration.prepareItemIdentityMigration()
     forEachInventory(function(inventory)
         convertLastChangeState(inventory, quality_by_offset)
     end)
+    ]]
 end
 
 function Migration.reconcileItemData()

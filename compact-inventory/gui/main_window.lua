@@ -1,5 +1,7 @@
 
 local InventoryManagerFactory = require("inventory.inventory_manager")
+local InventoryType           = require("inventory.inventory_type")
+local SourceType              = require("inventory.source_type")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -720,13 +722,17 @@ function metatable:showCreationPanel(presets)
     local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
     local source_column   = columns and columns[GUI_NAME.creation_source_column]
     local source_player   = source_column and source_column[GUI_NAME.source_player]
+    local source_vehicle  = source_column and source_column[GUI_NAME.source_player_vehicle]
+    local source_entities = source_column and source_column[GUI_NAME.source_selected_entities]
 
-    assert(windows_column and creation_column and source_player, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(windows_column and creation_column and source_player and source_vehicle and source_entities, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
     assert(type(presets) == "table", "Window preset metadata list must be a table !")                                     -- [DEBUG-ONLY] . --
 
     self.rename_target                = nil
     self.selected_window_preset_name  = nil
     source_player.state               = true
+    source_vehicle.state              = false
+    source_entities.state             = false
     windows_column.visible            = false
     creation_column.visible           = true
 
@@ -740,17 +746,26 @@ function metatable:getCreationConfiguration()
     local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
     local source_column   = columns and columns[GUI_NAME.creation_source_column]
     local source_player   = source_column and source_column[GUI_NAME.source_player]
+    local source_vehicle  = source_column and source_column[GUI_NAME.source_player_vehicle]
 
-    assert(source_player and source_player.state, "A supported inventory source must be selected !")      -- [DEBUG-ONLY] . --
+    assert(source_player and source_vehicle, "Supported inventory source controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(source_player.state or source_vehicle.state, "A supported inventory source must be selected !") -- [DEBUG-ONLY] . --
+
+    local inventory_types = {
+        InventoryType.character_main
+    }
+
+    if source_vehicle.state then
+        inventory_types[#inventory_types + 1] = InventoryType.vehicle_main
+    end
 
     return {
-        entities = {
+        sources = {
             {
-                entity = self:getPlayer(),
-                inventory_types = {
-                    defines.inventory.character_main
-                },
-                options = { }
+                type            = SourceType.player,
+                player          = self:getPlayer(),
+                inventory_types = inventory_types,
+                options         = { }
             }
         },
         options = { }
@@ -1035,14 +1050,12 @@ function factory.createGUI(window)                                              
         state   = true
     })
 
-    local player_vehicle = source_column.add({
+    source_column.add({
         type    = "radiobutton",
         name    = GUI_NAME.source_player_vehicle,
         caption = "Player vehicle",
         state   = false
     })
-
-    player_vehicle.enabled = false
 
     local selected_entities = source_column.add({
         type    = "radiobutton",

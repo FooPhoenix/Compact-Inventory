@@ -2,11 +2,13 @@
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local MainWindowFactory              = require("gui.main_window")
-local InventoryWindowFactory         = require("gui.inventory_window")
-local InventoryWindowScheduler       = require("gui.inventory_window_scheduler")
-local InventoryManagerFactory        = require("inventory.inventory_manager")
-local SchedulerFactory               = require("util.scheduler")
+local MainWindowFactory        = require("gui.main_window")
+local InventoryWindowFactory   = require("gui.inventory_window")
+local InventoryWindowScheduler = require("gui.inventory_window_scheduler")
+local InventoryManagerFactory  = require("inventory.inventory_manager")
+local InventoryType            = require("inventory.inventory_type")
+local SourceType               = require("inventory.source_type")
+local SchedulerFactory         = require("util.scheduler")
 
 InventoryWindowScheduler.install(InventoryWindowFactory)
 
@@ -114,12 +116,14 @@ end
 
 function manager.initializePlayer(player)
     local _, lua_player = resolve_player(player)
-    local inventory = InventoryManagerFactory.get(lua_player):monitorConfiguration({
-        entities = {
+    local inventory_manager = InventoryManagerFactory.get(lua_player)
+    local inventory = inventory_manager:monitorConfiguration({
+        sources = {
             {
-                entity = lua_player,
+                type   = SourceType.player,
+                player = lua_player,
                 inventory_types = {
-                    defines.inventory.character_main
+                    InventoryType.character_main
                 },
                 options = { }
             }
@@ -129,8 +133,15 @@ function manager.initializePlayer(player)
 
     assert(inventory, "Player inventory configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
 
+    inventory_manager:ensureCharacterTracking()
     inventory:createWindow()
     MainWindowFactory.create(lua_player)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function manager.ensureCharacterTracking(player)
+    return InventoryManagerFactory.get(player):ensureCharacterTracking()
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --

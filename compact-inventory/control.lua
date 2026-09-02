@@ -5,6 +5,8 @@ local Migration                 = require("util.migration")
 local PresetManagerFactory      = require("util.preset_manager")
 local InventoryViewFactory      = require("inventory.inventory_view")
 local InventoryManagerFactory   = require("inventory.inventory_manager")
+local InventoryType             = require("inventory.inventory_type")
+local SourceType                = require("inventory.source_type")
 local WindowsManager            = require("gui.windows_manager")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
 local WindowPresetMenuFactory   = require("gui.window_preset_menu")
@@ -216,15 +218,31 @@ local function applyWindowPresetSourceToCreationUI(main_window, configuration)
     assert(main_window and main_window.object_name == "MainWindow", "Main window must exist here !")      -- [DEBUG-ONLY] . --
     assert(type(configuration) == "table", "Window preset source configuration must be a table !")         -- [DEBUG-ONLY] . --
 
-    local entities         = configuration.entities
-    local entity_config    = type(entities) == "table" and entities[1] or nil
-    local inventory_types  = entity_config and entity_config.inventory_types or nil
-    local is_player_source = type(entities) == "table"
-        and #entities == 1
-        and entity_config.entity == main_window:getPlayer()
-        and type(inventory_types) == "table"
-        and #inventory_types == 1
-        and inventory_types[1] == defines.inventory.character_main
+    local sources              = configuration.sources
+    local source_configuration = type(sources) == "table" and sources[1] or nil
+    local inventory_types      = source_configuration and source_configuration.inventory_types or nil
+    local has_character_main   = false
+    local has_vehicle_main     = false
+    local supported_types      = type(inventory_types) == "table"
+
+    for _, inventory_type in ipairs(inventory_types or { }) do
+        if inventory_type == InventoryType.character_main then
+            has_character_main = true
+        elseif inventory_type == InventoryType.vehicle_main then
+            has_vehicle_main = true
+        else
+            supported_types = false
+            break
+        end
+    end
+
+    local is_player_source = type(sources) == "table"
+        and #sources == 1
+        and source_configuration.type == SourceType.player
+        and source_configuration.player == main_window:getPlayer()
+        and supported_types
+        and has_character_main
+        and (#inventory_types == 1 or #inventory_types == 2 and has_vehicle_main)
 
     assert(is_player_source, "Window preset contains an unsupported source configuration !")      -- [DEBUG-ONLY] . --
 
@@ -232,15 +250,15 @@ local function applyWindowPresetSourceToCreationUI(main_window, configuration)
         return false
     end
 
-    local frame             = main_window:getFrame()
-    local source_player     = findGuiElement(frame, MOD_PREFIX .. "MW_source-player")
-    local source_vehicle    = findGuiElement(frame, MOD_PREFIX .. "MW_source-player-vehicle")
-    local source_entities   = findGuiElement(frame, MOD_PREFIX .. "MW_source-selected-entities")
+    local frame           = main_window:getFrame()
+    local source_player   = findGuiElement(frame, MOD_PREFIX .. "MW_source-player")
+    local source_vehicle  = findGuiElement(frame, MOD_PREFIX .. "MW_source-player-vehicle")
+    local source_entities = findGuiElement(frame, MOD_PREFIX .. "MW_source-selected-entities")
 
     assert(source_player and source_vehicle and source_entities, "Main window source controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    source_player.state   = true
-    source_vehicle.state  = false
+    source_player.state   = not has_vehicle_main
+    source_vehicle.state  = has_vehicle_main
     source_entities.state = false
 
     return true
@@ -792,6 +810,17 @@ script.on_event(defines.events.on_gui_checked_state_changed, function(event)
     end
 
     local main_window = WindowsManager.getMainWindow(event.player_index)
+
+    for source_name in pairs(CREATION_SOURCE_GUI_NAMES) do
+        if source_name ~= event.element.name then
+            local source_element = findGuiElement(main_window:getFrame(), source_name)
+
+            if source_element then
+                source_element.state = false
+            end
+        end
+    end
+
     local preset_name = main_window:getSelectedWindowPresetName()
 
     if not preset_name then

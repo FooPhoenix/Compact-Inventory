@@ -1,4 +1,5 @@
-
+local InventoryType        = require("inventory.inventory_type")
+local SourceType           = require("inventory.source_type")
 local LuaInventoryRegistry = require("inventory.lua_inventory_registry")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
@@ -11,6 +12,223 @@ local inventory_content_cache      = { }
 local inventory_content_cache_tick = nil
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
+-- ║ Inventory type helpers.                                                                                       ║ --
+-- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
+
+local CHARACTER_INVENTORY_TYPES = {
+    [InventoryType.character_main]  = defines.inventory.character_main,
+    [InventoryType.character_ammo]  = defines.inventory.character_ammo,
+    [InventoryType.character_guns]  = defines.inventory.character_guns,
+    [InventoryType.character_armor] = defines.inventory.character_armor,
+    [InventoryType.character_trash] = defines.inventory.character_trash
+}
+
+local VEHICLE_INVENTORY_TYPES = {
+    [InventoryType.vehicle_main]  = true,
+    [InventoryType.vehicle_ammo]  = true,
+    [InventoryType.vehicle_trash] = true,
+    [InventoryType.vehicle_fuel]  = true
+}
+
+local VALID_INVENTORY_TYPES = { }
+
+for _, inventory_type in pairs(InventoryType) do
+    VALID_INVENTORY_TYPES[inventory_type] = true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getPlayerCharacter(lua_player)
+    local lua_character = lua_player.character
+
+    if lua_character and lua_character.valid then
+        return lua_character
+    end
+
+    lua_character = lua_player.cutscene_character
+
+    if lua_character and lua_character.valid then
+        return lua_character
+    end
+
+    return nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function resolveVehicleInventory(lua_vehicle, inventory_type)
+    if not lua_vehicle or not lua_vehicle.valid then
+        return nil
+    end
+
+    if inventory_type == InventoryType.vehicle_fuel then
+        local lua_inventory = lua_vehicle.get_fuel_inventory()
+        return lua_inventory and lua_inventory.valid and lua_inventory or nil
+    end
+
+    local factorio_inventory_type
+
+    if inventory_type == InventoryType.vehicle_main then
+        if lua_vehicle.type == "car" then
+            factorio_inventory_type = defines.inventory.car_trunk
+        elseif lua_vehicle.type == "spider-vehicle" then
+            factorio_inventory_type = defines.inventory.spider_trunk
+        elseif lua_vehicle.type == "cargo-wagon" then
+            factorio_inventory_type = defines.inventory.cargo_wagon
+        end
+
+    elseif inventory_type == InventoryType.vehicle_ammo then
+        if lua_vehicle.type == "car" then
+            factorio_inventory_type = defines.inventory.car_ammo
+        elseif lua_vehicle.type == "spider-vehicle" then
+            factorio_inventory_type = defines.inventory.spider_ammo
+        elseif lua_vehicle.type == "artillery-wagon" then
+            factorio_inventory_type = defines.inventory.artillery_wagon_ammo
+        end
+
+    elseif inventory_type == InventoryType.vehicle_trash then
+        if lua_vehicle.type == "car" then
+            factorio_inventory_type = defines.inventory.car_trash
+        elseif lua_vehicle.type == "spider-vehicle" then
+            factorio_inventory_type = defines.inventory.spider_trash
+        end
+    end
+
+    if not factorio_inventory_type then
+        return nil
+    end
+
+    local lua_inventory = lua_vehicle.get_inventory(factorio_inventory_type)
+    return lua_inventory and lua_inventory.valid and lua_inventory or nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function resolveInventory(owner, inventory_type, lua_character, lua_vehicle)
+    assert(owner and owner.valid, "InventorySource owner must be valid !")                                      -- [DEBUG-ONLY] . --
+    assert(VALID_INVENTORY_TYPES[inventory_type], "InventorySource contains an invalid InventoryType !")      -- [DEBUG-ONLY] . --
+
+    if owner.object_name == "LuaPlayer" then
+        if CHARACTER_INVENTORY_TYPES[inventory_type] then
+            lua_character = lua_character or getPlayerCharacter(owner)
+
+            if not lua_character then
+                return nil
+            end
+
+            local lua_inventory = lua_character.get_inventory(CHARACTER_INVENTORY_TYPES[inventory_type])
+            return lua_inventory and lua_inventory.valid and lua_inventory or nil
+        end
+
+        if VEHICLE_INVENTORY_TYPES[inventory_type] then
+            lua_vehicle = lua_vehicle or owner.physical_vehicle
+            return resolveVehicleInventory(lua_vehicle, inventory_type)
+        end
+
+        return nil
+    end
+
+    if owner.object_name ~= "LuaEntity" then
+        return nil
+    end
+
+    if VEHICLE_INVENTORY_TYPES[inventory_type] then
+        return resolveVehicleInventory(owner, inventory_type)
+    end
+
+    local factorio_inventory_type
+
+    if inventory_type == InventoryType.chest_main then
+        factorio_inventory_type = defines.inventory.chest
+    elseif inventory_type == InventoryType.chest_trash then
+        factorio_inventory_type = defines.inventory.logistic_container_trash
+    else
+        -- Train-wide sources intentionally remain unresolved until train support is implemented.
+        return nil
+    end
+
+    local lua_inventory = owner.get_inventory(factorio_inventory_type)
+    return lua_inventory and lua_inventory.valid and lua_inventory or nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function registerResolvedInventories(lua_inventories)
+    local registered_inventories = { }
+    local registered_ids         = { }
+
+    for _, lua_inventory in ipairs(lua_inventories) do
+        assert(lua_inventory and lua_inventory.valid and lua_inventory.object_name == "LuaInventory", "InventorySource can only contain valid LuaInventory !")      -- [DEBUG-ONLY] . --
+
+        registered_inventories[#registered_inventories + 1] = lua_inventory
+        registered_ids[#registered_ids + 1] = LuaInventoryRegistry.register(lua_inventory)
+    end
+
+    return registered_inventories, registered_ids
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function unregisterResolvedInventories(inventory_data)
+    for _, lua_inventory_id in ipairs(inventory_data.lua_inventory_ids) do
+        LuaInventoryRegistry.unregister(lua_inventory_id)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function buildEntries(configuration)
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                  -- [DEBUG-ONLY] . --
+    assert(type(configuration.sources) == "table", "Inventory configuration sources must be a table !") -- [DEBUG-ONLY] . --
+
+    local entries = { }
+
+    for _, source_configuration in ipairs(configuration.sources) do
+        assert(type(source_configuration) == "table", "Inventory source configuration must be a table !")        -- [DEBUG-ONLY] . --
+        assert(source_configuration.type == SourceType.player, "Inventory source type is not implemented yet !")  -- [DEBUG-ONLY] . --
+        assert(source_configuration.player and source_configuration.player.valid, "Inventory player source must be valid !")  -- [DEBUG-ONLY] . --
+        assert(source_configuration.player.object_name == "LuaPlayer", "Player source must contain a LuaPlayer !")            -- [DEBUG-ONLY] . --
+        assert(type(source_configuration.inventory_types) == "table", "Inventory types must be a table !")                    -- [DEBUG-ONLY] . --
+
+        local owner = source_configuration.player
+        local entry
+
+        for _, existing_entry in ipairs(entries) do
+            if existing_entry.source_type == source_configuration.type and existing_entry.owner == owner then
+                entry = existing_entry
+                break
+            end
+        end
+
+        if not entry then
+            entry = {
+                source_type = source_configuration.type,
+                owner       = owner,
+                inventories = { }
+            }
+
+            entries[#entries + 1] = entry
+        end
+
+        for _, inventory_type in ipairs(source_configuration.inventory_types) do
+            assert(VALID_INVENTORY_TYPES[inventory_type], "Inventory configuration contains an invalid InventoryType !")      -- [DEBUG-ONLY] . --
+            assert(entry.inventories[inventory_type] == nil, "InventorySource cannot request the same InventoryType twice for one source !")      -- [DEBUG-ONLY] . --
+
+            local lua_inventory = resolveInventory(owner, inventory_type)
+            local lua_inventories = lua_inventory and { lua_inventory } or { }
+            local registered_inventories, registered_ids = registerResolvedInventories(lua_inventories)
+
+            entry.inventories[inventory_type] = {
+                lua_inventories   = registered_inventories,
+                lua_inventory_ids = registered_ids
+            }
+        end
+    end
+
+    return entries
+end
+
+-- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventorySourceMetatable.                                                                                     ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
@@ -19,58 +237,214 @@ local inventory_content_cache_tick = nil
 ---
 --- ### This class groups all functions used to manage an inventory source.
 ---
---- @field private lua_inventories    LuaInventory[]      The LuaInventory contained in the source.
---- @field private lua_inventory_ids  integer[]           The internal registry IDs matching `lua_inventories`.
---- @field private inventory          Inventory?           The Inventory currently monitoring the source.
+--- @field private entries            table[]             Runtime source entries resolved from descriptive SourceType configurations.
+--- @field private lua_inventories    LuaInventory[]      The flattened resolved LuaInventory contained in the source.
+--- @field private lua_inventory_ids  integer[]           The flattened registry IDs matching `lua_inventories`.
+--- @field private inventory          Inventory?          The Inventory currently monitoring the source.
 ---
 --
 local metatable = { }
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 metatable.object_name = "InventorySource"
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 script.register_metatable(MOD_PREFIX .. "InventorySourceMetatable", metatable)
 metatable.__index = metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get all LuaInventory contained in the source.
---
---- -----
---- @return LuaInventory[]      @ The LuaInventory contained in the source.
---
+local function rebuildFlattenedInventories(source)
+    local lua_inventories   = { }
+    local lua_inventory_ids = { }
+
+    for _, entry in ipairs(source.entries) do
+        for _, inventory_data in pairs(entry.inventories) do
+            for index, lua_inventory in ipairs(inventory_data.lua_inventories) do
+                local duplicate = false
+
+                for _, existing_inventory in ipairs(lua_inventories) do
+                    if existing_inventory == lua_inventory then
+                        duplicate = true
+                        break
+                    end
+                end
+
+                if not duplicate then
+                    lua_inventories[#lua_inventories + 1] = lua_inventory
+                    lua_inventory_ids[#lua_inventory_ids + 1] = inventory_data.lua_inventory_ids[index]
+                end
+            end
+        end
+    end
+
+    source.lua_inventories   = lua_inventories
+    source.lua_inventory_ids = lua_inventory_ids
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function replaceInventoryType(source, entry, inventory_type, lua_inventories)
+    local inventory_data = entry.inventories[inventory_type]
+
+    assert(inventory_data, "InventorySource entry does not contain this InventoryType !")      -- [DEBUG-ONLY] . --
+
+    if #lua_inventories == #inventory_data.lua_inventories then
+        local identical = true
+
+        for index, lua_inventory in ipairs(lua_inventories) do
+            if inventory_data.lua_inventories[index] ~= lua_inventory then
+                identical = false
+                break
+            end
+        end
+
+        if identical then
+            return false
+        end
+    end
+
+    local new_lua_inventories, new_lua_inventory_ids = registerResolvedInventories(lua_inventories)
+
+    unregisterResolvedInventories(inventory_data)
+
+    inventory_data.lua_inventories   = new_lua_inventories
+    inventory_data.lua_inventory_ids = new_lua_inventory_ids
+
+    rebuildFlattenedInventories(source)
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:migrateConfiguration(configuration)
+    if self.entries then
+        return false
+    end
+
+    local old_lua_inventory_ids = self.lua_inventory_ids or { }
+
+    self.entries = buildEntries(configuration)
+    rebuildFlattenedInventories(self)
+
+    for _, lua_inventory_id in ipairs(old_lua_inventory_ids) do
+        LuaInventoryRegistry.unregister(lua_inventory_id)
+    end
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function ensureEntries(source)
+    if source.entries then
+        return
+    end
+
+    assert(source.inventory and source.inventory.configuration, "Legacy InventorySource requires its configuration to migrate !")      -- [DEBUG-ONLY] . --
+    source:migrateConfiguration(source.inventory.configuration)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getEntries()
+    ensureEntries(self)
+    return self.entries
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getInventories()
     return self.lua_inventories
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the internal registry IDs associated with the source LuaInventory.
---
---- IDs use the same indexes as `getInventories()`.
---
---- -----
---- @return integer[]      @ The internal LuaInventory IDs contained in the source.
---
 function metatable:getInventoryIDs()
     return self.lua_inventory_ids
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Get the content of one LuaInventory contained in the source.
+function metatable:getTrackedPlayers()
+    ensureEntries(self)
+
+    local players = { }
+
+    for _, entry in ipairs(self.entries) do
+        if entry.source_type == SourceType.player and entry.owner.object_name == "LuaPlayer" then
+            for inventory_type in pairs(entry.inventories) do
+                if CHARACTER_INVENTORY_TYPES[inventory_type] or VEHICLE_INVENTORY_TYPES[inventory_type] then
+                    local duplicate = false
+
+                    for _, lua_player in ipairs(players) do
+                        if lua_player == entry.owner then
+                            duplicate = true
+                            break
+                        end
+                    end
+
+                    if not duplicate then
+                        players[#players + 1] = entry.owner
+                    end
+
+                    break
+                end
+            end
+        end
+    end
+
+    return players
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:usesPlayer(player)
+    local _, lua_player = resolve_player(player)
+
+    for _, tracked_player in ipairs(self:getTrackedPlayers()) do
+        if tracked_player == lua_player then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+--- ### Re-resolve only player source entries that depend on one player's physical character or vehicle.
 --
---- The LuaInventory is read at most once per game tick. Other InventorySource referencing the same registry ID reuse
---- the same cached content for the rest of the tick.
+--- Character and vehicle are passed as one physical-context snapshot so a character replacement cannot leave vehicle
+--- inventories synchronized against the previous character.
 --
---- -----
---- @param index integer      The source LuaInventory index.
---
---- @return table             @ The LuaInventory content for the current game tick.
---
+function metatable:updatePlayerContext(player, lua_character, lua_vehicle, character_changed, vehicle_changed)
+    local _, lua_player = resolve_player(player)
+    local changed = false
+
+    ensureEntries(self)
+
+    for _, entry in ipairs(self.entries) do
+        if entry.source_type == SourceType.player and entry.owner == lua_player then
+            for inventory_type in pairs(entry.inventories) do
+                local should_resolve = CHARACTER_INVENTORY_TYPES[inventory_type] and character_changed
+                    or VEHICLE_INVENTORY_TYPES[inventory_type] and vehicle_changed
+
+                if should_resolve then
+                    local lua_inventory = resolveInventory(entry.owner, inventory_type, lua_character, lua_vehicle)
+                    local lua_inventories = lua_inventory and { lua_inventory } or { }
+
+                    if replaceInventoryType(self, entry, inventory_type, lua_inventories) then
+                        changed = true
+                    end
+                end
+            end
+        end
+    end
+
+    return changed
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getInventoryContent(index)
     assert(type(index) == "number" and index > 0 and index % 1 == 0, "InventorySource index must be a positive integer !")      -- [DEBUG-ONLY] . --
     assert(self.lua_inventories[index] ~= nil, "InventorySource LuaInventory does not exist !")                                  -- [DEBUG-ONLY] . --
@@ -105,15 +479,7 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Check whether a LuaInventory is contained in the source.
---
---- -----
---- @param lua_inventory LuaInventory      The LuaInventory to search for.
---
---- @return boolean                        @ Whether the LuaInventory is contained in the source.
---
 function metatable:containsInventory(lua_inventory)
-
     assert(lua_inventory ~= nil, "LuaInventory cannot be nil !")                                                       -- [DEBUG-ONLY] . --
     assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "LuaInventory must be a LuaObject !")  -- [DEBUG-ONLY] . --
     assert(lua_inventory.valid, "LuaInventory must be valid !")                                                        -- [DEBUG-ONLY] . --
@@ -135,79 +501,60 @@ end
 ---
 --- @class InventorySource: InventorySourceMetatable
 ---
---- ### This class represents a logical inventory source containing zero or more LuaInventory.
+--- ### This class represents a logical inventory source resolved from descriptive SourceType configurations.
 ---
---- @field private lua_inventories   LuaInventory[]      The LuaInventory contained in the source.
---- @field private lua_inventory_ids integer[]           The internal registry IDs matching `lua_inventories`.
---- @field private inventory         Inventory?          The Inventory currently monitoring the source.
+--- @field private entries            table[]             Runtime source entries used by the currently implemented resolvers.
+--- @field private lua_inventories    LuaInventory[]      The flattened resolved LuaInventory contained in the source.
+--- @field private lua_inventory_ids  integer[]           The flattened registry IDs matching `lua_inventories`.
+--- @field private inventory          Inventory?          The Inventory currently monitoring the source.
 ---
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ InventorySourceFactory.                                                                                       ║ --
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
----
---- @class InventorySourceFactory
----
---- ### This class groups all functions used to create inventory sources.
----
 local factory = { }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Create a new inventory source.
+--- ### Create an InventorySource from a descriptive inventory configuration.
 --
---- Each LuaInventory is registered once during source creation so hot-path updates can use its pre-resolved internal
---- ID without repeating the registry lookup.
+--- The public configuration is SourceType based. Runtime entries remain resolver-specific implementation details.
+--- Requested InventoryType are kept as map keys even when they currently resolve no LuaInventory, allowing dynamic
+--- player sources to become available later.
 --
---- -----
---- @param ... LuaInventory      The LuaInventory to include in the source.
---
---- @return InventorySource      @ Returns the created inventory source.
---
-function factory.new(...)
-
-    local lua_inventory_count = select("#", ...)
-    local lua_inventories     = { ... }
-
-    local source = {                                     ---@type InventorySource
+function factory.new(configuration)
+    local source = {      ---@type InventorySource
+        entries           = buildEntries(configuration),
         lua_inventories   = { },
         lua_inventory_ids = { }
     }
 
-    for index = 1, lua_inventory_count do
-        local lua_inventory = lua_inventories[index]
-
-        assert(lua_inventory ~= nil, "InventorySource cannot contain nil LuaInventory !")                                            -- [DEBUG-ONLY] . --
-        assert(type(lua_inventory) == "table" or type(lua_inventory) == "userdata", "InventorySource can only contain LuaObject !")  -- [DEBUG-ONLY] . --
-        assert(lua_inventory.valid, "InventorySource can only contain valid LuaInventory !")                                         -- [DEBUG-ONLY] . --
-        assert(lua_inventory.object_name == "LuaInventory", "InventorySource can only contain LuaInventory !")                       -- [DEBUG-ONLY] . --
-
-        source.lua_inventories[index]   = lua_inventory
-        source.lua_inventory_ids[index] = LuaInventoryRegistry.register(lua_inventory)
-    end
-
     setmetatable(source, metatable)
+    rebuildFlattenedInventories(source)
 
     return source
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
---- ### Destroy an inventory source and release all LuaInventory registry references it owns.
---
---- -----
---- @param source InventorySource      The InventorySource to destroy.
---
 function factory.destroy(source)
     assert(source and source.object_name == "InventorySource", "InventorySource does not exist or is invalid !")      -- [DEBUG-ONLY] . --
     assert(source.inventory == nil, "Monitored InventorySource cannot be destroyed !")                                 -- [DEBUG-ONLY] . --
-    assert(type(source.lua_inventory_ids) == "table", "InventorySource LuaInventory IDs must exist !")                -- [DEBUG-ONLY] . --
 
-    for _, lua_inventory_id in ipairs(source.lua_inventory_ids) do
-        LuaInventoryRegistry.unregister(lua_inventory_id)
+    if source.entries then
+        for _, entry in ipairs(source.entries) do
+            for _, inventory_data in pairs(entry.inventories) do
+                unregisterResolvedInventories(inventory_data)
+            end
+        end
+    else
+        for _, lua_inventory_id in ipairs(source.lua_inventory_ids or { }) do
+            LuaInventoryRegistry.unregister(lua_inventory_id)
+        end
     end
 
+    source.entries           = nil
     source.lua_inventories   = nil
     source.lua_inventory_ids = nil
 end
