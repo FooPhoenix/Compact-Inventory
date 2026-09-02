@@ -2,6 +2,7 @@ local ItemKey                     = require("util.item_key")
 local ItemOrder                   = require("util.item_order")
 local InventoryWindowFactory      = require("gui.inventory_window")
 local InventorySourceFactory      = require("inventory.inventory_source")
+local SourceType                  = require("inventory.source_type")
 local CharacterTrackingJobFactory = require("inventory.character_tracking_job")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
@@ -352,15 +353,19 @@ manager_metatable.__index = manager_metatable
 local function sourceMatchesConfiguration(source, configuration)
     local entries = source:getEntries()
 
-    if #entries ~= #configuration.entities then
+    if #entries ~= #configuration.sources then
         return false
     end
 
-    for _, entity_configuration in ipairs(configuration.entities) do
+    for _, source_configuration in ipairs(configuration.sources) do
+        if source_configuration.type ~= SourceType.player then
+            return false
+        end
+
         local matched_entry
 
         for _, entry in ipairs(entries) do
-            if entry.owner == entity_configuration.entity then
+            if entry.source_type == source_configuration.type and entry.owner == source_configuration.player then
                 matched_entry = entry
                 break
             end
@@ -373,7 +378,7 @@ local function sourceMatchesConfiguration(source, configuration)
         local requested_count = 0
         local resolved_count  = 0
 
-        for _, inventory_type in ipairs(entity_configuration.inventory_types) do
+        for _, inventory_type in ipairs(source_configuration.inventory_types) do
             requested_count = requested_count + 1
 
             if not matched_entry.inventories[inventory_type] then
@@ -420,8 +425,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function manager_metatable:monitorConfiguration(configuration)
-    assert(type(configuration) == "table", "Inventory configuration must be a table !")                    -- [DEBUG-ONLY] . --
-    assert(type(configuration.entities) == "table", "Inventory configuration entities must be a table !") -- [DEBUG-ONLY] . --
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                  -- [DEBUG-ONLY] . --
+    assert(type(configuration.sources) == "table", "Inventory configuration sources must be a table !") -- [DEBUG-ONLY] . --
     assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
 
     for _, inventory in pairs(self.inventories) do
