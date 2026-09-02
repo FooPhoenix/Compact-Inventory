@@ -722,13 +722,17 @@ function metatable:showCreationPanel(presets)
     local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
     local source_column   = columns and columns[GUI_NAME.creation_source_column]
     local source_player   = source_column and source_column[GUI_NAME.source_player]
+    local source_vehicle  = source_column and source_column[GUI_NAME.source_player_vehicle]
+    local source_entities = source_column and source_column[GUI_NAME.source_selected_entities]
 
-    assert(windows_column and creation_column and source_player, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(windows_column and creation_column and source_player and source_vehicle and source_entities, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
     assert(type(presets) == "table", "Window preset metadata list must be a table !")                                     -- [DEBUG-ONLY] . --
 
     self.rename_target                = nil
     self.selected_window_preset_name  = nil
     source_player.state               = true
+    source_vehicle.state              = false
+    source_entities.state             = false
     windows_column.visible            = false
     creation_column.visible           = true
 
