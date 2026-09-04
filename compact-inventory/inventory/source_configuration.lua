@@ -67,14 +67,32 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function validateUniquePlayerSelectors(sources)
+    local players = { }
+
+    for _, source_configuration in ipairs(sources) do
+        if source_configuration.type == SourceType.player then
+            for _, lua_player in ipairs(source_configuration.players) do
+                for _, existing_player in ipairs(players) do
+                    assert(existing_player ~= lua_player, "The same LuaPlayer cannot appear in multiple source descriptors !")      -- [DEBUG-ONLY] . --
+                end
+
+                players[#players + 1] = lua_player
+            end
+        end
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Convert a source configuration to the canonical persistent representation.
 --
 --- The canonical format groups equivalent selectors together. Player sources therefore use `players = { ... }`
 --- even when the current caller still provides the legacy single-player `player = ...` placeholder form.
 --
 function SourceConfiguration.canonicalize(configuration)
-    assert(type(configuration) == "table", "Inventory configuration must be a table !")                  -- [DEBUG-ONLY] . --
-    assert(type(configuration.sources) == "table", "Inventory configuration sources must be a table !") -- [DEBUG-ONLY] . --
+    assert(type(configuration) == "table", "Inventory configuration must be a table !")                                  -- [DEBUG-ONLY] . --
+    assert(type(configuration.sources) == "table" and #configuration.sources > 0, "Inventory configuration must contain at least one source !") -- [DEBUG-ONLY] . --
 
     local canonical = {
         sources = { },
@@ -90,6 +108,8 @@ function SourceConfiguration.canonicalize(configuration)
             assert(false, "Source configuration canonicalization is not implemented for this SourceType !")      -- [DEBUG-ONLY] . --
         end
     end
+
+    validateUniquePlayerSelectors(canonical.sources)
 
     return canonical
 end
