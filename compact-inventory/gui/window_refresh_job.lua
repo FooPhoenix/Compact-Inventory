@@ -28,6 +28,16 @@ metatable.__index = metatable
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function getRefreshRate(window)
+    local refresh_rate = window.refresh_rate
+
+    assert(type(refresh_rate) == "number" and refresh_rate > 0 and refresh_rate % 1 == 0, "InventoryWindow refresh rate must be a positive integer !")      -- [DEBUG-ONLY] . --
+
+    return refresh_rate
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 --- ### Get the InventoryWindow associated with the job.
 --
 --- -----
@@ -63,7 +73,7 @@ function metatable:execute(tick)
         window:refresh()
     end
 
-    self.next_tick = tick + window:getRefreshRate()
+    self.next_tick = tick + getRefreshRate(window)
 end
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
@@ -98,7 +108,7 @@ local factory = { }
 --- -----
 --- @param window InventoryWindow      The InventoryWindow associated with the job.
 --
---- @return WindowRefreshJob           @ Returns the created window refresh job.
+--- @return WindowRefreshJob           @ Returns the created WindowRefreshJob.
 --
 function factory.new(window)
 
@@ -106,7 +116,7 @@ function factory.new(window)
 
     local job = {      ---@type WindowRefreshJob
         window         = window,
-        next_tick      = game.tick + window:getRefreshRate(),
+        next_tick      = game.tick + getRefreshRate(window),
         current_bucket = nil
     }
 
