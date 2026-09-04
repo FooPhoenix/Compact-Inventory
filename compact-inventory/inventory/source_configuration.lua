@@ -18,6 +18,24 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function canonicalizeInventoryTypes(inventory_types)
+    assert(type(inventory_types) == "table" and #inventory_types > 0, "Source must contain at least one InventoryType !")      -- [DEBUG-ONLY] . --
+
+    local canonical_inventory_types = { }
+    local seen = { }
+
+    for _, inventory_type in ipairs(inventory_types) do
+        assert(seen[inventory_type] == nil, "Source cannot contain the same InventoryType twice !")      -- [DEBUG-ONLY] . --
+
+        seen[inventory_type] = true
+        canonical_inventory_types[#canonical_inventory_types + 1] = inventory_type
+    end
+
+    return canonical_inventory_types
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function canonicalizePlayerSource(source_configuration)
     local players = source_configuration.players
 
@@ -26,31 +44,23 @@ local function canonicalizePlayerSource(source_configuration)
     end
 
     assert(type(players) == "table" and #players > 0, "Player source must contain at least one player !")      -- [DEBUG-ONLY] . --
-    assert(type(source_configuration.inventory_types) == "table", "Inventory types must be a table !")        -- [DEBUG-ONLY] . --
 
     local canonical_players = { }
 
     for _, lua_player in ipairs(players) do
         assert(lua_player and lua_player.valid and lua_player.object_name == "LuaPlayer", "Player source must contain valid LuaPlayer objects !")      -- [DEBUG-ONLY] . --
 
-        local duplicate = false
-
         for _, existing_player in ipairs(canonical_players) do
-            if existing_player == lua_player then
-                duplicate = true
-                break
-            end
+            assert(existing_player ~= lua_player, "Player source cannot contain the same LuaPlayer twice !")      -- [DEBUG-ONLY] . --
         end
 
-        if not duplicate then
-            canonical_players[#canonical_players + 1] = lua_player
-        end
+        canonical_players[#canonical_players + 1] = lua_player
     end
 
     return {
         type            = SourceType.player,
         players         = canonical_players,
-        inventory_types = copyArray(source_configuration.inventory_types),
+        inventory_types = canonicalizeInventoryTypes(source_configuration.inventory_types),
         options         = source_configuration.options or { }
     }
 end
