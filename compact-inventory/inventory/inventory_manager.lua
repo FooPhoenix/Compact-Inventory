@@ -2,6 +2,7 @@ local ItemKey                     = require("util.item_key")
 local ItemOrder                   = require("util.item_order")
 local InventoryWindowFactory      = require("gui.inventory_window")
 local InventorySourceFactory      = require("inventory.inventory_source")
+local SourceConfiguration         = require("inventory.source_configuration")
 local SourceType                  = require("inventory.source_type")
 local CharacterTrackingJobFactory = require("inventory.character_tracking_job")
 
@@ -429,20 +430,23 @@ function manager_metatable:monitorConfiguration(configuration)
     assert(type(configuration.sources) == "table", "Inventory configuration sources must be a table !") -- [DEBUG-ONLY] . --
     assert(configuration.options == nil or type(configuration.options) == "table", "Inventory configuration options must be a table !") -- [DEBUG-ONLY] . --
 
+    local canonical_configuration = SourceConfiguration.canonicalize(configuration)
+    local runtime_configuration   = SourceConfiguration.normalize(canonical_configuration)
+
     for _, inventory in pairs(self.inventories) do
-        if sourceMatchesConfiguration(inventory:getSource(), configuration) then
+        if sourceMatchesConfiguration(inventory:getSource(), runtime_configuration) then
             if inventory.configuration == nil then
-                inventory.configuration = configuration
+                inventory.configuration = canonical_configuration
             end
 
             return inventory
         end
     end
 
-    local source    = InventorySourceFactory.new(configuration)
+    local source    = InventorySourceFactory.new(runtime_configuration)
     local inventory = self:monitorInventory(source)
 
-    inventory.configuration = configuration
+    inventory.configuration = canonical_configuration
     registerSourceTracking(source)
     inventory:update()
 
