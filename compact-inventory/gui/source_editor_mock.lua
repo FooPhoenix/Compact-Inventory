@@ -73,6 +73,8 @@ function SourceEditorMock.render(main_window)
 
     assert(source_table, "Source editor table must exist here !")      -- [DEBUG-ONLY] . --
 
+    source_table.style = MOD_PREFIX .. "source-editor-table"
+    source_table.draw_horizontal_lines = true
     source_table.clear()
 
     local entity_header = source_table.add({
