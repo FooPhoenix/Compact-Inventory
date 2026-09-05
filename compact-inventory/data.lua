@@ -49,6 +49,12 @@ gui_style[MOD_PREFIX .. "tree-action-button"] = {
     minimal_height        = 0
 }
 
+gui_style[MOD_PREFIX .. "source-editor-table"] = {
+    type                  = "table_style",
+    parent                = "table",
+    horizontal_line_color = { 0.28, 0.28, 0.28, 1 }
+}
+
 data:extend({
     {
         type = "sprite",
