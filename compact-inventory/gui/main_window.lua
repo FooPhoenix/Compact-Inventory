@@ -1,16 +1,13 @@
 
 local InventoryManagerFactory = require("inventory.inventory_manager")
-local InventoryType           = require("inventory.inventory_type")
-local SourceType              = require("inventory.source_type")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
-local WINDOW_LIST_MAX_HEIGHT       = 300      -- Approximately 10 inventory window rows in-game.
-local CREATION_PRESET_MAX_HEIGHT   = 300      -- Approximately 10 preset rows in-game.
-local TREE_INDENT                  = 16
-local TREE_TOGGLE_WIDTH            = 16
-local TREE_TOGGLE_HEIGHT           = 8
-local TREE_ACTION_SIZE             = 16
+local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
+local TREE_INDENT            = 16
+local TREE_TOGGLE_WIDTH      = 16
+local TREE_TOGGLE_HEIGHT     = 8
+local TREE_ACTION_SIZE       = 16
 
 local GUI_NAME = {
     main_frame                     = MOD_PREFIX .. "MW_frame",
@@ -36,28 +33,25 @@ local GUI_NAME = {
     tree_delete_button             = MOD_PREFIX .. "MW_tree-delete",
     creation_column                = MOD_PREFIX .. "MW_creation-column",
     creation_title                 = MOD_PREFIX .. "MW_creation-title",
-    creation_columns               = MOD_PREFIX .. "MW_creation-columns",
-    creation_source_column         = MOD_PREFIX .. "MW_creation-source-column",
-    creation_preset_outer_frame    = MOD_PREFIX .. "MW_creation-preset-outer-frame",
-    creation_preset_inner_frame    = MOD_PREFIX .. "MW_creation-preset-inner-frame",
-    creation_preset_column         = MOD_PREFIX .. "MW_creation-preset-column",
-    creation_preset_title          = MOD_PREFIX .. "MW_creation-preset-title",
-    creation_preset_scroll         = MOD_PREFIX .. "MW_creation-preset-scroll",
-    creation_preset_table          = MOD_PREFIX .. "MW_creation-preset-table",
-    source_player                  = MOD_PREFIX .. "MW_source-player",
-    source_player_vehicle          = MOD_PREFIX .. "MW_source-player-vehicle",
-    source_selected_entities       = MOD_PREFIX .. "MW_source-selected-entities",
+    creation_tabs                  = MOD_PREFIX .. "MW_creation-tabs",
+    source_editor_tab              = MOD_PREFIX .. "MW_source-editor-tab",
+    source_editor_panel            = MOD_PREFIX .. "MW_source-editor-panel",
+    source_table_outer_frame       = MOD_PREFIX .. "MW_source-table-outer-frame",
+    source_table_inner_frame       = MOD_PREFIX .. "MW_source-table-inner-frame",
+    source_table                   = MOD_PREFIX .. "MW_source-table",
+    source_selector_tab            = MOD_PREFIX .. "MW_source-selector-tab",
+    source_selector_panel          = MOD_PREFIX .. "MW_source-selector-panel",
+    source_selector_type           = MOD_PREFIX .. "MW_source-selector-type",
+    source_selector_list           = MOD_PREFIX .. "MW_source-selector-list",
     creation_actions               = MOD_PREFIX .. "MW_creation-actions",
     creation_cancel_button         = MOD_PREFIX .. "MW_creation-cancel",
     creation_create_button         = MOD_PREFIX .. "MW_creation-create",
     shortcut_button                = MOD_PREFIX .. "main-window-toggle"
 }
 
-local INVENTORY_ID_TAG_NAME            = MOD_PREFIX .. "MW_InventoryID"
-local WINDOW_ID_TAG_NAME               = MOD_PREFIX .. "MW_WindowID"
-local GROUP_ID_TAG_NAME                = MOD_PREFIX .. "MW_GroupID"
-local CREATION_PRESET_NAME_TAG_NAME    = MOD_PREFIX .. "MW_CreationPresetName"
-local CREATION_PRESET_DELETE_TAG_NAME  = MOD_PREFIX .. "MW_CreationPresetDelete"
+local INVENTORY_ID_TAG_NAME = MOD_PREFIX .. "MW_InventoryID"
+local WINDOW_ID_TAG_NAME    = MOD_PREFIX .. "MW_WindowID"
+local GROUP_ID_TAG_NAME     = MOD_PREFIX .. "MW_GroupID"
 
 -- ╔════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗ --
 -- ║ MainWindowMetatable.                                                                                           ║ --
@@ -66,13 +60,12 @@ local CREATION_PRESET_DELETE_TAG_NAME  = MOD_PREFIX .. "MW_CreationPresetDelete"
 ---
 --- @class MainWindowMetatable
 ---
---- @field private lua_player                  LuaPlayer
---- @field private expanded_inventories        table<integer, boolean>
---- @field private expanded_windows            table<integer, table<integer, boolean>>
---- @field private rename_target               table?
---- @field private selected_window_preset_name string?
---- @field         valid                       boolean
---- @field         object_name                 string
+--- @field private lua_player           LuaPlayer
+--- @field private expanded_inventories table<integer, boolean>
+--- @field private expanded_windows     table<integer, table<integer, boolean>>
+--- @field private rename_target        table?
+--- @field         valid                boolean
+--- @field         object_name          string
 ---
 local metatable = { }
 
@@ -286,6 +279,37 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function addMockSourceCell(parent, captions)
+    local flow = parent.add({
+        type      = "flow",
+        direction = "horizontal"
+    })
+
+    flow.style.horizontal_spacing = 2
+
+    for _, caption in ipairs(captions) do
+        flow.add({
+            type    = "button",
+            caption = caption
+        })
+    end
+
+    local add = flow.add({
+        type    = "sprite-button",
+        sprite  = "utility/add",
+        style   = "tool_button",
+        tooltip = "Add"
+    })
+
+    add.style.width   = 28
+    add.style.height  = 28
+    add.style.padding = 2
+
+    return flow
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function metatable:getPlayer()
     assert(self.lua_player and self.lua_player.valid and self.lua_player.object_name == "LuaPlayer", "Player must be valid here !")      -- [DEBUG-ONLY] . --
     return self.lua_player
@@ -323,22 +347,6 @@ function metatable:getVisibilitySwitch()
     assert(visibility_switch, "Main window visibility switch must exist here !")      -- [DEBUG-ONLY] . --
 
     return visibility_switch
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function metatable:getCreationPresetTable()
-    local creation_column = self:getFrame()[GUI_NAME.creation_column]
-    local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
-    local outer           = columns and columns[GUI_NAME.creation_preset_outer_frame]
-    local inner           = outer and outer[GUI_NAME.creation_preset_inner_frame]
-    local preset_column   = inner and inner[GUI_NAME.creation_preset_column]
-    local scroll          = preset_column and preset_column[GUI_NAME.creation_preset_scroll]
-    local preset_table    = scroll and scroll[GUI_NAME.creation_preset_table]
-
-    assert(preset_table, "Window preset creation controls must exist here !")      -- [DEBUG-ONLY] . --
-
-    return preset_table
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -397,64 +405,8 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:refreshCreationPresetList(presets)
-    assert(type(presets) == "table", "Window preset metadata list must be a table !")      -- [DEBUG-ONLY] . --
-
-    local preset_table = self:getCreationPresetTable()
-
-    preset_table.clear()
-
-    for _, preset in ipairs(presets) do
-        assert(type(preset.name) == "string" and preset.name ~= "", "Window preset metadata name must be valid !")      -- [DEBUG-ONLY] . --
-
-        local name_button = preset_table.add({
-            type    = "button",
-            caption = preset.name,
-            toggled = self.selected_window_preset_name == preset.name,
-            tags    = {
-                [CREATION_PRESET_NAME_TAG_NAME] = preset.name
-            }
-        })
-
-        name_button.style.horizontally_stretchable = true
-
-        preset_table.add({
-            type    = "button",
-            caption = "Delete",
-            enabled = preset.builtin ~= true,
-            tags    = {
-                [CREATION_PRESET_DELETE_TAG_NAME] = preset.name
-            }
-        })
-    end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function metatable:toggleCreationPresetSelection(preset_name)
-    assert(type(preset_name) == "string" and preset_name ~= "", "Window preset name must be valid !")      -- [DEBUG-ONLY] . --
-
-    if self.selected_window_preset_name == preset_name then
-        self.selected_window_preset_name = nil
-    else
-        self.selected_window_preset_name = preset_name
-    end
-
-    local preset_table = self:getCreationPresetTable()
-
-    for _, element in ipairs(preset_table.children) do
-        local name = element.tags[CREATION_PRESET_NAME_TAG_NAME]
-
-        if name then
-            element.toggled = name == self.selected_window_preset_name
-        end
-    end
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function metatable:getSelectedWindowPresetName()
-    return self.selected_window_preset_name
+    return nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -715,61 +667,40 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:showCreationPanel(presets)
+function metatable:showSourceEditor(mode)
+    mode = mode or "create"
+
+    assert(mode == "create" or mode == "edit", "Main window source editor mode must be valid !")      -- [DEBUG-ONLY] . --
+
     local frame           = self:getFrame()
     local windows_column  = frame[GUI_NAME.windows_column]
     local creation_column = frame[GUI_NAME.creation_column]
-    local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
-    local source_column   = columns and columns[GUI_NAME.creation_source_column]
-    local source_player   = source_column and source_column[GUI_NAME.source_player]
-    local source_vehicle  = source_column and source_column[GUI_NAME.source_player_vehicle]
-    local source_entities = source_column and source_column[GUI_NAME.source_selected_entities]
+    local title           = creation_column and creation_column[GUI_NAME.creation_title]
+    local tabs            = creation_column and creation_column[GUI_NAME.creation_tabs]
+    local actions         = creation_column and creation_column[GUI_NAME.creation_actions]
+    local confirm         = actions and actions[GUI_NAME.creation_create_button]
 
-    assert(windows_column and creation_column and source_player and source_vehicle and source_entities, "Main window creation controls must exist here !")      -- [DEBUG-ONLY] . --
-    assert(type(presets) == "table", "Window preset metadata list must be a table !")                                     -- [DEBUG-ONLY] . --
+    assert(windows_column and creation_column and title and tabs and confirm, "Main window source editor controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    self.rename_target                = nil
-    self.selected_window_preset_name  = nil
-    source_player.state               = true
-    source_vehicle.state              = false
-    source_entities.state             = false
-    windows_column.visible            = false
-    creation_column.visible           = true
+    self.rename_target     = nil
+    title.caption          = mode == "edit" and "Edit inventory" or "Create inventory"
+    confirm.caption        = mode == "edit" and "Save" or "Create"
+    tabs.selected_tab_index = 1
+    windows_column.visible = false
+    creation_column.visible = true
+end
 
-    self:refreshCreationPresetList(presets)
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:showCreationPanel(_)
+    self:showSourceEditor("create")
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 function metatable:getCreationConfiguration()
-    local creation_column = self:getFrame()[GUI_NAME.creation_column]
-    local columns         = creation_column and creation_column[GUI_NAME.creation_columns]
-    local source_column   = columns and columns[GUI_NAME.creation_source_column]
-    local source_player   = source_column and source_column[GUI_NAME.source_player]
-    local source_vehicle  = source_column and source_column[GUI_NAME.source_player_vehicle]
-
-    assert(source_player and source_vehicle, "Supported inventory source controls must exist here !")      -- [DEBUG-ONLY] . --
-    assert(source_player.state or source_vehicle.state, "A supported inventory source must be selected !") -- [DEBUG-ONLY] . --
-
-    local inventory_types = {
-        InventoryType.character_main
-    }
-
-    if source_vehicle.state then
-        inventory_types[#inventory_types + 1] = InventoryType.vehicle_main
-    end
-
-    return {
-        sources = {
-            {
-                type            = SourceType.player,
-                player          = self:getPlayer(),
-                inventory_types = inventory_types,
-                options         = { }
-            }
-        },
-        options = { }
-    }
+    assert(false, "Source editor UI is not connected to InventorySource configuration yet !")      -- [DEBUG-ONLY] . --
+    return nil
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -780,8 +711,7 @@ function metatable:setVisible(visible)
     if visible then
         self:showWindowsList()
     else
-        self.rename_target                = nil
-        self.selected_window_preset_name  = nil
+        self.rename_target = nil
     end
 
     self:getFrame().visible = visible
@@ -806,27 +736,25 @@ end
 
 local factory = {
     exposed_gui_names = {
-        add_button                        = GUI_NAME.add_button,
-        close_button                      = GUI_NAME.close_button,
-        visibility_switch                 = GUI_NAME.visibility_switch,
-        tree_inventory_toggle             = GUI_NAME.tree_inventory_toggle,
-        tree_window_toggle                = GUI_NAME.tree_window_toggle,
-        tree_label                        = GUI_NAME.tree_label,
-        tree_name_field                   = GUI_NAME.tree_name_field,
-        tree_edit_button                  = GUI_NAME.tree_edit_button,
-        tree_confirm_button               = GUI_NAME.tree_confirm_button,
-        tree_cancel_button                = GUI_NAME.tree_cancel_button,
-        tree_visibility_button            = GUI_NAME.tree_visibility_button,
-        tree_lock_button                  = GUI_NAME.tree_lock_button,
-        tree_delete_button                = GUI_NAME.tree_delete_button,
-        inventory_id_tag_name             = INVENTORY_ID_TAG_NAME,
-        window_id_tag_name                = WINDOW_ID_TAG_NAME,
-        group_id_tag_name                 = GROUP_ID_TAG_NAME,
-        creation_preset_name_tag_name      = CREATION_PRESET_NAME_TAG_NAME,
-        creation_preset_delete_tag_name    = CREATION_PRESET_DELETE_TAG_NAME,
-        creation_cancel_button            = GUI_NAME.creation_cancel_button,
-        creation_create_button            = GUI_NAME.creation_create_button,
-        shortcut_button                   = GUI_NAME.shortcut_button
+        add_button              = GUI_NAME.add_button,
+        close_button            = GUI_NAME.close_button,
+        visibility_switch       = GUI_NAME.visibility_switch,
+        tree_inventory_toggle   = GUI_NAME.tree_inventory_toggle,
+        tree_window_toggle      = GUI_NAME.tree_window_toggle,
+        tree_label              = GUI_NAME.tree_label,
+        tree_name_field         = GUI_NAME.tree_name_field,
+        tree_edit_button        = GUI_NAME.tree_edit_button,
+        tree_confirm_button     = GUI_NAME.tree_confirm_button,
+        tree_cancel_button      = GUI_NAME.tree_cancel_button,
+        tree_visibility_button  = GUI_NAME.tree_visibility_button,
+        tree_lock_button        = GUI_NAME.tree_lock_button,
+        tree_delete_button      = GUI_NAME.tree_delete_button,
+        inventory_id_tag_name   = INVENTORY_ID_TAG_NAME,
+        window_id_tag_name      = WINDOW_ID_TAG_NAME,
+        group_id_tag_name       = GROUP_ID_TAG_NAME,
+        creation_cancel_button  = GUI_NAME.creation_cancel_button,
+        creation_create_button  = GUI_NAME.creation_create_button,
+        shortcut_button         = GUI_NAME.shortcut_button
     }
 }
 
@@ -838,11 +766,10 @@ function factory.create(player)
     assert(storage.windows.main[player_index] == nil, "Main window already exists !")      -- [DEBUG-ONLY] . --
 
     local window = {                              ---@type MainWindow
-        lua_player                  = lua_player,
-        expanded_inventories       = { },
-        expanded_windows           = { },
-        rename_target              = nil,
-        selected_window_preset_name = nil
+        lua_player            = lua_player,
+        expanded_inventories = { },
+        expanded_windows     = { },
+        rename_target        = nil
     }
 
     setmetatable(window, metatable)
@@ -865,11 +792,10 @@ function factory.destroy(player)
 
     window:setVisible(false)
     window:getFrame().destroy()
-    window.lua_player                  = nil
-    window.expanded_inventories        = nil
-    window.expanded_windows            = nil
-    window.rename_target               = nil
-    window.selected_window_preset_name = nil
+    window.lua_player           = nil
+    window.expanded_inventories = nil
+    window.expanded_windows     = nil
+    window.rename_target        = nil
 
     storage.windows.main[player_index] = nil
 end
@@ -921,7 +847,7 @@ function factory.createGUI(window)                                              
         name    = GUI_NAME.add_button,
         sprite  = "utility/add_white",
         style   = "frame_action_button",
-        tooltip = "Create new window"
+        tooltip = "Create new inventory"
     })
 
     add.style.width   = 16
@@ -1016,105 +942,149 @@ function factory.createGUI(window)                                              
     creation_column.add({
         type    = "label",
         name    = GUI_NAME.creation_title,
-        caption = "Create new window",
+        caption = "Create inventory",
         style   = "frame_title"
     })
 
-    local creation_columns = creation_column.add({
-        type      = "flow",
-        name      = GUI_NAME.creation_columns,
-        direction = "horizontal"
+    local tabs = creation_column.add({
+        type = "tabbed-pane",
+        name = GUI_NAME.creation_tabs
     })
 
-    creation_columns.style.horizontal_spacing = 4
+    local source_editor_tab = tabs.add({
+        type    = "tab",
+        name    = GUI_NAME.source_editor_tab,
+        caption = "Sources"
+    })
 
-    local source_column = creation_columns.add({
+    local source_editor_panel = tabs.add({
         type      = "flow",
-        name      = GUI_NAME.creation_source_column,
+        name      = GUI_NAME.source_editor_panel,
         direction = "vertical"
     })
 
-    source_column.style.vertical_spacing       = 4
-    source_column.style.vertically_stretchable = true
+    source_editor_panel.style.vertical_spacing = 4
 
-    source_column.add({
-        type    = "label",
-        caption = "Source",
-        style   = "frame_title"
-    })
-
-    source_column.add({
-        type    = "radiobutton",
-        name    = GUI_NAME.source_player,
-        caption = "Player",
-        state   = true
-    })
-
-    source_column.add({
-        type    = "radiobutton",
-        name    = GUI_NAME.source_player_vehicle,
-        caption = "Player vehicle",
-        state   = false
-    })
-
-    local selected_entities = source_column.add({
-        type    = "radiobutton",
-        name    = GUI_NAME.source_selected_entities,
-        caption = "Selected entities",
-        state   = false
-    })
-
-    selected_entities.enabled = false
-
-    local preset_outer = creation_columns.add({
+    local source_table_outer = source_editor_panel.add({
         type      = "frame",
-        name      = GUI_NAME.creation_preset_outer_frame,
+        name      = GUI_NAME.source_table_outer_frame,
         direction = "vertical",
         style     = "inside_shallow_frame"
     })
 
-    preset_outer.style.padding = 2
+    source_table_outer.style.padding = 2
 
-    local preset_inner = preset_outer.add({
+    local source_table_inner = source_table_outer.add({
         type      = "frame",
-        name      = GUI_NAME.creation_preset_inner_frame,
+        name      = GUI_NAME.source_table_inner_frame,
         direction = "vertical"
     })
 
-    preset_inner.style.padding = 2
+    source_table_inner.style.padding = 2
 
-    local preset_column = preset_inner.add({
-        type      = "flow",
-        name      = GUI_NAME.creation_preset_column,
-        direction = "vertical"
-    })
-
-    preset_column.style.vertical_spacing = 2
-
-    preset_column.add({
-        type    = "label",
-        name    = GUI_NAME.creation_preset_title,
-        caption = "Presets",
-        style   = "frame_title"
-    })
-
-    local preset_scroll = preset_column.add({
-        type                     = "scroll-pane",
-        name                     = GUI_NAME.creation_preset_scroll,
-        vertical_scroll_policy   = "auto",
-        horizontal_scroll_policy = "never"
-    })
-
-    preset_scroll.style.maximal_height = CREATION_PRESET_MAX_HEIGHT
-
-    local preset_table = preset_scroll.add({
+    local source_table = source_table_inner.add({
         type         = "table",
-        name         = GUI_NAME.creation_preset_table,
+        name         = GUI_NAME.source_table,
         column_count = 2
     })
 
-    preset_table.style.horizontal_spacing = 2
-    preset_table.style.vertical_spacing   = 2
+    source_table.style.horizontal_spacing = 6
+    source_table.style.vertical_spacing   = 4
+
+    local entity_header = source_table.add({
+        type    = "label",
+        caption = "Entities",
+        style   = "heading_2_label"
+    })
+
+    entity_header.style.minimal_width = 180
+
+    local inventory_header = source_table.add({
+        type    = "label",
+        caption = "Inventories",
+        style   = "heading_2_label"
+    })
+
+    inventory_header.style.minimal_width = 180
+
+    addMockSourceCell(source_table, { window.lua_player.name })
+    addMockSourceCell(source_table, { "Main", "Vehicle" })
+    addMockSourceCell(source_table, { })
+    addMockSourceCell(source_table, { })
+
+    source_editor_panel.add({
+        type    = "label",
+        caption = "The last empty row is kept available for adding another source."
+    })
+
+    tabs.add_tab(source_editor_tab, source_editor_panel)
+
+    local source_selector_tab = tabs.add({
+        type    = "tab",
+        name    = GUI_NAME.source_selector_tab,
+        caption = "Select source"
+    })
+
+    local source_selector_panel = tabs.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_panel,
+        direction = "vertical"
+    })
+
+    source_selector_panel.style.vertical_spacing = 4
+
+    source_selector_panel.add({
+        type    = "label",
+        caption = "Source type",
+        style   = "heading_2_label"
+    })
+
+    source_selector_panel.add({
+        type           = "drop-down",
+        name           = GUI_NAME.source_selector_type,
+        items          = {
+            "Players",
+            "Logistic networks",
+            "Train stop / path",
+            "Chests",
+            "Other entities"
+        },
+        selected_index = 1
+    })
+
+    local selector_frame = source_selector_panel.add({
+        type      = "frame",
+        direction = "vertical",
+        style     = "inside_shallow_frame"
+    })
+
+    selector_frame.style.padding = 4
+
+    selector_frame.add({
+        type    = "label",
+        caption = "Players",
+        style   = "heading_2_label"
+    })
+
+    local selector_list = selector_frame.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_list,
+        direction = "vertical"
+    })
+
+    selector_list.add({
+        type    = "checkbox",
+        caption = window.lua_player.name,
+        state   = true
+    })
+
+    source_selector_panel.add({
+        type    = "label",
+        caption = "Other source types are visual placeholders for now."
+    })
+
+    tabs.add_tab(source_selector_tab, source_selector_panel)
+    tabs.selected_tab_index = 1
 
     local filler = creation_column.add({ type = "empty-widget" })
     filler.style.vertically_stretchable = true
@@ -1141,7 +1111,9 @@ function factory.createGUI(window)                                              
         type    = "button",
         name    = GUI_NAME.creation_create_button,
         caption = "Create",
-        style   = "green_button"
+        style   = "green_button",
+        enabled = false,
+        tooltip = "UI prototype only"
     })
 
     frame.auto_center = true
