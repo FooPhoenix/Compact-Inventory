@@ -56,6 +56,11 @@ local UI_INVENTORY_TYPES = {
         inventory_type = InventoryType.vehicle_trash,
         caption        = "Vehicle trash",
         section        = "vehicle"
+    },
+    {
+        inventory_type = InventoryType.vehicle_fuel,
+        caption        = "Vehicle fuel",
+        section        = "vehicle"
     }
 }
 
@@ -215,6 +220,7 @@ local function getInventorySlots(source)
         local is_vehicle = inventory_type == InventoryType.vehicle_main
             or inventory_type == InventoryType.vehicle_ammo
             or inventory_type == InventoryType.vehicle_trash
+            or inventory_type == InventoryType.vehicle_fuel
 
         slots[#slots + 1] = {
             sprite  = is_vehicle and "entity/car" or "utility/side_menu_players_icon",
@@ -502,7 +508,8 @@ local function readInventorySelector(main_window)
         for _, inventory_type in ipairs(selected_types) do
             if inventory_type ~= InventoryType.vehicle_main
                 and inventory_type ~= InventoryType.vehicle_ammo
-                and inventory_type ~= InventoryType.vehicle_trash then
+                and inventory_type ~= InventoryType.vehicle_trash
+                and inventory_type ~= InventoryType.vehicle_fuel then
 
                 filtered[#filtered + 1] = inventory_type
             end
@@ -531,7 +538,8 @@ local function refreshVehicleCheckboxes(main_window)
 
             if inventory_type == InventoryType.vehicle_main
                 or inventory_type == InventoryType.vehicle_ammo
-                or inventory_type == InventoryType.vehicle_trash then
+                or inventory_type == InventoryType.vehicle_trash
+                or inventory_type == InventoryType.vehicle_fuel then
 
                 element.enabled = master.state
 
@@ -719,6 +727,7 @@ function SourceEditorController.showInventorySelector(main_window, element)
         include_current_vehicle = containsInventoryType(selected_types, InventoryType.vehicle_main)
             or containsInventoryType(selected_types, InventoryType.vehicle_ammo)
             or containsInventoryType(selected_types, InventoryType.vehicle_trash)
+            or containsInventoryType(selected_types, InventoryType.vehicle_fuel)
     }
 
     local frame            = main_window:getFrame()
