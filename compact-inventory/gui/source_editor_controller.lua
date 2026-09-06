@@ -405,7 +405,6 @@ local function addPlayerInventoryPanel(parent, source, selected_types)
 
     local character_list = columns.add({
         type      = "flow",
-        name      = GUI_NAME.source_selector_list,
         direction = "vertical"
     })
 
@@ -417,7 +416,6 @@ local function addPlayerInventoryPanel(parent, source, selected_types)
 
     local vehicle_list = columns.add({
         type      = "flow",
-        name      = GUI_NAME.source_selector_list,
         direction = "vertical"
     })
 
