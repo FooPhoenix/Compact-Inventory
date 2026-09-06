@@ -64,6 +64,22 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function configurationContainsPlayer(configuration, lua_player)
+    for _, source in ipairs(configuration.sources or { }) do
+        if source.type == SourceType.player then
+            for _, source_player in ipairs(source.players or { }) do
+                if source_player == lua_player then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function addSlot(parent, name, sprite, number, tooltip, enabled)
     local wrapper = parent.add({
         type      = "flow",
@@ -229,11 +245,13 @@ function SourceEditorController.showSelector(main_window)
     local selector_list = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_list)
     local checkbox      = selector_list and getFirstCheckbox(selector_list)
     local add_button    = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_add_button)
+    local available     = not configurationContainsPlayer(main_window.editor_state.configuration, main_window:getPlayer())
 
     assert(checkbox and add_button, "Player source selector controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    checkbox.state     = true
-    add_button.enabled = true
+    checkbox.state     = available
+    checkbox.enabled   = available
+    add_button.enabled = available
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
