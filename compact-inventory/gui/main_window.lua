@@ -56,12 +56,23 @@ local GROUP_ID_TAG_NAME     = MOD_PREFIX .. "MW_GroupID"
 -- ╚════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝ --
 
 ---
+--- @class MainWindowSourceSelectorState
+--- @field source_index integer?
+--- @field source table
+---
+--- @class MainWindowEditorState
+--- @field mode "create"|"edit"
+--- @field configuration table
+--- @field target_inventory_id integer?
+--- @field selector_state MainWindowSourceSelectorState?
+---
 --- @class MainWindowMetatable
 ---
 --- @field private lua_player           LuaPlayer
 --- @field private expanded_inventories table<integer, boolean>
 --- @field private expanded_windows     table<integer, table<integer, boolean>>
 --- @field private rename_target        table?
+--- @field private editor_state         MainWindowEditorState?
 --- @field         valid                boolean
 --- @field         object_name          string
 ---
@@ -76,6 +87,41 @@ metatable.__index = function(self, key)                                         
     end
 
     return metatable[key]
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function isLuaObject(value)
+    local value_type = type(value)
+
+    if value_type ~= "table" and value_type ~= "userdata" then
+        return false
+    end
+
+    return type(value.object_name) == "string" and type(value.valid) == "boolean"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function copyEditorData(value, copies)
+    if type(value) ~= "table" or isLuaObject(value) then
+        return value
+    end
+
+    copies = copies or { }
+
+    if copies[value] then
+        return copies[value]
+    end
+
+    local copy = { }
+    copies[value] = copy
+
+    for key, child in pairs(value) do
+        copy[copyEditorData(key, copies)] = copyEditorData(child, copies)
+    end
+
+    return copy
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -713,6 +759,7 @@ function metatable:showWindowsList()
 
     self:refresh()
     self.rename_target      = nil
+    self.editor_state       = nil
     title.caption           = "Compact Inventory"
     add_button.visible      = true
     windows_column.visible  = true
@@ -722,10 +769,13 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:showSourceEditor(mode)
+function metatable:showSourceEditor(mode, configuration, target_inventory_id)
     mode = mode or "create"
 
     assert(mode == "create" or mode == "edit", "Main window source editor mode must be valid !")      -- [DEBUG-ONLY] . --
+    assert(configuration == nil or type(configuration) == "table", "Main window source editor configuration must be a table !")      -- [DEBUG-ONLY] . --
+    assert(target_inventory_id == nil or type(target_inventory_id) == "number" and target_inventory_id > 0 and target_inventory_id % 1 == 0, "Main window target Inventory ID must be valid !")      -- [DEBUG-ONLY] . --
+    assert(mode ~= "edit" or configuration ~= nil, "Editing an Inventory requires an initial configuration !")      -- [DEBUG-ONLY] . --
 
     local frame           = self:getFrame()
     local title_bar       = frame[GUI_NAME.title_bar]
@@ -739,6 +789,22 @@ function metatable:showSourceEditor(mode)
 
     assert(title and add_button and windows_column and editor_column and selector_column and confirm, "Main window source editor controls must exist here !")      -- [DEBUG-ONLY] . --
 
+    if self.editor_state then
+        assert(self.editor_state.selector_state ~= nil, "Source editor state must only be reused when leaving the source selector !")      -- [DEBUG-ONLY] . --
+        self.editor_state.selector_state = nil
+        mode = self.editor_state.mode
+    else
+        self.editor_state = {
+            mode                = mode,
+            configuration       = copyEditorData(configuration or {
+                sources = { },
+                options = { }
+            }),
+            target_inventory_id = target_inventory_id,
+            selector_state      = nil
+        }
+    end
+
     self.rename_target      = nil
     title.caption           = mode == "edit" and "Edit inventory" or "Create inventory"
     add_button.visible      = false
@@ -750,7 +816,12 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:showSourceSelector()
+function metatable:showSourceSelector(source_index, source)
+    assert(self.editor_state ~= nil, "Source selector requires an active source editor state !")      -- [DEBUG-ONLY] . --
+    assert(self.editor_state.selector_state == nil, "Source selector state already exists !")          -- [DEBUG-ONLY] . --
+    assert(source_index == nil or type(source_index) == "number" and source_index > 0 and source_index % 1 == 0, "Source selector index must be valid !")      -- [DEBUG-ONLY] . --
+    assert(source == nil or type(source) == "table", "Source selector data must be a table !")         -- [DEBUG-ONLY] . --
+
     local frame           = self:getFrame()
     local title_bar       = frame[GUI_NAME.title_bar]
     local title           = title_bar and title_bar[GUI_NAME.title]
@@ -760,6 +831,11 @@ function metatable:showSourceSelector()
     local selector_column = frame[GUI_NAME.source_selector_column]
 
     assert(title and add_button and windows_column and editor_column and selector_column, "Main window source selector controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    self.editor_state.selector_state = {
+        source_index = source_index,
+        source       = copyEditorData(source or { })
+    }
 
     title.caption           = "Select source"
     add_button.visible      = false
@@ -790,6 +866,7 @@ function metatable:setVisible(visible)
         self:showWindowsList()
     else
         self.rename_target = nil
+        self.editor_state  = nil
     end
 
     self:getFrame().visible = visible
@@ -852,7 +929,8 @@ function factory.create(player)
         lua_player            = lua_player,
         expanded_inventories = { },
         expanded_windows     = { },
-        rename_target        = nil
+        rename_target        = nil,
+        editor_state         = nil
     }
 
     setmetatable(window, metatable)
@@ -879,6 +957,7 @@ function factory.destroy(player)
     window.expanded_inventories = nil
     window.expanded_windows     = nil
     window.rename_target        = nil
+    window.editor_state         = nil
 
     storage.windows.main[player_index] = nil
 end
