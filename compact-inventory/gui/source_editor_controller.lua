@@ -22,9 +22,10 @@ local GUI_NAME = {
     current_vehicle_checkbox       = MOD_PREFIX .. "MW_current-vehicle-checkbox"
 }
 
-local SOURCE_SLOT_COLUMNS = 10
-local SOURCE_INDEX_TAG    = MOD_PREFIX .. "MW_SourceIndex"
-local INVENTORY_TYPE_TAG  = MOD_PREFIX .. "MW_InventoryType"
+local SOURCE_SLOT_COLUMNS    = 10
+local SOURCE_INDEX_TAG       = MOD_PREFIX .. "MW_SourceIndex"
+local SOURCE_TARGET_INDEX_TAG = MOD_PREFIX .. "MW_SourceTargetIndex"
+local INVENTORY_TYPE_TAG     = MOD_PREFIX .. "MW_InventoryType"
 
 local UI_INVENTORY_TYPES = {
     {
@@ -72,6 +73,7 @@ SourceEditorController.exposed_gui_names = {
     selector_add_button           = GUI_NAME.source_selector_add_button,
     current_vehicle_checkbox      = GUI_NAME.current_vehicle_checkbox,
     source_index_tag_name         = SOURCE_INDEX_TAG,
+    source_target_index_tag_name  = SOURCE_TARGET_INDEX_TAG,
     inventory_type_tag_name       = INVENTORY_TYPE_TAG
 }
 
@@ -164,7 +166,7 @@ local function addSlotCell(parent, name, slots, add_tooltip, add_enabled, tags)
     cell.style.vertical_spacing   = 0
 
     for _, slot in ipairs(slots) do
-        addSlot(cell, name, slot.sprite, slot.number, slot.tooltip, slot.enabled, tags)
+        addSlot(cell, name, slot.sprite, slot.number, slot.tooltip, slot.enabled, slot.tags or tags)
     end
 
     addSlot(cell, name, nil, nil, add_tooltip, add_enabled, tags)
@@ -174,13 +176,17 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function getPlayerSlots(source)
+local function getPlayerSlots(source, source_index)
     local slots = { }
 
-    for _, lua_player in ipairs(source.players or { }) do
+    for target_index, lua_player in ipairs(source.players or { }) do
         slots[#slots + 1] = {
             sprite  = "utility/side_menu_players_icon",
-            tooltip = lua_player.name
+            tooltip = lua_player.name,
+            tags    = {
+                [SOURCE_INDEX_TAG]        = source_index,
+                [SOURCE_TARGET_INDEX_TAG] = target_index
+            }
         }
     end
 
@@ -247,11 +253,13 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function findPlayerInConfiguration(configuration, lua_player, ignored_source_index)
+local function findPlayerInConfiguration(configuration, lua_player, ignored_source_index, ignored_target_index)
     for source_index, source in ipairs(configuration.sources or { }) do
-        if source_index ~= ignored_source_index and source.type == SourceType.player then
-            for _, selected_player in ipairs(source.players or { }) do
-                if selected_player == lua_player then
+        if source.type == SourceType.player then
+            for target_index, selected_player in ipairs(source.players or { }) do
+                local ignored = source_index == ignored_source_index and target_index == ignored_target_index
+
+                if not ignored and selected_player == lua_player then
                     return true
                 end
             end
@@ -640,17 +648,17 @@ function SourceEditorController.refresh(main_window)
 
     for source_index, source in ipairs(configuration.sources or { }) do
         local available_types = getAvailableUiInventoryTypes(source)
-        local tags            = {
+        local source_tags     = {
             [SOURCE_INDEX_TAG] = source_index
         }
 
         addSlotCell(
             source_table,
             GUI_NAME.source_slot_button,
-            getPlayerSlots(source),
-            "Edit source",
+            getPlayerSlots(source, source_index),
+            "Add source target",
             true,
-            tags
+            source_tags
         )
 
         addSlotCell(
@@ -659,7 +667,7 @@ function SourceEditorController.refresh(main_window)
             getInventorySlots(source),
             #available_types > 0 and "Select inventories" or "No compatible inventories",
             #available_types > 0,
-            tags
+            source_tags
         )
     end
 
@@ -682,16 +690,19 @@ end
 
 function SourceEditorController.showSelector(main_window, element)
     local source_index = element and element.tags[SOURCE_INDEX_TAG] or nil
+    local target_index = element and element.tags[SOURCE_TARGET_INDEX_TAG] or nil
     local source       = source_index and main_window.editor_state.configuration.sources[source_index] or nil
 
     main_window:showSourceSelector(source_index, source)
+    main_window.editor_state.selector_state.target_index = target_index
 
     local selector_list, add_button = getSourceSelectorControls(main_window)
     local checkbox                  = getFirstCheckbox(selector_list)
     local already_used              = findPlayerInConfiguration(
         main_window.editor_state.configuration,
         main_window:getPlayer(),
-        source_index
+        source_index,
+        target_index
     )
 
     assert(checkbox, "Player source selector checkbox must exist here !")      -- [DEBUG-ONLY] . --
@@ -813,21 +824,29 @@ function SourceEditorController.addSelector(main_window)
     end
 
     local selector_state = editor_state.selector_state
-    local existing       = selector_state.source_index and editor_state.configuration.sources[selector_state.source_index] or nil
-    local source         = {
-        type            = SourceType.player,
-        players         = { main_window:getPlayer() },
-        inventory_types = existing and existing.inventory_types or { },
-        options         = existing and existing.options or { }
-    }
+    local sources        = editor_state.configuration.sources
+    local source         = selector_state.source_index and sources[selector_state.source_index] or nil
+    local lua_player     = main_window:getPlayer()
 
-    assert(#SourceCapabilities.getAvailableInventoryTypes(source) > 0, "Player source must expose at least one InventoryType !")      -- [DEBUG-ONLY] . --
+    if source then
+        assert(source.type == SourceType.player, "Existing source must be a Player source here !")      -- [DEBUG-ONLY] . --
+        assert(type(source.players) == "table", "Player source must contain a players table !")         -- [DEBUG-ONLY] . --
 
-    local sources = editor_state.configuration.sources
-
-    if selector_state.source_index then
-        sources[selector_state.source_index] = source
+        if selector_state.target_index then
+            assert(source.players[selector_state.target_index] ~= nil, "Source target must exist here !")      -- [DEBUG-ONLY] . --
+            source.players[selector_state.target_index] = lua_player
+        else
+            source.players[#source.players + 1] = lua_player
+        end
     else
+        source = {
+            type            = SourceType.player,
+            players         = { lua_player },
+            inventory_types = { },
+            options         = { }
+        }
+
+        assert(#SourceCapabilities.getAvailableInventoryTypes(source) > 0, "Player source must expose at least one InventoryType !")      -- [DEBUG-ONLY] . --
         sources[#sources + 1] = source
     end
 
