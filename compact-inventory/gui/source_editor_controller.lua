@@ -21,6 +21,7 @@ local SOURCE_SLOT_COLUMNS = 10
 SourceEditorController.exposed_gui_names = {
     source_slot_button            = GUI_NAME.source_slot_button,
     inventory_slot_button         = GUI_NAME.inventory_slot_button,
+    selector_list                 = GUI_NAME.source_selector_list,
     selector_cancel_button        = GUI_NAME.source_selector_cancel_button,
     selector_add_button           = GUI_NAME.source_selector_add_button
 }
@@ -159,11 +160,11 @@ function SourceEditorController.refresh(main_window)
     assert(main_window and main_window.object_name == "MainWindow", "Main window must exist here !")      -- [DEBUG-ONLY] . --
     assert(main_window.editor_state and type(main_window.editor_state.configuration) == "table", "Source editor state must exist here !")      -- [DEBUG-ONLY] . --
 
-    local frame        = main_window:getFrame()
-    local source_table = findGuiElement(frame, GUI_NAME.source_table)
-    local editor       = findGuiElement(frame, GUI_NAME.source_editor_column)
-    local actions      = editor and editor[GUI_NAME.source_editor_actions]
-    local confirm      = actions and actions[GUI_NAME.source_editor_confirm_button]
+    local frame         = main_window:getFrame()
+    local source_table  = findGuiElement(frame, GUI_NAME.source_table)
+    local editor        = findGuiElement(frame, GUI_NAME.source_editor_column)
+    local actions       = editor and editor[GUI_NAME.source_editor_actions]
+    local confirm       = actions and actions[GUI_NAME.source_editor_confirm_button]
     local configuration = main_window.editor_state.configuration
 
     assert(source_table and confirm, "Source editor controls must exist here !")      -- [DEBUG-ONLY] . --
@@ -231,7 +232,7 @@ function SourceEditorController.showSelector(main_window)
 
     assert(checkbox and add_button, "Player source selector controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    checkbox.state    = true
+    checkbox.state     = true
     add_button.enabled = true
 end
 
