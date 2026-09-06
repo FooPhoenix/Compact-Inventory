@@ -5,14 +5,14 @@ local SourceEditorMock = { }
 local SOURCE_TABLE_NAME          = MOD_PREFIX .. "MW_source-table"
 local SOURCE_TABS_NAME           = MOD_PREFIX .. "MW_creation-tabs"
 local SOURCE_SELECTOR_PANEL_NAME = MOD_PREFIX .. "MW_source-selector-panel"
-local SOURCE_SLOT_BUTTON_NAME    = MOD_PREFIX .. "MW_source-slot-button"
+local SOURCE_SLOT_TAG_NAME       = MOD_PREFIX .. "MW_SourceSlot"
 local SELECTOR_CANCEL_BUTTON     = MOD_PREFIX .. "MW_source-selector-cancel"
 local SELECTOR_ADD_BUTTON        = MOD_PREFIX .. "MW_source-selector-add"
 local CREATE_BUTTON_NAME         = MOD_PREFIX .. "MW_creation-create"
 local SLOT_COLUMNS               = 10
 
 SourceEditorMock.exposed_gui_names = {
-    slot_button            = SOURCE_SLOT_BUTTON_NAME,
+    slot_tag_name          = SOURCE_SLOT_TAG_NAME,
     selector_cancel_button = SELECTOR_CANCEL_BUTTON,
     selector_add_button    = SELECTOR_ADD_BUTTON
 }
@@ -40,9 +40,11 @@ end
 local function addSlot(cell, sprite, number, tooltip)
     local definition = {
         type    = "sprite-button",
-        name    = SOURCE_SLOT_BUTTON_NAME,
         style   = "slot_button",
-        tooltip = tooltip
+        tooltip = tooltip,
+        tags    = {
+            [SOURCE_SLOT_TAG_NAME] = true
+        }
     }
 
     if sprite then
