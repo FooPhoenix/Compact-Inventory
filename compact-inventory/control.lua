@@ -8,6 +8,7 @@ local InventoryManagerFactory   = require("inventory.inventory_manager")
 local InventoryType             = require("inventory.inventory_type")
 local SourceType                = require("inventory.source_type")
 local WindowsManager            = require("gui.windows_manager")
+local SourceEditorMock          = require("gui.source_editor_mock")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
 local WindowPresetMenuFactory   = require("gui.window_preset_menu")
 local WindowPresetFactory       = require("gui.window_preset")
@@ -387,17 +388,28 @@ script.on_event(defines.events.on_player_created, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local main_gui_names    = WindowsManager.exposed_gui_names.MainWindow
-    local gui_names         = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names        = ItemGroupMenuFactory.exposed_gui_names
-    local preset_menu_names = WindowPresetMenuFactory.exposed_gui_names
-    local window            = resolveInventoryWindowFromElement(event.player_index, event.element)
+    local main_gui_names      = WindowsManager.exposed_gui_names.MainWindow
+    local source_editor_names = SourceEditorMock.exposed_gui_names
+    local gui_names           = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names          = ItemGroupMenuFactory.exposed_gui_names
+    local preset_menu_names   = WindowPresetMenuFactory.exposed_gui_names
+    local window              = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
 
     elseif event.element.name == main_gui_names.add_button then
         WindowsManager.getMainWindow(event.player_index):showCreationPanel(getWindowPresetManager():list())
+
+    elseif event.element.name == source_editor_names.slot_button
+        and event.button == defines.mouse_button_type.left then
+
+        SourceEditorMock.showSelector(WindowsManager.getMainWindow(event.player_index))
+
+    elseif event.element.name == source_editor_names.selector_cancel_button
+        or event.element.name == source_editor_names.selector_add_button then
+
+        SourceEditorMock.showEditor(WindowsManager.getMainWindow(event.player_index))
 
     elseif event.element.name == main_gui_names.tree_inventory_toggle then
         WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(
@@ -500,27 +512,10 @@ script.on_event(defines.events.on_gui_click, function(event)
             end
         end
 
-    elseif event.element.name == main_gui_names.creation_cancel_button then
+    elseif event.element.name == main_gui_names.creation_cancel_button
+        or event.element.name == main_gui_names.creation_create_button then
+
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
-
-    elseif event.element.name == main_gui_names.creation_create_button then
-        local main_window   = WindowsManager.getMainWindow(event.player_index)
-        local preset_name   = main_window:getSelectedWindowPresetName()
-        local preset_data   = preset_name and getWindowPresetManager():load(preset_name) or nil
-        local configuration = main_window:getCreationConfiguration()
-        local inventory     = InventoryManagerFactory.get(event.player_index):monitorConfiguration(configuration)
-
-        assert(inventory, "Inventory creation configuration must resolve an Inventory !")      -- [DEBUG-ONLY] . --
-
-        if inventory then
-            local created_window = inventory:createWindow()
-
-            if preset_data then
-                WindowPresetFactory.apply(created_window, preset_data)
-            end
-        end
-
-        main_window:showWindowsList()
 
     elseif event.element.name == gui_names.close_button and window then
         ItemGroupMenuFactory.close(event.player_index)
