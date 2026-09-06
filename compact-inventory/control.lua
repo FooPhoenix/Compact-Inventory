@@ -8,7 +8,7 @@ local InventoryManagerFactory   = require("inventory.inventory_manager")
 local InventoryType             = require("inventory.inventory_type")
 local SourceType                = require("inventory.source_type")
 local WindowsManager            = require("gui.windows_manager")
-local SourceEditorMock          = require("gui.source_editor_mock")
+local SourceEditorController    = require("gui.source_editor_controller")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
 local WindowPresetMenuFactory   = require("gui.window_preset_menu")
 local WindowPresetFactory       = require("gui.window_preset")
@@ -389,7 +389,7 @@ end)
 
 script.on_event(defines.events.on_gui_click, function(event)
     local main_gui_names      = WindowsManager.exposed_gui_names.MainWindow
-    local source_editor_names = SourceEditorMock.exposed_gui_names
+    local source_editor_names = SourceEditorController.exposed_gui_names
     local gui_names           = WindowsManager.exposed_gui_names.InventoryWindow
     local menu_names          = ItemGroupMenuFactory.exposed_gui_names
     local preset_menu_names   = WindowPresetMenuFactory.exposed_gui_names
@@ -399,17 +399,18 @@ script.on_event(defines.events.on_gui_click, function(event)
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
 
     elseif event.element.name == main_gui_names.add_button then
-        WindowsManager.getMainWindow(event.player_index):showCreationPanel(getWindowPresetManager():list())
+        SourceEditorController.begin(WindowsManager.getMainWindow(event.player_index), "create")
 
-    elseif event.element.name == source_editor_names.slot_button
+    elseif event.element.name == source_editor_names.source_slot_button
         and event.button == defines.mouse_button_type.left then
 
-        SourceEditorMock.showSelector(WindowsManager.getMainWindow(event.player_index))
+        SourceEditorController.showSelector(WindowsManager.getMainWindow(event.player_index))
 
-    elseif event.element.name == source_editor_names.selector_cancel_button
-        or event.element.name == source_editor_names.selector_add_button then
+    elseif event.element.name == source_editor_names.selector_cancel_button then
+        SourceEditorController.cancelSelector(WindowsManager.getMainWindow(event.player_index))
 
-        SourceEditorMock.showEditor(WindowsManager.getMainWindow(event.player_index))
+    elseif event.element.name == source_editor_names.selector_add_button then
+        SourceEditorController.addSelector(WindowsManager.getMainWindow(event.player_index))
 
     elseif event.element.name == main_gui_names.tree_inventory_toggle then
         WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(
@@ -800,6 +801,13 @@ script.on_event(defines.events.on_gui_elem_changed, function(event)
 end)
 
 script.on_event(defines.events.on_gui_checked_state_changed, function(event)
+    local source_editor_names = SourceEditorController.exposed_gui_names
+
+    if event.element.parent and event.element.parent.name == source_editor_names.selector_list then
+        SourceEditorController.refreshSelector(WindowsManager.getMainWindow(event.player_index))
+        return
+    end
+
     if not CREATION_SOURCE_GUI_NAMES[event.element.name] or not event.element.state then
         return
     end
