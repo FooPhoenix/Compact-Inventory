@@ -8,6 +8,7 @@ local TREE_INDENT            = 16
 local TREE_TOGGLE_WIDTH      = 16
 local TREE_TOGGLE_HEIGHT     = 8
 local TREE_ACTION_SIZE       = 16
+local SOURCE_SLOT_COLUMNS    = 10
 
 local GUI_NAME = {
     main_frame                     = MOD_PREFIX .. "MW_frame",
@@ -31,21 +32,18 @@ local GUI_NAME = {
     tree_visibility_button         = MOD_PREFIX .. "MW_tree-visibility",
     tree_lock_button               = MOD_PREFIX .. "MW_tree-lock",
     tree_delete_button             = MOD_PREFIX .. "MW_tree-delete",
-    creation_column                = MOD_PREFIX .. "MW_creation-column",
-    creation_title                 = MOD_PREFIX .. "MW_creation-title",
-    creation_tabs                  = MOD_PREFIX .. "MW_creation-tabs",
-    source_editor_tab              = MOD_PREFIX .. "MW_source-editor-tab",
-    source_editor_panel            = MOD_PREFIX .. "MW_source-editor-panel",
-    source_table_outer_frame       = MOD_PREFIX .. "MW_source-table-outer-frame",
-    source_table_inner_frame       = MOD_PREFIX .. "MW_source-table-inner-frame",
+    source_editor_column           = MOD_PREFIX .. "MW_source-editor-column",
     source_table                   = MOD_PREFIX .. "MW_source-table",
-    source_selector_tab            = MOD_PREFIX .. "MW_source-selector-tab",
-    source_selector_panel          = MOD_PREFIX .. "MW_source-selector-panel",
+    source_slot_button             = MOD_PREFIX .. "MW_source-slot-button",
+    source_editor_actions          = MOD_PREFIX .. "MW_source-editor-actions",
+    source_editor_cancel_button    = MOD_PREFIX .. "MW_source-editor-cancel",
+    source_editor_confirm_button   = MOD_PREFIX .. "MW_source-editor-confirm",
+    source_selector_column         = MOD_PREFIX .. "MW_source-selector-column",
     source_selector_type           = MOD_PREFIX .. "MW_source-selector-type",
     source_selector_list           = MOD_PREFIX .. "MW_source-selector-list",
-    creation_actions               = MOD_PREFIX .. "MW_creation-actions",
-    creation_cancel_button         = MOD_PREFIX .. "MW_creation-cancel",
-    creation_create_button         = MOD_PREFIX .. "MW_creation-create",
+    source_selector_actions        = MOD_PREFIX .. "MW_source-selector-actions",
+    source_selector_cancel_button  = MOD_PREFIX .. "MW_source-selector-cancel",
+    source_selector_add_button     = MOD_PREFIX .. "MW_source-selector-add",
     shortcut_button                = MOD_PREFIX .. "main-window-toggle"
 }
 
@@ -279,33 +277,82 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function addMockSourceCell(parent, captions)
-    local flow = parent.add({
+local function addSourceSlot(parent, sprite, number, tooltip)
+    local wrapper = parent.add({
         type      = "flow",
         direction = "horizontal"
     })
 
-    flow.style.horizontal_spacing = 2
+    local definition = {
+        type    = "sprite-button",
+        name    = GUI_NAME.source_slot_button,
+        style   = "slot_button",
+        tooltip = tooltip
+    }
 
-    for _, caption in ipairs(captions) do
-        flow.add({
-            type    = "button",
-            caption = caption
-        })
+    if sprite then
+        definition.sprite = sprite
     end
 
-    local add = flow.add({
-        type    = "sprite-button",
-        sprite  = "utility/add",
-        style   = "tool_button",
-        tooltip = "Add"
+    if number and number > 1 then
+        definition.number = number
+    end
+
+    return wrapper.add(definition)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addSourceSlotCell(parent, slots)
+    local cell = parent.add({
+        type         = "table",
+        column_count = SOURCE_SLOT_COLUMNS
     })
 
-    add.style.width   = 28
-    add.style.height  = 28
-    add.style.padding = 2
+    cell.style.horizontal_spacing = 0
+    cell.style.vertical_spacing   = 0
 
-    return flow
+    for _, slot in ipairs(slots) do
+        addSourceSlot(cell, slot.sprite, slot.number, slot.tooltip)
+    end
+
+    addSourceSlot(cell, nil, nil, "Add")
+
+    return cell
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function addBottomActions(parent, flow_name, cancel_name, confirm_name, confirm_caption)
+    local filler = parent.add({ type = "empty-widget" })
+    filler.style.vertically_stretchable = true
+
+    local actions = parent.add({
+        type      = "flow",
+        name      = flow_name,
+        direction = "horizontal"
+    })
+
+    actions.style.horizontally_stretchable = true
+    actions.style.horizontal_spacing       = 4
+
+    local spacer = actions.add({ type = "empty-widget" })
+    spacer.style.horizontally_stretchable = true
+
+    actions.add({
+        type    = "button",
+        name    = cancel_name,
+        caption = "Cancel"
+    })
+
+    actions.add({
+        type    = "button",
+        name    = confirm_name,
+        caption = confirm_caption,
+        style   = "green_button"
+    })
+
+    return actions
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -655,14 +702,22 @@ end
 
 function metatable:showWindowsList()
     local frame           = self:getFrame()
+    local title_bar       = frame[GUI_NAME.title_bar]
+    local title           = title_bar and title_bar[GUI_NAME.title]
+    local add_button      = title_bar and title_bar[GUI_NAME.add_button]
     local windows_column  = frame[GUI_NAME.windows_column]
-    local creation_column = frame[GUI_NAME.creation_column]
+    local editor_column   = frame[GUI_NAME.source_editor_column]
+    local selector_column = frame[GUI_NAME.source_selector_column]
 
-    assert(windows_column and creation_column, "Main window columns must exist here !")      -- [DEBUG-ONLY] . --
+    assert(title and add_button and windows_column and editor_column and selector_column, "Main window context controls must exist here !")      -- [DEBUG-ONLY] . --
 
     self:refresh()
+    self.rename_target      = nil
+    title.caption           = "Compact Inventory"
+    add_button.visible      = true
     windows_column.visible  = true
-    creation_column.visible = false
+    editor_column.visible   = false
+    selector_column.visible = false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -673,21 +728,44 @@ function metatable:showSourceEditor(mode)
     assert(mode == "create" or mode == "edit", "Main window source editor mode must be valid !")      -- [DEBUG-ONLY] . --
 
     local frame           = self:getFrame()
+    local title_bar       = frame[GUI_NAME.title_bar]
+    local title           = title_bar and title_bar[GUI_NAME.title]
+    local add_button      = title_bar and title_bar[GUI_NAME.add_button]
     local windows_column  = frame[GUI_NAME.windows_column]
-    local creation_column = frame[GUI_NAME.creation_column]
-    local title           = creation_column and creation_column[GUI_NAME.creation_title]
-    local tabs            = creation_column and creation_column[GUI_NAME.creation_tabs]
-    local actions         = creation_column and creation_column[GUI_NAME.creation_actions]
-    local confirm         = actions and actions[GUI_NAME.creation_create_button]
+    local editor_column   = frame[GUI_NAME.source_editor_column]
+    local selector_column = frame[GUI_NAME.source_selector_column]
+    local actions         = editor_column and editor_column[GUI_NAME.source_editor_actions]
+    local confirm         = actions and actions[GUI_NAME.source_editor_confirm_button]
 
-    assert(windows_column and creation_column and title and tabs and confirm, "Main window source editor controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(title and add_button and windows_column and editor_column and selector_column and confirm, "Main window source editor controls must exist here !")      -- [DEBUG-ONLY] . --
 
-    self.rename_target     = nil
-    title.caption          = mode == "edit" and "Edit inventory" or "Create inventory"
-    confirm.caption        = mode == "edit" and "Save" or "Create"
-    tabs.selected_tab_index = 1
-    windows_column.visible = false
-    creation_column.visible = true
+    self.rename_target      = nil
+    title.caption           = mode == "edit" and "Edit inventory" or "Create inventory"
+    add_button.visible      = false
+    windows_column.visible  = false
+    editor_column.visible   = true
+    selector_column.visible = false
+    confirm.caption         = mode == "edit" and "Save" or "Create"
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:showSourceSelector()
+    local frame           = self:getFrame()
+    local title_bar       = frame[GUI_NAME.title_bar]
+    local title           = title_bar and title_bar[GUI_NAME.title]
+    local add_button      = title_bar and title_bar[GUI_NAME.add_button]
+    local windows_column  = frame[GUI_NAME.windows_column]
+    local editor_column   = frame[GUI_NAME.source_editor_column]
+    local selector_column = frame[GUI_NAME.source_selector_column]
+
+    assert(title and add_button and windows_column and editor_column and selector_column, "Main window source selector controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    title.caption           = "Select source"
+    add_button.visible      = false
+    windows_column.visible  = false
+    editor_column.visible   = false
+    selector_column.visible = true
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -736,25 +814,30 @@ end
 
 local factory = {
     exposed_gui_names = {
-        add_button              = GUI_NAME.add_button,
-        close_button            = GUI_NAME.close_button,
-        visibility_switch       = GUI_NAME.visibility_switch,
-        tree_inventory_toggle   = GUI_NAME.tree_inventory_toggle,
-        tree_window_toggle      = GUI_NAME.tree_window_toggle,
-        tree_label              = GUI_NAME.tree_label,
-        tree_name_field         = GUI_NAME.tree_name_field,
-        tree_edit_button        = GUI_NAME.tree_edit_button,
-        tree_confirm_button     = GUI_NAME.tree_confirm_button,
-        tree_cancel_button      = GUI_NAME.tree_cancel_button,
-        tree_visibility_button  = GUI_NAME.tree_visibility_button,
-        tree_lock_button        = GUI_NAME.tree_lock_button,
-        tree_delete_button      = GUI_NAME.tree_delete_button,
-        inventory_id_tag_name   = INVENTORY_ID_TAG_NAME,
-        window_id_tag_name      = WINDOW_ID_TAG_NAME,
-        group_id_tag_name       = GROUP_ID_TAG_NAME,
-        creation_cancel_button  = GUI_NAME.creation_cancel_button,
-        creation_create_button  = GUI_NAME.creation_create_button,
-        shortcut_button         = GUI_NAME.shortcut_button
+        add_button                    = GUI_NAME.add_button,
+        close_button                  = GUI_NAME.close_button,
+        visibility_switch             = GUI_NAME.visibility_switch,
+        tree_inventory_toggle         = GUI_NAME.tree_inventory_toggle,
+        tree_window_toggle            = GUI_NAME.tree_window_toggle,
+        tree_label                    = GUI_NAME.tree_label,
+        tree_name_field               = GUI_NAME.tree_name_field,
+        tree_edit_button              = GUI_NAME.tree_edit_button,
+        tree_confirm_button           = GUI_NAME.tree_confirm_button,
+        tree_cancel_button            = GUI_NAME.tree_cancel_button,
+        tree_visibility_button        = GUI_NAME.tree_visibility_button,
+        tree_lock_button              = GUI_NAME.tree_lock_button,
+        tree_delete_button            = GUI_NAME.tree_delete_button,
+        source_slot_button            = GUI_NAME.source_slot_button,
+        source_editor_cancel_button   = GUI_NAME.source_editor_cancel_button,
+        source_editor_confirm_button  = GUI_NAME.source_editor_confirm_button,
+        source_selector_cancel_button = GUI_NAME.source_selector_cancel_button,
+        source_selector_add_button    = GUI_NAME.source_selector_add_button,
+        inventory_id_tag_name         = INVENTORY_ID_TAG_NAME,
+        window_id_tag_name            = WINDOW_ID_TAG_NAME,
+        group_id_tag_name             = GROUP_ID_TAG_NAME,
+        creation_cancel_button        = GUI_NAME.source_editor_cancel_button,
+        creation_create_button        = GUI_NAME.source_editor_confirm_button,
+        shortcut_button               = GUI_NAME.shortcut_button
     }
 }
 
@@ -929,45 +1012,18 @@ function factory.createGUI(window)                                              
     local visibility_spacer_right = visibility_flow.add({ type = "empty-widget" })
     visibility_spacer_right.style.horizontally_stretchable = true
 
-    local creation_column = frame.add({
+    local source_editor_column = frame.add({
         type      = "flow",
-        name      = GUI_NAME.creation_column,
+        name      = GUI_NAME.source_editor_column,
         direction = "vertical",
         visible   = false
     })
 
-    creation_column.style.horizontally_stretchable = true
-    creation_column.style.vertical_spacing         = 4
+    source_editor_column.style.horizontally_stretchable = true
+    source_editor_column.style.vertical_spacing         = 4
 
-    creation_column.add({
-        type    = "label",
-        name    = GUI_NAME.creation_title,
-        caption = "Create inventory",
-        style   = "frame_title"
-    })
-
-    local tabs = creation_column.add({
-        type = "tabbed-pane",
-        name = GUI_NAME.creation_tabs
-    })
-
-    local source_editor_tab = tabs.add({
-        type    = "tab",
-        name    = GUI_NAME.source_editor_tab,
-        caption = "Sources"
-    })
-
-    local source_editor_panel = tabs.add({
-        type      = "flow",
-        name      = GUI_NAME.source_editor_panel,
-        direction = "vertical"
-    })
-
-    source_editor_panel.style.vertical_spacing = 4
-
-    local source_table_outer = source_editor_panel.add({
+    local source_table_outer = source_editor_column.add({
         type      = "frame",
-        name      = GUI_NAME.source_table_outer_frame,
         direction = "vertical",
         style     = "inside_shallow_frame"
     })
@@ -976,16 +1032,17 @@ function factory.createGUI(window)                                              
 
     local source_table_inner = source_table_outer.add({
         type      = "frame",
-        name      = GUI_NAME.source_table_inner_frame,
         direction = "vertical"
     })
 
     source_table_inner.style.padding = 2
 
     local source_table = source_table_inner.add({
-        type         = "table",
-        name         = GUI_NAME.source_table,
-        column_count = 2
+        type                  = "table",
+        name                  = GUI_NAME.source_table,
+        column_count          = 2,
+        style                 = MOD_PREFIX .. "source-editor-table",
+        draw_horizontal_lines = true
     })
 
     source_table.style.horizontal_spacing = 6
@@ -1007,39 +1064,62 @@ function factory.createGUI(window)                                              
 
     inventory_header.style.minimal_width = 180
 
-    addMockSourceCell(source_table, { window.lua_player.name })
-    addMockSourceCell(source_table, { "Main", "Vehicle" })
-    addMockSourceCell(source_table, { })
-    addMockSourceCell(source_table, { })
-
-    source_editor_panel.add({
-        type    = "label",
-        caption = "The last empty row is kept available for adding another source."
+    addSourceSlotCell(source_table, {
+        {
+            sprite  = "utility/side_menu_players_icon",
+            tooltip = window.lua_player.name
+        },
+        {
+            sprite  = "entity/wooden-chest",
+            number  = 10,
+            tooltip = "Wooden chest × 10"
+        },
+        {
+            sprite  = "entity/car",
+            number  = 2,
+            tooltip = "Car × 2"
+        }
     })
 
-    tabs.add_tab(source_editor_tab, source_editor_panel)
-
-    local source_selector_tab = tabs.add({
-        type    = "tab",
-        name    = GUI_NAME.source_selector_tab,
-        caption = "Select source"
+    addSourceSlotCell(source_table, {
+        {
+            sprite  = "utility/side_menu_players_icon",
+            tooltip = "Character main inventory"
+        },
+        {
+            sprite  = "entity/car",
+            tooltip = "Vehicle main inventory"
+        }
     })
 
-    local source_selector_panel = tabs.add({
+    addSourceSlotCell(source_table, { })
+    addSourceSlotCell(source_table, { })
+
+    addBottomActions(
+        source_editor_column,
+        GUI_NAME.source_editor_actions,
+        GUI_NAME.source_editor_cancel_button,
+        GUI_NAME.source_editor_confirm_button,
+        "Create"
+    )
+
+    local source_selector_column = frame.add({
         type      = "flow",
-        name      = GUI_NAME.source_selector_panel,
-        direction = "vertical"
+        name      = GUI_NAME.source_selector_column,
+        direction = "vertical",
+        visible   = false
     })
 
-    source_selector_panel.style.vertical_spacing = 4
+    source_selector_column.style.horizontally_stretchable = true
+    source_selector_column.style.vertical_spacing         = 4
 
-    source_selector_panel.add({
+    source_selector_column.add({
         type    = "label",
         caption = "Source type",
         style   = "heading_2_label"
     })
 
-    source_selector_panel.add({
+    source_selector_column.add({
         type           = "drop-down",
         name           = GUI_NAME.source_selector_type,
         items          = {
@@ -1052,7 +1132,7 @@ function factory.createGUI(window)                                              
         selected_index = 1
     })
 
-    local selector_frame = source_selector_panel.add({
+    local selector_frame = source_selector_column.add({
         type      = "frame",
         direction = "vertical",
         style     = "inside_shallow_frame"
@@ -1078,43 +1158,13 @@ function factory.createGUI(window)                                              
         state   = true
     })
 
-    source_selector_panel.add({
-        type    = "label",
-        caption = "Other source types are visual placeholders for now."
-    })
-
-    tabs.add_tab(source_selector_tab, source_selector_panel)
-    tabs.selected_tab_index = 1
-
-    local filler = creation_column.add({ type = "empty-widget" })
-    filler.style.vertically_stretchable = true
-
-    local actions = creation_column.add({
-        type      = "flow",
-        name      = GUI_NAME.creation_actions,
-        direction = "horizontal"
-    })
-
-    actions.style.horizontally_stretchable = true
-    actions.style.horizontal_spacing       = 4
-
-    local spacer = actions.add({ type = "empty-widget" })
-    spacer.style.horizontally_stretchable = true
-
-    actions.add({
-        type    = "button",
-        name    = GUI_NAME.creation_cancel_button,
-        caption = "Cancel"
-    })
-
-    actions.add({
-        type    = "button",
-        name    = GUI_NAME.creation_create_button,
-        caption = "Create",
-        style   = "green_button",
-        enabled = false,
-        tooltip = "UI prototype only"
-    })
+    addBottomActions(
+        source_selector_column,
+        GUI_NAME.source_selector_actions,
+        GUI_NAME.source_selector_cancel_button,
+        GUI_NAME.source_selector_add_button,
+        "Add"
+    )
 
     frame.auto_center = true
     window:refresh()
