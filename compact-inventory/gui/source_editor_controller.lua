@@ -110,6 +110,19 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function getSourceSelectorControls(main_window)
+    local selector_column = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_column)
+    local selector_list   = selector_column and findGuiElement(selector_column, GUI_NAME.source_selector_list)
+    local actions         = selector_column and findGuiElement(selector_column, MOD_PREFIX .. "MW_source-selector-actions")
+    local add_button      = actions and actions[GUI_NAME.source_selector_add_button]
+
+    assert(selector_list and add_button, "Player source selector controls must exist here !")      -- [DEBUG-ONLY] . --
+
+    return selector_list, add_button
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function addSlot(parent, name, sprite, number, tooltip, enabled, tags)
     local wrapper = parent.add({
         type      = "flow",
@@ -659,16 +672,15 @@ function SourceEditorController.showSelector(main_window, element)
 
     main_window:showSourceSelector(source_index, source)
 
-    local selector_list = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_list)
-    local checkbox      = selector_list and getFirstCheckbox(selector_list)
-    local add_button    = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_add_button)
-    local already_used  = findPlayerInConfiguration(
+    local selector_list, add_button = getSourceSelectorControls(main_window)
+    local checkbox                  = getFirstCheckbox(selector_list)
+    local already_used              = findPlayerInConfiguration(
         main_window.editor_state.configuration,
         main_window:getPlayer(),
         source_index
     )
 
-    assert(checkbox and add_button, "Player source selector controls must exist here !")      -- [DEBUG-ONLY] . --
+    assert(checkbox, "Player source selector checkbox must exist here !")      -- [DEBUG-ONLY] . --
 
     checkbox.state     = not already_used
     checkbox.enabled   = not already_used
@@ -776,8 +788,8 @@ function SourceEditorController.addSelector(main_window)
 
     assert(editor_state.selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
 
-    local selector_list = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_list)
-    local checkbox      = selector_list and getFirstCheckbox(selector_list)
+    local selector_list = getSourceSelectorControls(main_window)
+    local checkbox      = getFirstCheckbox(selector_list)
 
     assert(checkbox, "Player source selector checkbox must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -830,11 +842,10 @@ function SourceEditorController.refreshSelector(main_window)
         return
     end
 
-    local selector_list = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_list)
-    local checkbox      = selector_list and getFirstCheckbox(selector_list)
-    local add_button    = findGuiElement(main_window:getFrame(), GUI_NAME.source_selector_add_button)
+    local selector_list, add_button = getSourceSelectorControls(main_window)
+    local checkbox                  = getFirstCheckbox(selector_list)
 
-    if checkbox and add_button then
+    if checkbox then
         add_button.enabled = checkbox.state
     end
 end
