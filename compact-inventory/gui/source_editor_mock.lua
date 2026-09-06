@@ -2,8 +2,20 @@
 
 local SourceEditorMock = { }
 
-local SOURCE_TABLE_NAME = MOD_PREFIX .. "MW_source-table"
-local SLOT_COLUMNS       = 10
+local SOURCE_TABLE_NAME          = MOD_PREFIX .. "MW_source-table"
+local SOURCE_TABS_NAME           = MOD_PREFIX .. "MW_creation-tabs"
+local SOURCE_SELECTOR_PANEL_NAME = MOD_PREFIX .. "MW_source-selector-panel"
+local SOURCE_SLOT_BUTTON_NAME    = MOD_PREFIX .. "MW_source-slot-button"
+local SELECTOR_CANCEL_BUTTON     = MOD_PREFIX .. "MW_source-selector-cancel"
+local SELECTOR_ADD_BUTTON        = MOD_PREFIX .. "MW_source-selector-add"
+local CREATE_BUTTON_NAME         = MOD_PREFIX .. "MW_creation-create"
+local SLOT_COLUMNS               = 10
+
+SourceEditorMock.exposed_gui_names = {
+    slot_button            = SOURCE_SLOT_BUTTON_NAME,
+    selector_cancel_button = SELECTOR_CANCEL_BUTTON,
+    selector_add_button    = SELECTOR_ADD_BUTTON
+}
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
@@ -28,6 +40,7 @@ end
 local function addSlot(cell, sprite, number, tooltip)
     local definition = {
         type    = "sprite-button",
+        name    = SOURCE_SLOT_BUTTON_NAME,
         style   = "slot_button",
         tooltip = tooltip
     }
@@ -66,12 +79,70 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function renderSelectorActions(main_window)
+    local selector_panel = findGuiElement(main_window:getFrame(), SOURCE_SELECTOR_PANEL_NAME)
+
+    assert(selector_panel, "Source selector panel must exist here !")      -- [DEBUG-ONLY] . --
+
+    local old_actions = findGuiElement(selector_panel, MOD_PREFIX .. "MW_source-selector-actions")
+
+    if old_actions then
+        old_actions.destroy()
+    end
+
+    local actions = selector_panel.add({
+        type      = "flow",
+        name      = MOD_PREFIX .. "MW_source-selector-actions",
+        direction = "horizontal"
+    })
+
+    actions.style.horizontally_stretchable = true
+    actions.style.horizontal_spacing       = 4
+
+    local spacer = actions.add({ type = "empty-widget" })
+    spacer.style.horizontally_stretchable = true
+
+    actions.add({
+        type    = "button",
+        name    = SELECTOR_CANCEL_BUTTON,
+        caption = "Cancel"
+    })
+
+    actions.add({
+        type    = "button",
+        name    = SELECTOR_ADD_BUTTON,
+        caption = "Add",
+        style   = "green_button"
+    })
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function SourceEditorMock.showEditor(main_window)
+    local tabs = findGuiElement(main_window:getFrame(), SOURCE_TABS_NAME)
+
+    assert(tabs, "Source editor tabs must exist here !")      -- [DEBUG-ONLY] . --
+    tabs.selected_tab_index = 1
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function SourceEditorMock.showSelector(main_window)
+    local tabs = findGuiElement(main_window:getFrame(), SOURCE_TABS_NAME)
+
+    assert(tabs, "Source editor tabs must exist here !")      -- [DEBUG-ONLY] . --
+    tabs.selected_tab_index = 2
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function SourceEditorMock.render(main_window)
     assert(main_window and main_window.object_name == "MainWindow", "Main window must exist here !")      -- [DEBUG-ONLY] . --
 
-    local source_table = findGuiElement(main_window:getFrame(), SOURCE_TABLE_NAME)
+    local source_table  = findGuiElement(main_window:getFrame(), SOURCE_TABLE_NAME)
+    local create_button = findGuiElement(main_window:getFrame(), CREATE_BUTTON_NAME)
 
-    assert(source_table, "Source editor table must exist here !")      -- [DEBUG-ONLY] . --
+    assert(source_table and create_button, "Source editor controls must exist here !")      -- [DEBUG-ONLY] . --
 
     source_table.style = MOD_PREFIX .. "source-editor-table"
     source_table.draw_horizontal_lines = true
@@ -123,6 +194,12 @@ function SourceEditorMock.render(main_window)
 
     addSlotCell(source_table, { })
     addSlotCell(source_table, { })
+
+    create_button.enabled = true
+    create_button.tooltip = nil
+
+    renderSelectorActions(main_window)
+    SourceEditorMock.showEditor(main_window)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
