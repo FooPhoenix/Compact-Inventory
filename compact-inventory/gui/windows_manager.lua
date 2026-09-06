@@ -3,7 +3,6 @@
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local MainWindowFactory        = require("gui.main_window")
-local SourceEditorMock         = require("gui.source_editor_mock")
 local InventoryWindowFactory   = require("gui.inventory_window")
 local InventoryWindowScheduler = require("gui.inventory_window_scheduler")
 local InventoryManagerFactory  = require("inventory.inventory_manager")
@@ -136,9 +135,7 @@ function manager.initializePlayer(player)
 
     inventory_manager:ensureCharacterTracking()
     inventory:createWindow()
-
-    local main_window = MainWindowFactory.create(lua_player)
-    SourceEditorMock.render(main_window)
+    MainWindowFactory.create(lua_player)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -220,7 +217,6 @@ function manager.rebuildGUI(player)
 
     if main_window and main_window.object_name == "MainWindow" then
         MainWindowFactory.createGUI(main_window)
-        SourceEditorMock.render(main_window)
 
         if main_location then
             main_window:getFrame().location = main_location
