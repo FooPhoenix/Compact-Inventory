@@ -201,14 +201,12 @@ local function getInventorySlots(source)
     local slots = { }
 
     for _, inventory_type in ipairs(source.inventory_types or { }) do
-        local sprite = inventory_type == InventoryType.vehicle_main
+        local is_vehicle = inventory_type == InventoryType.vehicle_main
             or inventory_type == InventoryType.vehicle_ammo
             or inventory_type == InventoryType.vehicle_trash
-            and "entity/car"
-            or "utility/side_menu_players_icon"
 
         slots[#slots + 1] = {
-            sprite  = sprite,
+            sprite  = is_vehicle and "entity/car" or "utility/side_menu_players_icon",
             tooltip = getInventoryTypeCaption(inventory_type)
         }
     end
@@ -459,10 +457,6 @@ local function readInventorySelector(main_window)
     local selected_types   = { }
     local include_vehicle  = false
 
-    for _, checkbox in ipairs(inventory_column.children) do
-        -- Checkboxes are nested inside panel flows, so use a recursive scan below.
-    end
-
     local function scan(element)
         if element.type == "checkbox" then
             if element.name == GUI_NAME.current_vehicle_checkbox then
@@ -498,7 +492,7 @@ local function readInventorySelector(main_window)
         selected_types = filtered
     end
 
-    selector_state.inventory_types        = selected_types
+    selector_state.inventory_types         = selected_types
     selector_state.include_current_vehicle = include_vehicle
 end
 
@@ -534,6 +528,24 @@ local function refreshVehicleCheckboxes(main_window)
     end
 
     update(inventory_column)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function refreshInventorySelectorConfirm(main_window)
+    local editor_state   = main_window.editor_state
+    local selector_state = editor_state and editor_state.inventory_selector_state
+
+    if not selector_state then
+        return
+    end
+
+    local inventory_column = getInventorySelectorColumn(main_window)
+    local actions          = inventory_column[GUI_NAME.inventory_selector_actions]
+    local confirm          = actions and actions[GUI_NAME.source_selector_add_button]
+
+    assert(confirm, "Inventory selector confirm button must exist here !")      -- [DEBUG-ONLY] . --
+    confirm.enabled = #selector_state.inventory_types > 0
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -684,9 +696,9 @@ function SourceEditorController.showInventorySelector(main_window, element)
     end
 
     main_window.editor_state.inventory_selector_state = {
-        source_index             = source_index,
-        inventory_types          = selected_types,
-        include_current_vehicle  = containsInventoryType(selected_types, InventoryType.vehicle_main)
+        source_index            = source_index,
+        inventory_types         = selected_types,
+        include_current_vehicle = containsInventoryType(selected_types, InventoryType.vehicle_main)
             or containsInventoryType(selected_types, InventoryType.vehicle_ammo)
             or containsInventoryType(selected_types, InventoryType.vehicle_trash)
     }
@@ -709,6 +721,9 @@ function SourceEditorController.showInventorySelector(main_window, element)
     setEditorContentVisible(main_window, false)
     title.caption   = "Select inventories"
     confirm.caption = #selected_types > 0 and "Save" or "Add"
+
+    readInventorySelector(main_window)
+    refreshInventorySelectorConfirm(main_window)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -742,7 +757,12 @@ function SourceEditorController.addSelector(main_window)
         readInventorySelector(main_window)
 
         local selector_state = editor_state.inventory_selector_state
-        local source         = editor_state.configuration.sources[selector_state.source_index]
+
+        if #selector_state.inventory_types == 0 then
+            return false
+        end
+
+        local source = editor_state.configuration.sources[selector_state.source_index]
 
         assert(source, "Inventory selector source must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -802,6 +822,7 @@ function SourceEditorController.refreshSelector(main_window)
     if editor_state.inventory_selector_state then
         refreshVehicleCheckboxes(main_window)
         readInventorySelector(main_window)
+        refreshInventorySelectorConfirm(main_window)
         return
     end
 
