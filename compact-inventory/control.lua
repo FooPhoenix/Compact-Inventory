@@ -404,7 +404,12 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == source_editor_names.source_slot_button
         and event.button == defines.mouse_button_type.left then
 
-        SourceEditorController.showSelector(WindowsManager.getMainWindow(event.player_index))
+        SourceEditorController.showSelector(WindowsManager.getMainWindow(event.player_index), event.element)
+
+    elseif event.element.name == source_editor_names.inventory_slot_button
+        and event.button == defines.mouse_button_type.left then
+
+        SourceEditorController.showInventorySelector(WindowsManager.getMainWindow(event.player_index), event.element)
 
     elseif event.element.name == source_editor_names.selector_cancel_button then
         SourceEditorController.cancelSelector(WindowsManager.getMainWindow(event.player_index))
