@@ -403,8 +403,14 @@ local function addPlayerInventoryPanel(parent, source, selected_types)
     columns.style.horizontal_spacing = 18
     columns.style.vertical_spacing   = 0
 
-    local character_list = columns.add({
+    local character_wrapper = columns.add({
         type      = "flow",
+        direction = "horizontal"
+    })
+
+    local character_list = character_wrapper.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_list,
         direction = "vertical"
     })
 
@@ -414,8 +420,14 @@ local function addPlayerInventoryPanel(parent, source, selected_types)
         addInventoryCheckbox(character_list, metadata, containsInventoryType(selected_types, metadata.inventory_type))
     end
 
-    local vehicle_list = columns.add({
+    local vehicle_wrapper = columns.add({
         type      = "flow",
+        direction = "horizontal"
+    })
+
+    local vehicle_list = vehicle_wrapper.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_list,
         direction = "vertical"
     })
 
