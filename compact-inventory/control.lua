@@ -518,10 +518,20 @@ script.on_event(defines.events.on_gui_click, function(event)
             end
         end
 
-    elseif event.element.name == main_gui_names.creation_cancel_button
-        or event.element.name == main_gui_names.creation_create_button then
-
+    elseif event.element.name == main_gui_names.creation_cancel_button then
         WindowsManager.getMainWindow(event.player_index):showWindowsList()
+
+    elseif event.element.name == main_gui_names.creation_create_button then
+        local main_window   = WindowsManager.getMainWindow(event.player_index)
+        local editor_state  = main_window.editor_state
+        local configuration = editor_state and editor_state.configuration
+
+        assert(configuration and SourceEditorController.isConfigurationValid(configuration), "Inventory configuration must be valid before creation !")      -- [DEBUG-ONLY] . --
+
+        local inventory = InventoryManagerFactory.get(event.player_index):monitorConfiguration(configuration)
+
+        inventory:createWindow()
+        main_window:showWindowsList()
 
     elseif event.element.name == gui_names.close_button and window then
         ItemGroupMenuFactory.close(event.player_index)
