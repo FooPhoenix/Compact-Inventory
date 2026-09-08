@@ -9,6 +9,7 @@ local InventoryType             = require("inventory.inventory_type")
 local SourceType                = require("inventory.source_type")
 local WindowsManager            = require("gui.windows_manager")
 local SourceEditorController    = require("gui.source_editor_controller")
+local SourceSelectorController  = require("gui.source_selector_controller")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
 local WindowPresetMenuFactory   = require("gui.window_preset_menu")
 local WindowPresetFactory       = require("gui.window_preset")
@@ -388,12 +389,13 @@ script.on_event(defines.events.on_player_created, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local main_gui_names      = WindowsManager.exposed_gui_names.MainWindow
-    local source_editor_names = SourceEditorController.exposed_gui_names
-    local gui_names           = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names          = ItemGroupMenuFactory.exposed_gui_names
-    local preset_menu_names   = WindowPresetMenuFactory.exposed_gui_names
-    local window              = resolveInventoryWindowFromElement(event.player_index, event.element)
+    local main_gui_names       = WindowsManager.exposed_gui_names.MainWindow
+    local source_editor_names  = SourceEditorController.exposed_gui_names
+    local source_selector_names = SourceSelectorController.exposed_gui_names
+    local gui_names            = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names           = ItemGroupMenuFactory.exposed_gui_names
+    local preset_menu_names    = WindowPresetMenuFactory.exposed_gui_names
+    local window               = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
         WindowsManager.getMainWindow(event.player_index):setVisible(false)
@@ -401,10 +403,17 @@ script.on_event(defines.events.on_gui_click, function(event)
     elseif event.element.name == main_gui_names.add_button then
         SourceEditorController.begin(WindowsManager.getMainWindow(event.player_index), "create")
 
+    elseif event.element.name == source_selector_names.vehicle_slot_button then
+        SourceSelectorController.onVehicleSlotClick(
+            WindowsManager.getMainWindow(event.player_index),
+            event.element,
+            event.button
+        )
+
     elseif event.element.name == source_editor_names.source_slot_button
         and event.button == defines.mouse_button_type.left then
 
-        SourceEditorController.showSelector(WindowsManager.getMainWindow(event.player_index), event.element)
+        SourceSelectorController.show(WindowsManager.getMainWindow(event.player_index), event.element)
 
     elseif event.element.name == source_editor_names.inventory_slot_button
         and event.button == defines.mouse_button_type.left then
@@ -412,10 +421,10 @@ script.on_event(defines.events.on_gui_click, function(event)
         SourceEditorController.showInventorySelector(WindowsManager.getMainWindow(event.player_index), event.element)
 
     elseif event.element.name == source_editor_names.selector_cancel_button then
-        SourceEditorController.cancelSelector(WindowsManager.getMainWindow(event.player_index))
+        SourceSelectorController.cancel(WindowsManager.getMainWindow(event.player_index))
 
     elseif event.element.name == source_editor_names.selector_add_button then
-        SourceEditorController.addSelector(WindowsManager.getMainWindow(event.player_index))
+        SourceSelectorController.add(WindowsManager.getMainWindow(event.player_index))
 
     elseif event.element.name == main_gui_names.tree_inventory_toggle then
         WindowsManager.getMainWindow(event.player_index):toggleInventoryExpanded(
@@ -819,7 +828,7 @@ script.on_event(defines.events.on_gui_checked_state_changed, function(event)
     local source_editor_names = SourceEditorController.exposed_gui_names
 
     if event.element.parent and event.element.parent.name == source_editor_names.selector_list then
-        SourceEditorController.refreshSelector(WindowsManager.getMainWindow(event.player_index))
+        SourceSelectorController.refresh(WindowsManager.getMainWindow(event.player_index))
         return
     end
 
@@ -849,6 +858,17 @@ script.on_event(defines.events.on_gui_checked_state_changed, function(event)
 
     if data and data.source then
         main_window:toggleCreationPresetSelection(preset_name)
+    end
+end)
+
+script.on_event(defines.events.on_gui_selection_state_changed, function(event)
+    local source_selector_names = SourceSelectorController.exposed_gui_names
+
+    if event.element.name == source_selector_names.source_type_dropdown then
+        SourceSelectorController.selectType(
+            WindowsManager.getMainWindow(event.player_index),
+            event.element.selected_index
+        )
     end
 end)
 
