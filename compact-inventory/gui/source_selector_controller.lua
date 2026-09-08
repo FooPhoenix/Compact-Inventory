@@ -1,5 +1,6 @@
 local SourceType             = require("inventory.source_type")
 local SourceEditorController = require("gui.source_editor_controller")
+local EntityPreviewWindow    = require("gui.entity_preview_window")
 local WindowsManager         = require("gui.windows_manager")
 
 local SourceSelectorController = { }
@@ -26,6 +27,8 @@ local MAIN_WINDOW_SHORTCUT   = MOD_PREFIX .. "main-window-toggle"
 local VEHICLE_SLOT_COLUMNS   = 10
 local VEHICLE_VISIBLE_ROWS   = 10
 local VEHICLE_SLOT_SIZE      = 40
+local PREVIEW_OFFSET_X       = VEHICLE_SLOT_COLUMNS * VEHICLE_SLOT_SIZE + 24
+local PREVIEW_SIZE           = VEHICLE_VISIBLE_ROWS * VEHICLE_SLOT_SIZE
 
 local SOURCE_TYPES = {
     SourceType.player,
@@ -33,6 +36,9 @@ local SOURCE_TYPES = {
 }
 
 local shortcut_handler
+local preview_hover_handler
+local preview_leave_handler
+local preview_location_handler
 
 SourceSelectorController.exposed_gui_names = {
     source_type_dropdown   = GUI_NAME.source_selector_type,
@@ -237,11 +243,12 @@ local function addVehicleSlot(parent, lua_vehicle, vehicle_index)
     })
 
     local definition = {
-        type    = "sprite-button",
-        name    = GUI_NAME.vehicle_slot_button,
-        style   = "slot_button",
-        tooltip = lua_vehicle and lua_vehicle.name or "Add vehicle",
-        tags    = { }
+        type               = "sprite-button",
+        name               = GUI_NAME.vehicle_slot_button,
+        style              = "slot_button",
+        tooltip            = lua_vehicle and lua_vehicle.name or "Add vehicle",
+        tags               = { },
+        raise_hover_events = lua_vehicle ~= nil
     }
 
     if lua_vehicle then
@@ -485,12 +492,112 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function showVehiclePreview(event)
+    if event.element.name ~= GUI_NAME.vehicle_slot_button then
+        return false
+    end
+
+    local vehicle_index = event.element.tags[VEHICLE_INDEX_TAG]
+
+    if not vehicle_index or not WindowsManager.hasMainWindow(event.player_index) then
+        return false
+    end
+
+    local main_window    = WindowsManager.getMainWindow(event.player_index)
+    local selector_state = main_window.editor_state and main_window.editor_state.selector_state
+    local vehicle_draft  = selector_state and selector_state.drafts and selector_state.drafts[SourceType.vehicle]
+    local lua_vehicle    = vehicle_draft and vehicle_draft.vehicles[vehicle_index] or nil
+
+    if not lua_vehicle or not lua_vehicle.valid or lua_vehicle.object_name ~= "LuaEntity" then
+        return false
+    end
+
+    EntityPreviewWindow.show(main_window:getPlayer(), lua_vehicle, main_window:getFrame(), {
+        size     = PREVIEW_SIZE,
+        offset_x = PREVIEW_OFFSET_X,
+        offset_y = 0
+    })
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function hideVehiclePreview(event)
+    if event.element.name ~= GUI_NAME.vehicle_slot_button then
+        return false
+    end
+
+    local lua_player = game.get_player(event.player_index)
+
+    if not lua_player then
+        return false
+    end
+
+    return EntityPreviewWindow.hide(lua_player)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function installPreviewHandlers()
+    local current_hover_handler = script.get_event_handler(defines.events.on_gui_hover)
+
+    if current_hover_handler ~= preview_hover_handler then
+        local previous_hover_handler = current_hover_handler
+
+        preview_hover_handler = function(event)
+            showVehiclePreview(event)
+
+            if previous_hover_handler then
+                previous_hover_handler(event)
+            end
+        end
+
+        script.on_event(defines.events.on_gui_hover, preview_hover_handler)
+    end
+
+    local current_leave_handler = script.get_event_handler(defines.events.on_gui_leave)
+
+    if current_leave_handler ~= preview_leave_handler then
+        local previous_leave_handler = current_leave_handler
+
+        preview_leave_handler = function(event)
+            hideVehiclePreview(event)
+
+            if previous_leave_handler then
+                previous_leave_handler(event)
+            end
+        end
+
+        script.on_event(defines.events.on_gui_leave, preview_leave_handler)
+    end
+
+    local current_location_handler = script.get_event_handler(defines.events.on_gui_location_changed)
+
+    if current_location_handler ~= preview_location_handler then
+        local previous_location_handler = current_location_handler
+
+        preview_location_handler = function(event)
+            EntityPreviewWindow.onAnchorLocationChanged(event)
+
+            if previous_location_handler then
+                previous_location_handler(event)
+            end
+        end
+
+        script.on_event(defines.events.on_gui_location_changed, preview_location_handler)
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 function SourceSelectorController.show(main_window, element)
     local source_editor_names = SourceEditorController.exposed_gui_names
     local source_index        = element and element.tags[source_editor_names.source_index_tag_name] or nil
     local target_index        = element and element.tags[source_editor_names.source_target_index_tag_name] or nil
     local source              = source_index and main_window.editor_state.configuration.sources[source_index] or nil
 
+    installPreviewHandlers()
     main_window:showSourceSelector(source_index, source)
 
     local selector_state = main_window.editor_state.selector_state
@@ -592,6 +699,7 @@ function SourceSelectorController.cancel(main_window)
 
     assert(editor_state and editor_state.selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
 
+    EntityPreviewWindow.hide(main_window:getPlayer())
     main_window:showSourceEditor()
     SourceEditorController.refresh(main_window)
 end
@@ -645,6 +753,7 @@ function SourceSelectorController.add(main_window)
         }
     end
 
+    EntityPreviewWindow.hide(main_window:getPlayer())
     main_window:showSourceEditor()
     SourceEditorController.refresh(main_window)
 
@@ -665,6 +774,7 @@ function SourceSelectorController.onVehicleSlotClick(main_window, element, butto
 
         assert(vehicles[vehicle_index] ~= nil, "Vehicle draft target must exist here !")      -- [DEBUG-ONLY] . --
 
+        EntityPreviewWindow.hide(main_window:getPlayer())
         table.remove(vehicles, vehicle_index)
         renderVehicleDraft(main_window)
         refreshConfirm(main_window)
@@ -672,6 +782,7 @@ function SourceSelectorController.onVehicleSlotClick(main_window, element, butto
     end
 
     if button == defines.mouse_button_type.left and not vehicle_index then
+        EntityPreviewWindow.hide(main_window:getPlayer())
         return beginVehicleSelection(main_window)
     end
 
