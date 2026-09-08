@@ -21,11 +21,14 @@ local GUI_NAME = {
 
 local VEHICLE_INDEX_TAG      = MOD_PREFIX .. "MW_SourceSelectorVehicleIndex"
 local VEHICLE_SELECTION_TOOL = MOD_PREFIX .. "vehicle-selection-tool"
+local MAIN_WINDOW_SHORTCUT   = MOD_PREFIX .. "main-window-toggle"
 
 local SOURCE_TYPES = {
     SourceType.player,
     SourceType.vehicle
 }
+
+local shortcut_handler
 
 SourceSelectorController.exposed_gui_names = {
     source_type_dropdown   = GUI_NAME.source_selector_type,
@@ -342,6 +345,33 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function installShortcutHandler()
+    local current_handler = script.get_event_handler(defines.events.on_lua_shortcut)
+
+    if current_handler == shortcut_handler then
+        return
+    end
+
+    local previous_handler = current_handler
+
+    shortcut_handler = function(event)
+        if event.prototype_name == MAIN_WINDOW_SHORTCUT
+            and getSelectionSessions()[event.player_index] then
+
+            finishVehicleSelection(event.player_index, true)
+            return
+        end
+
+        if previous_handler then
+            previous_handler(event)
+        end
+    end
+
+    script.on_event(defines.events.on_lua_shortcut, shortcut_handler)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function beginVehicleSelection(main_window)
     local selector_state = main_window.editor_state and main_window.editor_state.selector_state
 
@@ -353,6 +383,8 @@ local function beginVehicleSelection(main_window)
     if not lua_player.clear_cursor() then
         return false
     end
+
+    installShortcutHandler()
 
     local sessions = getSelectionSessions()
     sessions[lua_player.index] = {
