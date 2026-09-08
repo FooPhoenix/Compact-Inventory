@@ -5,6 +5,7 @@ local ContextScope             = require("gui.main_window_context_scope")
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
 local WINDOW_LIST_MAX_HEIGHT = 300      -- Approximately 10 inventory window rows in-game.
+local MAIN_WINDOW_WIDTH      = 460
 local TREE_INDENT            = 16
 local TREE_TOGGLE_WIDTH      = 16
 local TREE_TOGGLE_HEIGHT     = 8
@@ -417,6 +418,12 @@ function metatable:getFrame()
     assert(frame, "Main window GUI frame does not exist !")      -- [DEBUG-ONLY] . --
 
     return frame
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:getWidth()
+    return MAIN_WINDOW_WIDTH
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -988,6 +995,8 @@ function factory.createGUI(window)                                              
         name      = GUI_NAME.main_frame,
         direction = "vertical"
     })
+
+    frame.style.width = MAIN_WINDOW_WIDTH
 
     local title_bar = frame.add({
         type      = "flow",
