@@ -184,13 +184,22 @@ local function buildEntries(configuration)
     local entries = { }
 
     for _, source_configuration in ipairs(configuration.sources) do
-        assert(type(source_configuration) == "table", "Inventory source configuration must be a table !")        -- [DEBUG-ONLY] . --
-        assert(source_configuration.type == SourceType.player, "Inventory source type is not implemented yet !")  -- [DEBUG-ONLY] . --
-        assert(source_configuration.player and source_configuration.player.valid, "Inventory player source must be valid !")  -- [DEBUG-ONLY] . --
-        assert(source_configuration.player.object_name == "LuaPlayer", "Player source must contain a LuaPlayer !")            -- [DEBUG-ONLY] . --
-        assert(type(source_configuration.inventory_types) == "table", "Inventory types must be a table !")                    -- [DEBUG-ONLY] . --
+        assert(type(source_configuration) == "table", "Inventory source configuration must be a table !")      -- [DEBUG-ONLY] . --
+        assert(type(source_configuration.inventory_types) == "table", "Inventory types must be a table !")      -- [DEBUG-ONLY] . --
 
-        local owner = source_configuration.player
+        local owner
+
+        if source_configuration.type == SourceType.player then
+            owner = source_configuration.player
+            assert(owner and owner.valid and owner.object_name == "LuaPlayer", "Player source must contain a valid LuaPlayer !")      -- [DEBUG-ONLY] . --
+        elseif source_configuration.type == SourceType.vehicle then
+            owner = source_configuration.vehicle
+            assert(owner and owner.valid and owner.object_name == "LuaEntity", "Vehicle source must contain a valid LuaEntity !")      -- [DEBUG-ONLY] . --
+            assert(owner.type == "car" or owner.type == "spider-vehicle", "Vehicle source must contain a supported vehicle entity !")  -- [DEBUG-ONLY] . --
+        else
+            assert(false, "Inventory source type is not implemented yet !")      -- [DEBUG-ONLY] . --
+        end
+
         local entry
 
         for _, existing_entry in ipairs(entries) do
