@@ -1,5 +1,6 @@
 local SourceType             = require("inventory.source_type")
 local SourceEditorController = require("gui.source_editor_controller")
+local WindowsManager         = require("gui.windows_manager")
 
 local SourceSelectorController = { }
 
@@ -18,7 +19,8 @@ local GUI_NAME = {
     vehicle_slot_button             = MOD_PREFIX .. "MW_source-selector-vehicle-slot"
 }
 
-local VEHICLE_INDEX_TAG = MOD_PREFIX .. "MW_SourceSelectorVehicleIndex"
+local VEHICLE_INDEX_TAG      = MOD_PREFIX .. "MW_SourceSelectorVehicleIndex"
+local VEHICLE_SELECTION_TOOL = MOD_PREFIX .. "vehicle-selection-tool"
 
 local SOURCE_TYPES = {
     SourceType.player,
@@ -59,6 +61,13 @@ local function copyArray(values)
     end
 
     return result
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getSelectionSessions()
+    storage.source_selection_sessions = storage.source_selection_sessions or { }
+    return storage.source_selection_sessions
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -190,8 +199,8 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function setSelectedPanel(main_window, source_type)
-    local _, panels      = ensureSelectorPanels(main_window)
-    local player_content = panels[GUI_NAME.source_selector_player_content]
+    local _, panels       = ensureSelectorPanels(main_window)
+    local player_content  = panels[GUI_NAME.source_selector_player_content]
     local vehicle_content = panels[GUI_NAME.source_selector_vehicle_content]
 
     assert(player_content and vehicle_content, "Source selector panels must exist here !")      -- [DEBUG-ONLY] . --
@@ -247,6 +256,18 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function containsVehicle(vehicles, lua_vehicle)
+    for _, selected_vehicle in ipairs(vehicles) do
+        if selected_vehicle == lua_vehicle then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function findPlayerInConfiguration(configuration, lua_player, ignored_source_index, ignored_target_index)
     for source_index, source in ipairs(configuration.sources or { }) do
         if source.type == SourceType.player then
@@ -286,8 +307,132 @@ local function refreshConfirm(main_window)
         return
     end
 
-    -- Vehicle selection is intentionally not committable until the empty-slot selection workflow is implemented.
-    add_button.enabled = false
+    local vehicle_draft = selector_state.drafts[SourceType.vehicle]
+    add_button.enabled = vehicle_draft ~= nil and #vehicle_draft.vehicles > 0
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function finishVehicleSelection(player_index, clear_cursor)
+    local sessions = getSelectionSessions()
+    local session  = sessions[player_index]
+
+    if not session then
+        return false
+    end
+
+    sessions[player_index] = nil
+
+    local lua_player = game.get_player(player_index)
+
+    if lua_player and lua_player.valid and clear_cursor then
+        local cursor_stack = lua_player.cursor_stack
+
+        if cursor_stack and cursor_stack.valid_for_read and cursor_stack.name == VEHICLE_SELECTION_TOOL then
+            lua_player.clear_cursor()
+        end
+    end
+
+    if WindowsManager.hasMainWindow(player_index) then
+        WindowsManager.getMainWindow(player_index):setVisible(true)
+    end
+
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function beginVehicleSelection(main_window)
+    local selector_state = main_window.editor_state and main_window.editor_state.selector_state
+
+    assert(selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
+    assert(selector_state.selected_type == SourceType.vehicle, "Vehicle selection requires the Vehicle source type !")      -- [DEBUG-ONLY] . --
+
+    local lua_player = main_window:getPlayer()
+
+    if not lua_player.clear_cursor() then
+        return false
+    end
+
+    local sessions = getSelectionSessions()
+    sessions[lua_player.index] = {
+        source_type    = SourceType.vehicle,
+        selector_state = selector_state,
+        tool            = VEHICLE_SELECTION_TOOL
+    }
+
+    lua_player.cursor_stack.set_stack({
+        name  = VEHICLE_SELECTION_TOOL,
+        count = 1
+    })
+
+    main_window:setVisible(false)
+    return true
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function onVehicleSelection(event)
+    local sessions = getSelectionSessions()
+    local session  = sessions[event.player_index]
+
+    if not session or event.item ~= VEHICLE_SELECTION_TOOL then
+        return
+    end
+
+    local main_window = WindowsManager.hasMainWindow(event.player_index)
+        and WindowsManager.getMainWindow(event.player_index)
+        or nil
+
+    local selector_state = main_window
+        and main_window.editor_state
+        and main_window.editor_state.selector_state
+        or nil
+
+    if selector_state ~= session.selector_state
+        or selector_state.selected_type ~= SourceType.vehicle then
+
+        finishVehicleSelection(event.player_index, true)
+        return
+    end
+
+    local vehicles = selector_state.drafts[SourceType.vehicle].vehicles
+
+    for _, lua_entity in ipairs(event.entities or { }) do
+        if lua_entity.valid
+            and lua_entity.object_name == "LuaEntity"
+            and (lua_entity.type == "car" or lua_entity.type == "spider-vehicle")
+            and not containsVehicle(vehicles, lua_entity) then
+
+            vehicles[#vehicles + 1] = lua_entity
+        end
+    end
+
+    finishVehicleSelection(event.player_index, true)
+    renderVehicleDraft(main_window)
+    refreshConfirm(main_window)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function onCursorStackChanged(event)
+    local session = getSelectionSessions()[event.player_index]
+
+    if not session then
+        return
+    end
+
+    local lua_player  = game.get_player(event.player_index)
+    local cursor_stack = lua_player and lua_player.cursor_stack or nil
+
+    if cursor_stack
+        and cursor_stack.valid_for_read
+        and cursor_stack.name == session.tool then
+
+        return
+    end
+
+    finishVehicleSelection(event.player_index, false)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -416,6 +561,36 @@ function SourceSelectorController.add(main_window)
 
     assert(selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
 
+    if selector_state.selected_type == SourceType.vehicle then
+        local vehicles = selector_state.drafts[SourceType.vehicle].vehicles
+
+        if #vehicles == 0 then
+            return false
+        end
+
+        local sources = editor_state.configuration.sources
+        local source  = selector_state.source_index and sources[selector_state.source_index] or nil
+
+        if source then
+            if source.type ~= SourceType.vehicle then
+                return false
+            end
+
+            source.vehicles = copyArray(vehicles)
+        else
+            sources[#sources + 1] = {
+                type            = SourceType.vehicle,
+                vehicles        = copyArray(vehicles),
+                inventory_types = { },
+                options         = { }
+            }
+        end
+
+        main_window:showSourceEditor()
+        SourceEditorController.refresh(main_window)
+        return true
+    end
+
     if selector_state.selected_type ~= SourceType.player then
         return false
     end
@@ -478,10 +653,29 @@ function SourceSelectorController.onVehicleSlotClick(main_window, element, butto
         return true
     end
 
-    -- Left click on the empty slot is intentionally reserved for the future entity selection workflow.
+    if button == defines.mouse_button_type.left and not vehicle_index then
+        return beginVehicleSelection(main_window)
+    end
+
     return false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function SourceSelectorController.isSelectionActive(player_index)
+    return getSelectionSessions()[player_index] ~= nil
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function SourceSelectorController.cancelSelection(player_index)
+    return finishVehicleSelection(player_index, true)
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+script.on_event(defines.events.on_player_selected_area, onVehicleSelection)
+script.on_event(defines.events.on_player_alt_selected_area, onVehicleSelection)
+script.on_event(defines.events.on_player_cursor_stack_changed, onCursorStackChanged)
 
 return SourceSelectorController
