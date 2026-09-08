@@ -196,6 +196,40 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function getVehicleSlots(source, source_index)
+    local slots = { }
+
+    for target_index, lua_vehicle in ipairs(source.vehicles or { }) do
+        if lua_vehicle and lua_vehicle.valid and lua_vehicle.object_name == "LuaEntity" then
+            slots[#slots + 1] = {
+                sprite  = "entity/" .. lua_vehicle.name,
+                tooltip = lua_vehicle.name,
+                tags    = {
+                    [SOURCE_INDEX_TAG]        = source_index,
+                    [SOURCE_TARGET_INDEX_TAG] = target_index
+                }
+            }
+        end
+    end
+
+    return slots
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function getSourceSlots(source, source_index)
+    if source.type == SourceType.player then
+        return getPlayerSlots(source, source_index)
+    elseif source.type == SourceType.vehicle then
+        return getVehicleSlots(source, source_index)
+    end
+
+    assert(false, "Source editor slots are not implemented for this SourceType !")      -- [DEBUG-ONLY] . --
+    return { }
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function containsInventoryType(inventory_types, inventory_type)
     for _, selected_type in ipairs(inventory_types or { }) do
         if selected_type == inventory_type then
@@ -481,15 +515,52 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
+local function addVehicleInventoryPanel(parent, source, selected_types)
+    local available = getAvailableUiInventoryTypes(source)
+
+    if #available == 0 then
+        return
+    end
+
+    local panel = parent.add({
+        type      = "frame",
+        direction = "vertical",
+        style     = "inside_shallow_frame"
+    })
+
+    panel.style.padding = 6
+
+    panel.add({
+        type    = "label",
+        caption = "Vehicle",
+        style   = "heading_2_label"
+    })
+
+    local list = panel.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_list,
+        direction = "vertical"
+    })
+
+    list.style.vertical_spacing = 4
+
+    for _, metadata in ipairs(available) do
+        addInventoryCheckbox(list, metadata, containsInventoryType(selected_types, metadata.inventory_type))
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
 local function readInventorySelector(main_window)
     local editor_state   = main_window.editor_state
     local selector_state = editor_state and editor_state.inventory_selector_state
 
     assert(selector_state, "Inventory selector state must exist here !")      -- [DEBUG-ONLY] . --
 
+    local source           = editor_state.configuration.sources[selector_state.source_index]
     local inventory_column = getInventorySelectorColumn(main_window)
     local selected_types   = { }
-    local include_vehicle  = false
+    local include_vehicle  = source.type ~= SourceType.player
 
     local function scan(element)
         if element.type == "checkbox" then
@@ -511,7 +582,7 @@ local function readInventorySelector(main_window)
 
     scan(inventory_column)
 
-    if not include_vehicle then
+    if source.type == SourceType.player and not include_vehicle then
         local filtered = { }
 
         for _, inventory_type in ipairs(selected_types) do
@@ -534,6 +605,14 @@ end
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
 local function refreshVehicleCheckboxes(main_window)
+    local editor_state   = main_window.editor_state
+    local selector_state = editor_state and editor_state.inventory_selector_state
+    local source         = selector_state and editor_state.configuration.sources[selector_state.source_index]
+
+    if not source or source.type ~= SourceType.player then
+        return
+    end
+
     local inventory_column = getInventorySelectorColumn(main_window)
     local master           = findGuiElement(inventory_column, GUI_NAME.current_vehicle_checkbox)
 
@@ -596,7 +675,17 @@ function SourceEditorController.getFirstIncompleteSource(configuration)
     end
 
     for source_index, source in ipairs(sources) do
-        if type(source.players) ~= "table" or #source.players == 0 then
+        local targets
+
+        if source.type == SourceType.player then
+            targets = source.players
+        elseif source.type == SourceType.vehicle then
+            targets = source.vehicles
+        else
+            return source_index
+        end
+
+        if type(targets) ~= "table" or #targets == 0 then
             return source_index
         end
 
@@ -656,7 +745,7 @@ function SourceEditorController.refresh(main_window)
         addSlotCell(
             source_table,
             GUI_NAME.source_slot_button,
-            getPlayerSlots(source, source_index),
+            getSourceSlots(source, source_index),
             "Add source target",
             true,
             source_tags
@@ -735,10 +824,12 @@ function SourceEditorController.showInventorySelector(main_window, element)
     main_window.editor_state.inventory_selector_state = {
         source_index            = source_index,
         inventory_types         = selected_types,
-        include_current_vehicle = containsInventoryType(selected_types, InventoryType.vehicle_main)
+        include_current_vehicle = source.type == SourceType.player and (
+            containsInventoryType(selected_types, InventoryType.vehicle_main)
             or containsInventoryType(selected_types, InventoryType.vehicle_ammo)
             or containsInventoryType(selected_types, InventoryType.vehicle_trash)
             or containsInventoryType(selected_types, InventoryType.vehicle_fuel)
+        )
     }
 
     local frame            = main_window:getFrame()
@@ -754,6 +845,10 @@ function SourceEditorController.showInventorySelector(main_window, element)
 
     if source.type == SourceType.player then
         addPlayerInventoryPanel(content, source, selected_types)
+    elseif source.type == SourceType.vehicle then
+        addVehicleInventoryPanel(content, source, selected_types)
+    else
+        assert(false, "Inventory selector UI is not implemented for this SourceType !")      -- [DEBUG-ONLY] . --
     end
 
     setEditorContentVisible(main_window, false)
