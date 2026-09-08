@@ -1,6 +1,7 @@
 local InventoryType       = require("inventory.inventory_type")
 local SourceCapabilities  = require("inventory.source_capabilities")
 local SourceType          = require("inventory.source_type")
+local ContextScope        = require("gui.main_window_context_scope")
 
 local SourceEditorController = { }
 
@@ -22,10 +23,10 @@ local GUI_NAME = {
     current_vehicle_checkbox       = MOD_PREFIX .. "MW_current-vehicle-checkbox"
 }
 
-local SOURCE_SLOT_COLUMNS    = 10
-local SOURCE_INDEX_TAG       = MOD_PREFIX .. "MW_SourceIndex"
+local SOURCE_SLOT_COLUMNS     = 10
+local SOURCE_INDEX_TAG        = MOD_PREFIX .. "MW_SourceIndex"
 local SOURCE_TARGET_INDEX_TAG = MOD_PREFIX .. "MW_SourceTargetIndex"
-local INVENTORY_TYPE_TAG     = MOD_PREFIX .. "MW_InventoryType"
+local INVENTORY_TYPE_TAG      = MOD_PREFIX .. "MW_InventoryType"
 
 local UI_INVENTORY_TYPES = {
     {
@@ -671,7 +672,6 @@ function SourceEditorController.refresh(main_window)
         )
     end
 
-    -- Permanent empty row used to add another source. Inventories stay disabled until a source exists on that row.
     addSlotCell(source_table, GUI_NAME.source_slot_button, { }, "Add source", true)
     addSlotCell(source_table, GUI_NAME.inventory_slot_button, { }, "Select a source first", false)
 
@@ -772,7 +772,7 @@ function SourceEditorController.cancelSelector(main_window)
     assert(editor_state, "Source editor state must exist here !")      -- [DEBUG-ONLY] . --
 
     if editor_state.inventory_selector_state then
-        editor_state.inventory_selector_state = nil
+        main_window:clearContext(ContextScope.inventory_selector)
         restoreEditorView(main_window)
         SourceEditorController.refresh(main_window)
         return
@@ -805,7 +805,7 @@ function SourceEditorController.addSelector(main_window)
         assert(source, "Inventory selector source must exist here !")      -- [DEBUG-ONLY] . --
 
         source.inventory_types = selector_state.inventory_types
-        editor_state.inventory_selector_state = nil
+        main_window:clearContext(ContextScope.inventory_selector)
 
         restoreEditorView(main_window)
         SourceEditorController.refresh(main_window)
