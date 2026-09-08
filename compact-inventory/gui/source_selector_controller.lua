@@ -207,7 +207,7 @@ local function addVehicleSlot(parent, lua_vehicle, vehicle_index)
         type    = "sprite-button",
         name    = GUI_NAME.vehicle_slot_button,
         style   = "slot_button",
-        tooltip = lua_vehicle and lua_vehicle.localised_name or "Add vehicle",
+        tooltip = lua_vehicle and lua_vehicle.name or "Add vehicle",
         tags    = { }
     }
 
