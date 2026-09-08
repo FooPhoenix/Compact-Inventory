@@ -331,7 +331,12 @@ local function refreshConfirm(main_window)
         return
     end
 
-    -- Vehicle sources remain draft-only until their runtime configuration path is implemented.
+    if selector_state.selected_type == SourceType.vehicle then
+        local vehicle_draft = selector_state.drafts[SourceType.vehicle]
+        add_button.enabled = vehicle_draft ~= nil and #vehicle_draft.vehicles > 0
+        return
+    end
+
     add_button.enabled = false
 end
 
@@ -699,40 +704,65 @@ function SourceSelectorController.add(main_window)
 
     assert(selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
 
-    if selector_state.selected_type ~= SourceType.player then
-        return false
-    end
+    local sources = editor_state.configuration.sources
+    local source  = selector_state.source_index and sources[selector_state.source_index] or nil
 
-    local checkbox = findGuiElement(getSelectorColumn(main_window), GUI_NAME.source_selector_player_checkbox)
+    if selector_state.selected_type == SourceType.player then
+        local checkbox = findGuiElement(getSelectorColumn(main_window), GUI_NAME.source_selector_player_checkbox)
 
-    if not checkbox or not checkbox.state then
-        return false
-    end
-
-    local sources    = editor_state.configuration.sources
-    local source     = selector_state.source_index and sources[selector_state.source_index] or nil
-    local lua_player = main_window:getPlayer()
-
-    if source then
-        if source.type ~= SourceType.player then
+        if not checkbox or not checkbox.state then
             return false
         end
 
-        assert(type(source.players) == "table", "Player source must contain a players table !")      -- [DEBUG-ONLY] . --
+        local lua_player = main_window:getPlayer()
 
-        if selector_state.target_index then
-            assert(source.players[selector_state.target_index] ~= nil, "Source target must exist here !")      -- [DEBUG-ONLY] . --
-            source.players[selector_state.target_index] = lua_player
+        if source then
+            if source.type ~= SourceType.player then
+                return false
+            end
+
+            assert(type(source.players) == "table", "Player source must contain a players table !")      -- [DEBUG-ONLY] . --
+
+            if selector_state.target_index then
+                assert(source.players[selector_state.target_index] ~= nil, "Source target must exist here !")      -- [DEBUG-ONLY] . --
+                source.players[selector_state.target_index] = lua_player
+            else
+                source.players[#source.players + 1] = lua_player
+            end
         else
-            source.players[#source.players + 1] = lua_player
+            sources[#sources + 1] = {
+                type            = SourceType.player,
+                players         = { lua_player },
+                inventory_types = { },
+                options         = { }
+            }
+        end
+
+    elseif selector_state.selected_type == SourceType.vehicle then
+        local vehicles = selector_state.drafts[SourceType.vehicle].vehicles
+
+        if #vehicles == 0 then
+            return false
+        end
+
+        local selected_vehicles = copyArray(vehicles)
+
+        if source then
+            if source.type ~= SourceType.vehicle then
+                return false
+            end
+
+            source.vehicles = selected_vehicles
+        else
+            sources[#sources + 1] = {
+                type            = SourceType.vehicle,
+                vehicles        = selected_vehicles,
+                inventory_types = { },
+                options         = { }
+            }
         end
     else
-        sources[#sources + 1] = {
-            type            = SourceType.player,
-            players         = { lua_player },
-            inventory_types = { },
-            options         = { }
-        }
+        return false
     end
 
     EntityPreviewWindow.hide(main_window:getPlayer())
