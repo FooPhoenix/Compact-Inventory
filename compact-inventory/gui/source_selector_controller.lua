@@ -6,7 +6,8 @@ local SourceSelectorController = { }
 local GUI_NAME = {
     source_selector_column          = MOD_PREFIX .. "MW_source-selector-column",
     source_selector_type            = MOD_PREFIX .. "MW_source-selector-type",
-    source_selector_tabs            = MOD_PREFIX .. "MW_source-selector-tabs",
+    source_selector_tabs            = MOD_PREFIX .. "MW_source-selector-tabs",       -- Legacy transient GUI, removed on first use.
+    source_selector_panels          = MOD_PREFIX .. "MW_source-selector-panels",
     source_selector_player_content  = MOD_PREFIX .. "MW_source-selector-player-content",
     source_selector_vehicle_content = MOD_PREFIX .. "MW_source-selector-vehicle-content",
     source_selector_list            = MOD_PREFIX .. "MW_source-selector-list",
@@ -94,41 +95,43 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function ensureTabbedSelector(main_window)
+local function ensureSelectorPanels(main_window)
     local selector_column = getSelectorColumn(main_window)
     local dropdown        = selector_column[GUI_NAME.source_selector_type]
-    local tabbed_pane     = selector_column[GUI_NAME.source_selector_tabs]
+    local panels          = selector_column[GUI_NAME.source_selector_panels]
 
     assert(dropdown, "Source type dropdown must exist here !")      -- [DEBUG-ONLY] . --
 
     dropdown.items = { "Player", "Vehicle" }
 
-    if tabbed_pane then
-        return dropdown, tabbed_pane
+    if panels then
+        return dropdown, panels
     end
 
-    local old_selector_list = findGuiElement(selector_column, GUI_NAME.source_selector_list)
+    local legacy_tabs = selector_column[GUI_NAME.source_selector_tabs]
 
-    if old_selector_list then
-        local old_panel = old_selector_list.parent
-        assert(old_panel, "Legacy source selector panel must exist here !")      -- [DEBUG-ONLY] . --
-        old_panel.destroy()
+    if legacy_tabs then
+        legacy_tabs.destroy()
+    else
+        local old_selector_list = findGuiElement(selector_column, GUI_NAME.source_selector_list)
+
+        if old_selector_list then
+            local old_panel = old_selector_list.parent
+            assert(old_panel, "Legacy source selector panel must exist here !")      -- [DEBUG-ONLY] . --
+            old_panel.destroy()
+        end
     end
 
-    tabbed_pane = selector_column.add({
-        type  = "tabbed-pane",
-        name  = GUI_NAME.source_selector_tabs,
-        index = dropdown.get_index_in_parent() + 1
+    panels = selector_column.add({
+        type      = "flow",
+        name      = GUI_NAME.source_selector_panels,
+        direction = "vertical",
+        index     = dropdown.get_index_in_parent() + 1
     })
 
-    tabbed_pane.style.horizontally_stretchable = true
+    panels.style.horizontally_stretchable = true
 
-    local player_tab = tabbed_pane.add({
-        type    = "tab",
-        caption = "Player"
-    })
-
-    local player_content = tabbed_pane.add({
+    local player_content = panels.add({
         type      = "frame",
         name      = GUI_NAME.source_selector_player_content,
         direction = "vertical",
@@ -156,16 +159,12 @@ local function ensureTabbedSelector(main_window)
         state   = true
     })
 
-    local vehicle_tab = tabbed_pane.add({
-        type    = "tab",
-        caption = "Vehicle"
-    })
-
-    local vehicle_content = tabbed_pane.add({
+    local vehicle_content = panels.add({
         type      = "frame",
         name      = GUI_NAME.source_selector_vehicle_content,
         direction = "vertical",
-        style     = "inside_shallow_frame"
+        style     = "inside_shallow_frame",
+        visible   = false
     })
 
     vehicle_content.style.padding = 4
@@ -185,14 +184,20 @@ local function ensureTabbedSelector(main_window)
     vehicle_table.style.horizontal_spacing = 0
     vehicle_table.style.vertical_spacing   = 0
 
-    tabbed_pane.add_tab(player_tab, player_content)
-    tabbed_pane.add_tab(vehicle_tab, vehicle_content)
+    return dropdown, panels
+end
 
-    -- The dropdown is the visible navigation. Tabs only provide persistent content containers.
-    player_tab.visible  = false
-    vehicle_tab.visible = false
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-    return dropdown, tabbed_pane
+local function setSelectedPanel(main_window, source_type)
+    local _, panels      = ensureSelectorPanels(main_window)
+    local player_content = panels[GUI_NAME.source_selector_player_content]
+    local vehicle_content = panels[GUI_NAME.source_selector_vehicle_content]
+
+    assert(player_content and vehicle_content, "Source selector panels must exist here !")      -- [DEBUG-ONLY] . --
+
+    player_content.visible  = source_type == SourceType.player
+    vehicle_content.visible = source_type == SourceType.vehicle
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -225,8 +230,7 @@ local function renderVehicleDraft(main_window)
     local selector_state = main_window.editor_state and main_window.editor_state.selector_state
     local drafts         = selector_state and selector_state.drafts
     local vehicle_draft  = drafts and drafts[SourceType.vehicle]
-    local selector       = getSelectorColumn(main_window)
-    local vehicle_table  = selector and findGuiElement(selector, GUI_NAME.vehicle_table)
+    local vehicle_table  = findGuiElement(getSelectorColumn(main_window), GUI_NAME.vehicle_table)
 
     assert(vehicle_draft and vehicle_table, "Vehicle source selector draft and table must exist here !")      -- [DEBUG-ONLY] . --
 
@@ -271,9 +275,8 @@ local function refreshConfirm(main_window)
     local add_button = getSelectorActions(main_window)
 
     if selector_state.selected_type == SourceType.player then
-        local selector_column = getSelectorColumn(main_window)
-        local checkbox        = findGuiElement(selector_column, GUI_NAME.source_selector_player_checkbox)
-        local source          = selector_state.source_index
+        local checkbox = findGuiElement(getSelectorColumn(main_window), GUI_NAME.source_selector_player_checkbox)
+        local source   = selector_state.source_index
             and main_window.editor_state.configuration.sources[selector_state.source_index]
             or nil
 
@@ -298,7 +301,7 @@ function SourceSelectorController.show(main_window, element)
     main_window:showSourceSelector(source_index, source)
 
     local selector_state = main_window.editor_state.selector_state
-    local dropdown, tabs = ensureTabbedSelector(main_window)
+    local dropdown       = ensureSelectorPanels(main_window)
     local selected_type  = source and source.type or SourceType.player
 
     if selected_type ~= SourceType.player and selected_type ~= SourceType.vehicle then
@@ -331,9 +334,8 @@ function SourceSelectorController.show(main_window, element)
     checkbox.enabled = not already_used
     selector_state.drafts[SourceType.player].selected = checkbox.state
 
-    local selected_index = getSourceTypeIndex(selected_type)
-    dropdown.selected_index = selected_index
-    tabs.selected_tab_index = selected_index
+    dropdown.selected_index = getSourceTypeIndex(selected_type)
+    setSelectedPanel(main_window, selected_type)
 
     renderVehicleDraft(main_window)
     refreshConfirm(main_window)
@@ -347,12 +349,12 @@ function SourceSelectorController.selectType(main_window, selected_index)
     assert(selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
     assert(SOURCE_TYPES[selected_index] ~= nil, "Selected source type index must be valid !")      -- [DEBUG-ONLY] . --
 
-    local dropdown, tabs = ensureTabbedSelector(main_window)
+    local dropdown = ensureSelectorPanels(main_window)
 
     selector_state.selected_type = SOURCE_TYPES[selected_index]
     dropdown.selected_index      = selected_index
-    tabs.selected_tab_index      = selected_index
 
+    setSelectedPanel(main_window, selector_state.selected_type)
     refreshConfirm(main_window)
 end
 
@@ -418,8 +420,7 @@ function SourceSelectorController.add(main_window)
         return false
     end
 
-    local selector_column = getSelectorColumn(main_window)
-    local checkbox        = findGuiElement(selector_column, GUI_NAME.source_selector_player_checkbox)
+    local checkbox = findGuiElement(getSelectorColumn(main_window), GUI_NAME.source_selector_player_checkbox)
 
     if not checkbox or not checkbox.state then
         return false
