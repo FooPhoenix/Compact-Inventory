@@ -15,6 +15,13 @@ local PLAYER_INVENTORY_TYPES = {
     InventoryType.vehicle_fuel
 }
 
+local VEHICLE_INVENTORY_TYPES = {
+    InventoryType.vehicle_main,
+    InventoryType.vehicle_ammo,
+    InventoryType.vehicle_trash,
+    InventoryType.vehicle_fuel
+}
+
 local SourceCapabilities = { }
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -41,6 +48,8 @@ function SourceCapabilities.getAvailableInventoryTypes(source_configuration)
 
     if source_configuration.type == SourceType.player then
         return copyInventoryTypes(PLAYER_INVENTORY_TYPES)
+    elseif source_configuration.type == SourceType.vehicle then
+        return copyInventoryTypes(VEHICLE_INVENTORY_TYPES)
     end
 
     assert(false, "Source capabilities are not implemented for this SourceType !")      -- [DEBUG-ONLY] . --
