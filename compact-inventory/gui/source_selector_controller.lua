@@ -819,4 +819,6 @@ script.on_event(defines.events.on_player_selected_area, onVehicleSelection)
 script.on_event(defines.events.on_player_alt_selected_area, onVehicleSelection)
 script.on_event(defines.events.on_player_cursor_stack_changed, onCursorStackChanged)
 
+require("gui.vehicle_source_groups").install(SourceEditorController, SourceSelectorController)
+
 return SourceSelectorController
