@@ -67,8 +67,41 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function validateUniquePlayerSelectors(sources)
-    local players = { }
+local function canonicalizeVehicleSource(source_configuration)
+    local vehicles = source_configuration.vehicles
+
+    if vehicles == nil and source_configuration.vehicle ~= nil then
+        vehicles = { source_configuration.vehicle }
+    end
+
+    assert(type(vehicles) == "table" and #vehicles > 0, "Vehicle source must contain at least one vehicle !")      -- [DEBUG-ONLY] . --
+
+    local canonical_vehicles = { }
+
+    for _, lua_vehicle in ipairs(vehicles) do
+        assert(lua_vehicle and lua_vehicle.valid and lua_vehicle.object_name == "LuaEntity", "Vehicle source must contain valid LuaEntity objects !")      -- [DEBUG-ONLY] . --
+        assert(lua_vehicle.type == "car" or lua_vehicle.type == "spider-vehicle", "Vehicle source must contain supported vehicle entities !")                -- [DEBUG-ONLY] . --
+
+        for _, existing_vehicle in ipairs(canonical_vehicles) do
+            assert(existing_vehicle ~= lua_vehicle, "Vehicle source cannot contain the same LuaEntity twice !")      -- [DEBUG-ONLY] . --
+        end
+
+        canonical_vehicles[#canonical_vehicles + 1] = lua_vehicle
+    end
+
+    return {
+        type            = SourceType.vehicle,
+        vehicles        = canonical_vehicles,
+        inventory_types = canonicalizeInventoryTypes(source_configuration.inventory_types),
+        options         = source_configuration.options or { }
+    }
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+local function validateUniqueSelectors(sources)
+    local players  = { }
+    local vehicles = { }
 
     for _, source_configuration in ipairs(sources) do
         if source_configuration.type == SourceType.player then
@@ -79,6 +112,14 @@ local function validateUniquePlayerSelectors(sources)
 
                 players[#players + 1] = lua_player
             end
+        elseif source_configuration.type == SourceType.vehicle then
+            for _, lua_vehicle in ipairs(source_configuration.vehicles) do
+                for _, existing_vehicle in ipairs(vehicles) do
+                    assert(existing_vehicle ~= lua_vehicle, "The same vehicle cannot appear in multiple source descriptors !")      -- [DEBUG-ONLY] . --
+                end
+
+                vehicles[#vehicles + 1] = lua_vehicle
+            end
         end
     end
 end
@@ -88,7 +129,7 @@ end
 --- ### Convert a source configuration to the canonical persistent representation.
 --
 --- The canonical format groups equivalent selectors together. Player sources therefore use `players = { ... }`
---- even when the current caller still provides the legacy single-player `player = ...` placeholder form.
+--- and fixed vehicle sources use `vehicles = { ... }`, even when a caller still provides a unit descriptor.
 --
 function SourceConfiguration.canonicalize(configuration)
     assert(type(configuration) == "table", "Inventory configuration must be a table !")                                  -- [DEBUG-ONLY] . --
@@ -104,12 +145,14 @@ function SourceConfiguration.canonicalize(configuration)
 
         if source_configuration.type == SourceType.player then
             canonical.sources[#canonical.sources + 1] = canonicalizePlayerSource(source_configuration)
+        elseif source_configuration.type == SourceType.vehicle then
+            canonical.sources[#canonical.sources + 1] = canonicalizeVehicleSource(source_configuration)
         else
             assert(false, "Source configuration canonicalization is not implemented for this SourceType !")      -- [DEBUG-ONLY] . --
         end
     end
 
-    validateUniquePlayerSelectors(canonical.sources)
+    validateUniqueSelectors(canonical.sources)
 
     return canonical
 end
@@ -118,7 +161,7 @@ end
 
 --- ### Expand a canonical persistent configuration into the unit descriptors used by the current runtime resolvers.
 --
---- One player descriptor containing N players becomes N runtime descriptors sharing the same InventoryType selection.
+--- Grouped player and vehicle selectors become one runtime descriptor per concrete target.
 --
 function SourceConfiguration.normalize(configuration)
     local canonical = SourceConfiguration.canonicalize(configuration)
@@ -133,6 +176,15 @@ function SourceConfiguration.normalize(configuration)
                 normalized.sources[#normalized.sources + 1] = {
                     type            = SourceType.player,
                     player          = lua_player,
+                    inventory_types = copyArray(source_configuration.inventory_types),
+                    options         = source_configuration.options
+                }
+            end
+        elseif source_configuration.type == SourceType.vehicle then
+            for _, lua_vehicle in ipairs(source_configuration.vehicles) do
+                normalized.sources[#normalized.sources + 1] = {
+                    type            = SourceType.vehicle,
+                    vehicle         = lua_vehicle,
                     inventory_types = copyArray(source_configuration.inventory_types),
                     options         = source_configuration.options
                 }
