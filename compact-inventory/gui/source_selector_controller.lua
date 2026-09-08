@@ -27,7 +27,6 @@ local MAIN_WINDOW_SHORTCUT   = MOD_PREFIX .. "main-window-toggle"
 local VEHICLE_SLOT_COLUMNS   = 10
 local VEHICLE_VISIBLE_ROWS   = 10
 local VEHICLE_SLOT_SIZE      = 40
-local PREVIEW_OFFSET_X       = VEHICLE_SLOT_COLUMNS * VEHICLE_SLOT_SIZE + 24
 local PREVIEW_SIZE           = VEHICLE_VISIBLE_ROWS * VEHICLE_SLOT_SIZE
 
 local SOURCE_TYPES = {
@@ -38,7 +37,6 @@ local SOURCE_TYPES = {
 local shortcut_handler
 local preview_hover_handler
 local preview_leave_handler
-local preview_location_handler
 
 SourceSelectorController.exposed_gui_names = {
     source_type_dropdown   = GUI_NAME.source_selector_type,
@@ -514,7 +512,7 @@ local function showVehiclePreview(event)
 
     EntityPreviewWindow.show(main_window:getPlayer(), lua_vehicle, main_window:getFrame(), {
         size     = PREVIEW_SIZE,
-        offset_x = PREVIEW_OFFSET_X,
+        offset_x = main_window:getWidth(),
         offset_y = 0
     })
 
@@ -570,22 +568,6 @@ local function installPreviewHandlers()
         end
 
         script.on_event(defines.events.on_gui_leave, preview_leave_handler)
-    end
-
-    local current_location_handler = script.get_event_handler(defines.events.on_gui_location_changed)
-
-    if current_location_handler ~= preview_location_handler then
-        local previous_location_handler = current_location_handler
-
-        preview_location_handler = function(event)
-            EntityPreviewWindow.onAnchorLocationChanged(event)
-
-            if previous_location_handler then
-                previous_location_handler(event)
-            end
-        end
-
-        script.on_event(defines.events.on_gui_location_changed, preview_location_handler)
     end
 end
 
