@@ -5,12 +5,6 @@ local GUI_NAME = {
     camera = MOD_PREFIX .. "entity-preview-camera"
 }
 
-local TAG_NAME = {
-    anchor_name = MOD_PREFIX .. "EntityPreviewAnchorName",
-    offset_x    = MOD_PREFIX .. "EntityPreviewOffsetX",
-    offset_y    = MOD_PREFIX .. "EntityPreviewOffsetY"
-}
-
 local DEFAULT_SIZE = 400
 local DEFAULT_ZOOM = 0.75
 
@@ -54,25 +48,6 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-local function updateLocation(frame, anchor_frame)
-    local anchor_location = anchor_frame.location
-
-    if not anchor_location then
-        return false
-    end
-
-    local tags = frame.tags
-
-    frame.location = {
-        x = anchor_location.x + (tags[TAG_NAME.offset_x] or 0),
-        y = anchor_location.y + (tags[TAG_NAME.offset_y] or 0)
-    }
-
-    return true
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
 function EntityPreviewWindow.show(lua_player, lua_entity, anchor_frame, options)
     assert(lua_player and lua_player.valid and lua_player.object_name == "LuaPlayer", "Entity preview requires a valid LuaPlayer !")      -- [DEBUG-ONLY] . --
     assert(lua_entity and lua_entity.valid and lua_entity.object_name == "LuaEntity", "Entity preview requires a valid LuaEntity !")      -- [DEBUG-ONLY] . --
@@ -80,11 +55,13 @@ function EntityPreviewWindow.show(lua_player, lua_entity, anchor_frame, options)
 
     options = options or { }
 
-    local size   = options.size or DEFAULT_SIZE
-    local frame  = getOrCreateFrame(lua_player)
-    local camera = frame[GUI_NAME.camera]
+    local size            = options.size or DEFAULT_SIZE
+    local anchor_location = anchor_frame.location
+    local frame           = getOrCreateFrame(lua_player)
+    local camera          = frame[GUI_NAME.camera]
 
     assert(type(size) == "number" and size > 0, "Entity preview size must be positive !")      -- [DEBUG-ONLY] . --
+    assert(anchor_location ~= nil, "Entity preview anchor must have a screen location !")       -- [DEBUG-ONLY] . --
     assert(camera, "Entity preview camera must exist here !")                                   -- [DEBUG-ONLY] . --
 
     camera.style.width   = size
@@ -94,13 +71,11 @@ function EntityPreviewWindow.show(lua_player, lua_entity, anchor_frame, options)
     camera.zoom          = options.zoom or DEFAULT_ZOOM
     camera.entity        = lua_entity
 
-    frame.tags = {
-        [TAG_NAME.anchor_name] = anchor_frame.name,
-        [TAG_NAME.offset_x]    = options.offset_x or 0,
-        [TAG_NAME.offset_y]    = options.offset_y or 0
+    frame.location = {
+        x = anchor_location.x + (options.offset_x or 0),
+        y = anchor_location.y + (options.offset_y or 0)
     }
 
-    updateLocation(frame, anchor_frame)
     frame.visible = true
     frame.bring_to_front()
 
@@ -126,25 +101,6 @@ function EntityPreviewWindow.hide(lua_player)
 
     frame.visible = false
     return true
-end
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
-
-function EntityPreviewWindow.onAnchorLocationChanged(event)
-    local lua_player = game.get_player(event.player_index)
-    local frame      = lua_player and getFrame(lua_player) or nil
-
-    if not frame or not frame.visible then
-        return false
-    end
-
-    local tags = frame.tags
-
-    if tags[TAG_NAME.anchor_name] ~= event.element.name then
-        return false
-    end
-
-    return updateLocation(frame, event.element)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
