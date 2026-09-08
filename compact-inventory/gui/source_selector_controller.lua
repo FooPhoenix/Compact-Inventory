@@ -307,8 +307,8 @@ local function refreshConfirm(main_window)
         return
     end
 
-    local vehicle_draft = selector_state.drafts[SourceType.vehicle]
-    add_button.enabled = vehicle_draft ~= nil and #vehicle_draft.vehicles > 0
+    -- Vehicle sources remain draft-only until their runtime configuration path is implemented.
+    add_button.enabled = false
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
@@ -422,7 +422,7 @@ local function onCursorStackChanged(event)
         return
     end
 
-    local lua_player  = game.get_player(event.player_index)
+    local lua_player   = game.get_player(event.player_index)
     local cursor_stack = lua_player and lua_player.cursor_stack or nil
 
     if cursor_stack
@@ -560,36 +560,6 @@ function SourceSelectorController.add(main_window)
     local selector_state = editor_state and editor_state.selector_state
 
     assert(selector_state, "Source selector state must exist here !")      -- [DEBUG-ONLY] . --
-
-    if selector_state.selected_type == SourceType.vehicle then
-        local vehicles = selector_state.drafts[SourceType.vehicle].vehicles
-
-        if #vehicles == 0 then
-            return false
-        end
-
-        local sources = editor_state.configuration.sources
-        local source  = selector_state.source_index and sources[selector_state.source_index] or nil
-
-        if source then
-            if source.type ~= SourceType.vehicle then
-                return false
-            end
-
-            source.vehicles = copyArray(vehicles)
-        else
-            sources[#sources + 1] = {
-                type            = SourceType.vehicle,
-                vehicles        = copyArray(vehicles),
-                inventory_types = { },
-                options         = { }
-            }
-        end
-
-        main_window:showSourceEditor()
-        SourceEditorController.refresh(main_window)
-        return true
-    end
 
     if selector_state.selected_type ~= SourceType.player then
         return false
