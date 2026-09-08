@@ -8,6 +8,7 @@ local InventoryManagerFactory   = require("inventory.inventory_manager")
 local InventoryType             = require("inventory.inventory_type")
 local SourceType                = require("inventory.source_type")
 local WindowsManager            = require("gui.windows_manager")
+local ContextScope              = require("gui.main_window_context_scope")
 local SourceEditorController    = require("gui.source_editor_controller")
 local SourceSelectorController  = require("gui.source_selector_controller")
 local ItemGroupMenuFactory      = require("gui.item_group_menu")
@@ -389,16 +390,20 @@ script.on_event(defines.events.on_player_created, function(event)
 end)
 
 script.on_event(defines.events.on_gui_click, function(event)
-    local main_gui_names       = WindowsManager.exposed_gui_names.MainWindow
-    local source_editor_names  = SourceEditorController.exposed_gui_names
+    local main_gui_names        = WindowsManager.exposed_gui_names.MainWindow
+    local source_editor_names   = SourceEditorController.exposed_gui_names
     local source_selector_names = SourceSelectorController.exposed_gui_names
-    local gui_names            = WindowsManager.exposed_gui_names.InventoryWindow
-    local menu_names           = ItemGroupMenuFactory.exposed_gui_names
-    local preset_menu_names    = WindowPresetMenuFactory.exposed_gui_names
-    local window               = resolveInventoryWindowFromElement(event.player_index, event.element)
+    local gui_names             = WindowsManager.exposed_gui_names.InventoryWindow
+    local menu_names            = ItemGroupMenuFactory.exposed_gui_names
+    local preset_menu_names     = WindowPresetMenuFactory.exposed_gui_names
+    local window                = resolveInventoryWindowFromElement(event.player_index, event.element)
 
     if event.element.name == main_gui_names.close_button then
-        WindowsManager.getMainWindow(event.player_index):setVisible(false)
+        local main_window = WindowsManager.getMainWindow(event.player_index)
+
+        main_window:clearContext(ContextScope.working_state)
+        main_window:showWindowsList()
+        main_window:setVisible(false)
 
     elseif event.element.name == main_gui_names.add_button then
         SourceEditorController.begin(WindowsManager.getMainWindow(event.player_index), "create")
@@ -528,7 +533,10 @@ script.on_event(defines.events.on_gui_click, function(event)
         end
 
     elseif event.element.name == main_gui_names.creation_cancel_button then
-        WindowsManager.getMainWindow(event.player_index):showWindowsList()
+        local main_window = WindowsManager.getMainWindow(event.player_index)
+
+        main_window:clearContext(ContextScope.working_state)
+        main_window:showWindowsList()
 
     elseif event.element.name == main_gui_names.creation_create_button then
         local main_window   = WindowsManager.getMainWindow(event.player_index)
@@ -540,6 +548,7 @@ script.on_event(defines.events.on_gui_click, function(event)
         local inventory = InventoryManagerFactory.get(event.player_index):monitorConfiguration(configuration)
 
         inventory:createWindow()
+        main_window:clearContext(ContextScope.working_state)
         main_window:showWindowsList()
 
     elseif event.element.name == gui_names.close_button and window then
