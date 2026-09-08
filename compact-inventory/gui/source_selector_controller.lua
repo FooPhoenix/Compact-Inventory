@@ -15,6 +15,7 @@ local GUI_NAME = {
     source_selector_player_checkbox = MOD_PREFIX .. "MW_source-selector-player-checkbox",
     source_selector_actions         = MOD_PREFIX .. "MW_source-selector-actions",
     source_selector_add_button      = MOD_PREFIX .. "MW_source-selector-add",
+    vehicle_scroll                  = MOD_PREFIX .. "MW_source-selector-vehicle-scroll",
     vehicle_table                   = MOD_PREFIX .. "MW_source-selector-vehicle-table",
     vehicle_slot_button             = MOD_PREFIX .. "MW_source-selector-vehicle-slot"
 }
@@ -22,6 +23,9 @@ local GUI_NAME = {
 local VEHICLE_INDEX_TAG      = MOD_PREFIX .. "MW_SourceSelectorVehicleIndex"
 local VEHICLE_SELECTION_TOOL = MOD_PREFIX .. "vehicle-selection-tool"
 local MAIN_WINDOW_SHORTCUT   = MOD_PREFIX .. "main-window-toggle"
+local VEHICLE_SLOT_COLUMNS   = 10
+local VEHICLE_VISIBLE_ROWS   = 10
+local VEHICLE_SLOT_SIZE      = 40
 
 local SOURCE_TYPES = {
     SourceType.player,
@@ -187,10 +191,22 @@ local function ensureSelectorPanels(main_window)
         style   = "heading_2_label"
     })
 
-    local vehicle_table = vehicle_content.add({
+    local vehicle_scroll = vehicle_content.add({
+        type                     = "scroll-pane",
+        name                     = GUI_NAME.vehicle_scroll,
+        direction                = "vertical",
+        vertical_scroll_policy   = "auto",
+        horizontal_scroll_policy = "never"
+    })
+
+    vehicle_scroll.style.padding                  = 0
+    vehicle_scroll.style.maximal_height           = VEHICLE_VISIBLE_ROWS * VEHICLE_SLOT_SIZE
+    vehicle_scroll.style.horizontally_stretchable = true
+
+    local vehicle_table = vehicle_scroll.add({
         type         = "table",
         name         = GUI_NAME.vehicle_table,
-        column_count = 10
+        column_count = VEHICLE_SLOT_COLUMNS
     })
 
     vehicle_table.style.horizontal_spacing = 0
