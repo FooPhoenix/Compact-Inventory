@@ -1,5 +1,6 @@
 
 local InventoryManagerFactory = require("inventory.inventory_manager")
+local ContextScope             = require("gui.main_window_context_scope")
 
 -- [REFERENCE] Documentation      : https://luals.github.io/wiki/annotations/   --
 
@@ -758,8 +759,6 @@ function metatable:showWindowsList()
     assert(title and add_button and windows_column and editor_column and selector_column, "Main window context controls must exist here !")      -- [DEBUG-ONLY] . --
 
     self:refresh()
-    self.rename_target      = nil
-    self.editor_state       = nil
     title.caption           = "Compact Inventory"
     add_button.visible      = true
     windows_column.visible  = true
@@ -791,7 +790,7 @@ function metatable:showSourceEditor(mode, configuration, target_inventory_id)
 
     if self.editor_state then
         assert(self.editor_state.selector_state ~= nil, "Source editor state must only be reused when leaving the source selector !")      -- [DEBUG-ONLY] . --
-        self.editor_state.selector_state = nil
+        self:clearContext(ContextScope.source_selector)
         mode = self.editor_state.mode
     else
         self.editor_state = {
@@ -859,15 +858,30 @@ end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
 
-function metatable:setVisible(visible)
-    assert(type(visible) == "boolean", "Main window visibility must be a boolean !")      -- [DEBUG-ONLY] . --
+function metatable:clearContext(scope)
+    assert(scope == ContextScope.working_state
+        or scope == ContextScope.source_selector
+        or scope == ContextScope.inventory_selector, "Main window context scope must be valid !")      -- [DEBUG-ONLY] . --
 
-    if visible then
-        self:showWindowsList()
-    else
+    if scope == ContextScope.working_state then
         self.rename_target = nil
         self.editor_state  = nil
+        return
     end
+
+    assert(self.editor_state ~= nil, "Main window editor state must exist here !")      -- [DEBUG-ONLY] . --
+
+    if scope == ContextScope.source_selector then
+        self.editor_state.selector_state = nil
+    else
+        self.editor_state.inventory_selector_state = nil
+    end
+end
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ --
+
+function metatable:setVisible(visible)
+    assert(type(visible) == "boolean", "Main window visibility must be a boolean !")      -- [DEBUG-ONLY] . --
 
     self:getFrame().visible = visible
     self:getPlayer().set_shortcut_toggled(GUI_NAME.shortcut_button, visible)
